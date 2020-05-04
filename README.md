@@ -4,9 +4,23 @@ This repository collects some statistical tools we might use during projects of 
 Durham 2020 
 matias.di.martino.uy@gmail.com  
 
-
 ## Index:
 For the moment, just follow the python nootbook notebooks/dev.ipynb, it is pretty self-explanatory. 
+
+## Repository tree.
+"""
+├── LICENSE
+├── README.md
+├── notebooks
+│   ├── dev.ipynb
+│   ├── figs
+│   └── media
+├── requirements.txt
+├── slides.key
+└── tools
+    ├── create_data.py
+    └── stats.py
+"""
 
 ## License information.
 
