@@ -8,7 +8,7 @@ matias.di.martino.uy@gmail.com
 For the moment, just follow the python nootbook notebooks/dev.ipynb, it is pretty self-explanatory. 
 
 ## Repository tree.
-"""
+```
 ├── LICENSE
 ├── README.md
 ├── notebooks
@@ -20,7 +20,7 @@ For the moment, just follow the python nootbook notebooks/dev.ipynb, it is prett
 └── tools
     ├── create_data.py
     └── stats.py
-"""
+```
 
 ## License information.
 
