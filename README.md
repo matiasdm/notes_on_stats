@@ -11,50 +11,47 @@ For the moment, just follow the python nootbook notebooks/dev.ipynb, it is prett
 ```
 ├── LICENSE
 ├── README.md
-├── notebooks
-│   ├── dev.ipynb
-│   ├── figs
-│   └── media
-├── requirements.txt
-├── slides.key
-└── tools
-    ├── create_data.py
-    └── stats.py
+├── enviroment.yml
+├── doc
+    ├── sections
+        ├── secX.ipynb
+        └── Sections files (md or notebooks)
+    ├── figs
+    └── tools
+        ├── fileX.py 
+        └── python source code. 
 ```
 
 ## License information.
+This code can be openly used for educational and research porpoises, any commercial use is env
 
 ## Installation Instructions.
-0. Prerequisited:
-- Python 3, pip, and virtualenvwrapper (if you don't have them installed look at the next section for instructions). 
-1. Prepare your python environment.  
-$mkvirtualenv ENVNAME -p python3 &nbsp; &nbsp; &nbsp; _create your virtual environment_.  
-$workon ENVNAME &nbsp; &nbsp; &nbsp; _use your brand new virtual environment_.  
-$pip install -r requirements.txt &nbsp; &nbsp; &nbsp; _install python libraries_.  
-2. Get our code.  
-$git clone XXXXXX  
+### Creating an Conda Environment
+The conda environment is provided as `environment.yml`. 
+
+1. `conda env create -f environment.yml`
+2. `conda activate stats`
+
+### Building a Jupyter Book
+Run the following command in your terminal:
+```bash
+jb build doc/
+```
+
+If you would like to work with a clean build, you can empty the build folder by running:
+
+```bash
+jb clean doc/
+```
+
+If jupyter execution is cached, this command will not delete the cached folder. 
+To remove the build folder (including `cached` executables), you can run:
+
+```bash
+jb clean --all doc/
+```
+
 
 ## References.
 
-
-
-## Installing pre-requisites: (this is for mac, if you are in linux is similar, in windows idk)
-Install python:  
-$brew install python.  
-Check that it is correctly installed. 
-$python3 --version.     
-$Python 3.x.x     
-
-Install pip:  
-$sudo easy_install pip    
-
-Install virtualenvwrapper:
-$sudo pip install virtualenvwrapper   (maybe you have to use pip3 to install it in python3)
-
-Finally add Shell Startup File
-Add three lines to your shell startup file (.zshrc, .bashrc, .profile, etc.) to set the location where the virtual environments should live, the location of your development project directories, and the location of the script installed with this package:
-
-export WORKON_HOME=$HOME/.virtualenvs
-export PROJECT_HOME=$HOME/Devel
-source /usr/local/bin/virtualenvwrapper.sh
 
