@@ -29,7 +29,7 @@ This code can be openly used for educational and research porpoises, any commerc
 ### Creating an Conda Environment
 The conda environment is provided as `environment.yml`. 
 
-1. `conda env create -f environment.yml`
+1. `conda env create --file environment.yml`
 2. `conda activate stats`
 
 ### Building a Jupyter Book
