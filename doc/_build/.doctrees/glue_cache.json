@@ -1,0 +1,20 @@
+{
+  "sections/bayes": {
+    "hist_head_turn_lab": {
+      "data": {
+        "application/papermill.record/image/png": null,
+        "application/papermill.record/text/plain": "<Figure size 432x288 with 1 Axes>"
+      },
+      "metadata": {
+        "scrapbook": {
+          "mime_prefix": "application/papermill.record/",
+          "name": "hist_head_turn_lab"
+        },
+        "filenames": {
+          "image/png": "/Users/matiasdimartino/Dropbox/Work/research/2020/notes_on_stats/doc/_build/jupyter_execute/sections/bayes_5_0.png"
+        }
+      },
+      "output_type": "display_data"
+    }
+  }
+}
