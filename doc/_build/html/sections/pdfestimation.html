@@ -1,0 +1,1190 @@
+
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta charset="utf-8" />
+    <title>Estimation of PDF and CDF distributions &#8212; Notes on stats</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.11.2/css/all.min.css" integrity="sha384-KA6wR/X5RY4zFAHpv/CnoG2UW1uogYfdnP67Uv7eULvTveboZJg0qUpmJZb5VqzN" crossorigin="anonymous">
+    <link href="../_static/css/index.css" rel="stylesheet">
+    <link rel="stylesheet" href="../_static/sphinx-book-theme.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+    <link rel="stylesheet" type="text/css" href="../_static/togglebutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/copybutton.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/mystnb.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-thebe.css" />
+    <link rel="stylesheet" type="text/css" href="../_static/sphinx-dropdown.css" />
+    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+    <script src="../_static/sphinx-book-theme.js"></script>
+    <script src="../_static/jquery.js"></script>
+    <script src="../_static/underscore.js"></script>
+    <script src="../_static/doctools.js"></script>
+    <script src="../_static/language_data.js"></script>
+    <script src="../_static/togglebutton.js"></script>
+    <script src="../_static/clipboard.min.js"></script>
+    <script src="../_static/copybutton.js"></script>
+    <script src="../_static/sphinx-book-theme.js"></script>
+    <script >var togglebuttonSelector = '.toggle, .admonition.dropdown, .tag_hide_input div.cell_input, .tag_hide-input div.cell_input, .tag_hide_output div.cell_output, .tag_hide-output div.cell_output, .tag_hide_cell.cell, .tag_hide-cell.cell';</script>
+    <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script type="text/x-mathjax-config">MathJax.Hub.Config({"tex2jax": {"inlineMath": [["\\(", "\\)"]], "displayMath": [["\\[", "\\]"]], "processRefs": false, "processEnvironments": false}})</script>
+    <script async="async" src="https://unpkg.com/thebelab@latest/lib/index.js"></script>
+    <script >
+        const thebe_selector = ".thebe"
+        const thebe_selector_input = "pre"
+        const thebe_selector_output = ".output"
+    </script>
+    <script async="async" src="../_static/sphinx-thebe.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="Hypothesis testing and effect size" href="hypothesisTesting.html" />
+    <link rel="prev" title="Introduction to Bayesian Inference" href="bayes.html" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="docsearch:language" content="en">
+
+
+
+  </head>
+  <body data-spy="scroll" data-target="#bd-toc-nav" data-offset="80">
+    
+
+    <div class="container-xl">
+      <div class="row">
+          
+<div class="col-12 col-md-3 bd-sidebar site-navigation show" id="site-navigation">
+    
+        <div class="navbar-brand-box">
+<a class="navbar-brand text-wrap" href="../index.html">
+  
+  <img src="../_static/logo.png" class="logo" alt="logo">
+  
+  
+  <h1 class="site-logo" id="site-title">Notes on stats</h1>
+  
+</a>
+</div>
+
+<form class="bd-search d-flex align-items-center" action="../search.html" method="get">
+  <i class="icon fas fa-search"></i>
+  <input type="search" class="form-control" name="q" id="search-input" placeholder="Search this book..." aria-label="Search this book..." autocomplete="off" >
+</form>
+
+<nav class="bd-links" id="bd-docs-nav" aria-label="Main navigation">
+  <ul class="current nav sidenav_l1">
+ <li class="toctree-l1">
+  <a class="reference internal" href="bayes.html">
+   Introduction to Bayesian Inference
+  </a>
+ </li>
+ <li class="toctree-l1 current active">
+  <a class="current reference internal" href="#">
+   Estimation of PDF and CDF distributions
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="hypothesisTesting.html">
+   Hypothesis testing and effect size
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="complexity.html">
+   Time signals complexity
+  </a>
+ </li>
+ <li class="toctree-l1">
+  <a class="reference internal" href="bibliography.html">
+   Bibliography
+  </a>
+ </li>
+</ul>
+
+</nav>
+
+ <!-- To handle the deprecated key -->
+
+<div class="navbar_extra_footer">
+  Powered by <a href="https://jupyterbook.org">Jupyter Book</a>
+</div>
+
+</div>
+
+
+          
+
+
+          
+<main class="col py-md-3 pl-md-4 bd-content overflow-auto" role="main">
+    
+    <div class="row topbar fixed-top container-xl">
+    <div class="col-12 col-md-3 bd-topbar-whitespace site-navigation show">
+    </div>
+    <div class="col pl-2 topbar-main">
+        
+        <button id="navbar-toggler" class="navbar-toggler ml-0" type="button" data-toggle="collapse"
+            data-toggle="tooltip" data-placement="bottom" data-target=".site-navigation" aria-controls="navbar-menu"
+            aria-expanded="true" aria-label="Toggle navigation" aria-controls="site-navigation"
+            title="Toggle navigation" data-toggle="tooltip" data-placement="left">
+            <i class="fas fa-bars"></i>
+            <i class="fas fa-arrow-left"></i>
+            <i class="fas fa-arrow-up"></i>
+        </button>
+        
+        <div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn" aria-label="Download this page"><i
+            class="fas fa-download"></i></button>
+
+    
+    <div class="dropdown-buttons">
+        <!-- ipynb file if we had a myst markdown file -->
+        
+        <!-- Download raw file -->
+        <a class="dropdown-buttons" href="../_sources/sections/pdfestimation.ipynb"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Download source file" data-toggle="tooltip"
+                data-placement="left">.ipynb</button></a>
+        <!-- Download PDF via print -->
+        <button type="button" id="download-print" class="btn btn-secondary topbarbtn" title="Print to PDF"
+            onClick="window.print()" data-toggle="tooltip" data-placement="left">.pdf</button>
+    </div>
+    
+</div>
+        <!-- Source interaction buttons -->
+
+
+        <!-- Full screen (wrap in <a> to have style consistency -->
+        <a class="full-screen-button"><button type="button" class="btn btn-secondary topbarbtn" data-toggle="tooltip"
+                data-placement="bottom" onclick="toggleFullScreen()" title="Fullscreen mode"><i
+                    class="fas fa-expand"></i></button></a>
+
+        <!-- Launch buttons -->
+
+<div class="dropdown-buttons-trigger">
+    <button id="dropdown-buttons-trigger" class="btn btn-secondary topbarbtn"
+        aria-label="Launch interactive content"><i class="fas fa-rocket"></i></button>
+    <div class="dropdown-buttons">
+        
+        <a class="binder-button" href="https://mybinder.org/v2/gh/executablebooks/jupyter-book/master?urlpath=tree/sections/pdfestimation.ipynb"><button type="button"
+                class="btn btn-secondary topbarbtn" title="Launch Binder" data-toggle="tooltip"
+                data-placement="left"><img class="binder-button-logo"
+                    src="../_static/images/logo_binder.svg"
+                    alt="Interact on binder">Binder</button></a>
+        
+        
+        
+        <a class="colab-button" href="https://colab.research.google.com/github/executablebooks/jupyter-book/blob/master/sections/pdfestimation.ipynb"><button type="button" class="btn btn-secondary topbarbtn"
+                title="Launch Colab" data-toggle="tooltip" data-placement="left"><img class="colab-button-logo"
+                    src="../_static/images/logo_colab.png"
+                    alt="Interact on Colab">Colab</button></a>
+        
+        
+    </div>
+</div>
+
+    </div>
+
+    <!-- Table of contents -->
+    <div class="d-none d-md-block col-md-2 bd-toc show">
+        <div class="tocsection onthispage pt-5 pb-3">
+            <i class="fas fa-list"></i> Contents
+        </div>
+        <nav id="bd-toc-nav">
+            <ul class="nav section-nav flex-column">
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#cdf-definition">
+   CDF Definition
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#pdf-definition">
+   PDF definition
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#cdf-confidence-intervals">
+   CDF confidence intervals
+  </a>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#pdf-confidence-intervals">
+   PDF confidence intervals
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#setting-the-optimal-number-of-histograms">
+     Setting the optimal number of histograms
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#confidence-intervals-associated-to-a-pdf-estimation">
+     Confidence intervals associated to a pdf estimation
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#kernel-based-density-estimation">
+     Kernel-based density estimation
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#confidence-associated-with-a-kernel-estimation">
+     Confidence associated with a kernel estimation
+    </a>
+   </li>
+  </ul>
+ </li>
+ <li class="toc-h2 nav-item toc-entry">
+  <a class="reference internal nav-link" href="#parameter-estimation">
+   Parameter estimation
+  </a>
+  <ul class="nav section-nav flex-column">
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#a-general-framework">
+     A general framework
+    </a>
+   </li>
+   <li class="toc-h3 nav-item toc-entry">
+    <a class="reference internal nav-link" href="#bootstrap-method">
+     Bootstrap method
+    </a>
+    <ul class="nav section-nav flex-column">
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#estimating-the-variance">
+       Estimating the variance
+      </a>
+     </li>
+     <li class="toc-h4 nav-item toc-entry">
+      <a class="reference internal nav-link" href="#bootstrap-confidence-intervals">
+       Bootstrap confidence intervals
+      </a>
+     </li>
+    </ul>
+   </li>
+  </ul>
+ </li>
+</ul>
+
+        </nav>
+    </div>
+</div>
+    <div id="main-content" class="row">
+        <div class="col-12 col-md-9 pl-md-3 pr-md-0">
+        
+              <div>
+                
+  <div class="section" id="estimation-of-pdf-and-cdf-distributions">
+<span id="sec-pdf-estimation"></span><h1>Estimation of PDF and CDF distributions<a class="headerlink" href="#estimation-of-pdf-and-cdf-distributions" title="Permalink to this headline">¶</a></h1>
+<p>Continue from here updating this notebook.</p>
+<div class="cell tag_hide-cell tag_remove-output docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># import pre-installed packages and init. </span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">import</span> <span class="nn">pandas</span> <span class="k">as</span> <span class="nn">pd</span> 
+<span class="kn">import</span> <span class="nn">os</span> 
+<span class="kn">import</span> <span class="nn">matplotlib.pyplot</span> <span class="k">as</span> <span class="nn">plt</span>
+<span class="kn">import</span> <span class="nn">matplotlib</span> <span class="k">as</span> <span class="nn">mpl</span>
+<span class="kn">import</span> <span class="nn">seaborn</span> <span class="k">as</span> <span class="nn">sns</span>
+<span class="kn">import</span> <span class="nn">sys</span> 
+<span class="kn">from</span> <span class="nn">myst_nb</span> <span class="kn">import</span> <span class="n">glue</span>
+
+<span class="c1"># add tools path and import our own tools</span>
+<span class="n">sys</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="s1">&#39;../tools&#39;</span><span class="p">)</span>
+<span class="o">%</span><span class="k">load_ext</span> autoreload
+<span class="o">%</span><span class="k">autoreload</span> 2
+<span class="n">mpl</span><span class="o">.</span><span class="n">rcParams</span><span class="o">.</span><span class="n">update</span><span class="p">({</span><span class="s1">&#39;font.size&#39;</span><span class="p">:</span> <span class="mi">14</span><span class="p">})</span>
+
+<span class="k">class</span> <span class="nc">color</span><span class="p">:</span>
+   <span class="n">PURPLE</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\033</span><span class="s1">[95m&#39;</span>
+   <span class="n">CYAN</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\033</span><span class="s1">[96m&#39;</span>
+   <span class="n">DARKCYAN</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\033</span><span class="s1">[36m&#39;</span>
+   <span class="n">BLUE</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\033</span><span class="s1">[94m&#39;</span>
+   <span class="n">GREEN</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\033</span><span class="s1">[92m&#39;</span>
+   <span class="n">YELLOW</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\033</span><span class="s1">[93m&#39;</span>
+   <span class="n">RED</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\033</span><span class="s1">[91m&#39;</span>
+   <span class="n">BOLD</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\033</span><span class="s1">[1m&#39;</span>
+   <span class="n">UNDERLINE</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\033</span><span class="s1">[4m&#39;</span>
+   <span class="n">END</span> <span class="o">=</span> <span class="s1">&#39;</span><span class="se">\033</span><span class="s1">[0m&#39;</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>We will consider the illustrative example introduced in Section <a class="reference internal" href="bayes.html#sec-introduction-to-bayesian-inference"><span class="std std-ref">Introduction to Bayesian Inference</span></a>, please check that section for details. In short, the illustrative example consist on measuring a quantity X and predicting a label Y; in this toy example, X represent a feature we measure, and Y a binary variable associated to the diagnosis of ASD.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Let us create some toy data:</span>
+<span class="kn">from</span> <span class="nn">create_data</span> <span class="kn">import</span> <span class="n">create_headturn_toy_example</span>
+<span class="n">X_u</span><span class="p">,</span> <span class="n">Y_u</span> <span class="o">=</span> <span class="n">create_headturn_toy_example</span><span class="p">(</span><span class="n">num_points</span><span class="o">=</span><span class="mf">1e5</span><span class="p">,</span> <span class="n">prop_positive</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
+<span class="n">X</span><span class="p">,</span> <span class="n">Y</span> <span class="o">=</span> <span class="n">create_headturn_toy_example</span><span class="p">(</span><span class="n">num_points</span><span class="o">=</span><span class="mf">1e3</span><span class="p">,</span> <span class="n">prop_positive</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<p>In Section <a class="reference internal" href="bayes.html#sec-introduction-to-bayesian-inference"><span class="std std-ref">Introduction to Bayesian Inference</span></a>, we discussed how to use the marginal probabilities <span class="math notranslate nohighlight">\(P(X|Y)\)</span> to assess the diagnosis power of a feature “X” and, in particular, how to correctly measure performance in the context of imbalanced classes. During that discussion, we assumed <span class="math notranslate nohighlight">\(P(X|Y)\)</span> was known, or more precisely, we assumed that a histogram of empirical observations was a <em>good approximation</em> of the probability density function (PDF). This might or not be true; we need to analyze when a histogram is a good approximation of a PDF, and provide a formal numerical assessment for “<em>good approximation</em>.”</p>
+<p>In the present section, we address most of the problems stated above. We provide quantitative indications of when a histogram is a good approximation of a PDF, and we show how to compute the optimal number of bins (or histogram resolution). We show how to calculate confidence intervals associated with empirical histograms. Also, we discuss the “Bootstrap” method, which is arguably one of the most robust and versatile techniques to estimate confidence intervals. Finally, we discuss the problem of estimating the parameters of a distribution.</p>
+<div class="section" id="cdf-definition">
+<span id="sec-cdf-definition"></span><h2>CDF Definition<a class="headerlink" href="#cdf-definition" title="Permalink to this headline">¶</a></h2>
+<p>Let <span class="math notranslate nohighlight">\(X_1,...,X_n \sim F\)</span> be an IID sample with distribution <span class="math notranslate nohighlight">\(F\)</span>. IID states for “independent identically distributed,” i.e., all the samples are independent realizations of the same phenomenon. For example, consider the illustrative case introduced in Section <a class="reference internal" href="bayes.html#sec-introduction-to-bayesian-inference"><span class="std std-ref">Introduction to Bayesian Inference</span></a>. We measure for <span class="math notranslate nohighlight">\(n\)</span> children in the ASD group their head-turn delay after a name call. All these events will be independent of each other, and all can be seen as a realization of a distribution <span class="math notranslate nohighlight">\(F\)</span>. The CDF <span class="math notranslate nohighlight">\(F(x)\)</span> is formally defined as <span class="math notranslate nohighlight">\(P(X\leq x)\)</span>, in this example, the probability that child responds with a delay less than or equal to <span class="math notranslate nohighlight">\(x\)</span>. <span class="math notranslate nohighlight">\(F\)</span> is unknown in practice, but in this toy example, we are simulating it. Since we have two different groups, we have two distributions <span class="math notranslate nohighlight">\(F_{ASD}\)</span> and <span class="math notranslate nohighlight">\(F_{non-ASD}\)</span>. In this section, we are not focusing on distinguishing them but rather on how well we can approximate each. Hence, for the rest of the section, let us focus on a single one, for example, <span class="math notranslate nohighlight">\(F\stackrel{def}{=}F_{ASD}\)</span>.</p>
+<p>The <strong>empirical distribution function</strong> <span class="math notranslate nohighlight">\(\hat{F}\)</span> is defined as:</p>
+<div class="math notranslate nohighlight" id="equation-eq-cdf-definition">
+<span class="eqno">(4)<a class="headerlink" href="#equation-eq-cdf-definition" title="Permalink to this equation">¶</a></span>\[
+\hat{F}(x) = \frac{1}{n} \sum_{i=1}^{n} I(X_i \leq x)
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(I(X_i \leq x) = 1\)</span> if <span class="math notranslate nohighlight">\(X_i\leq x\)</span>, <span class="math notranslate nohighlight">\(0\)</span> otherwise.</p>
+<p>For example, <a class="reference internal" href="#fig-cdf-empirical-approximation"><span class="std std-numref">Fig. 4</span></a> shows for our toy example, the ground truth, and the empirical CDF estimated for 10, 20, and 200 observed samples.</p>
+<div class="cell tag_remove-output tag_hide-cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Let us create some toy data:</span>
+<span class="kn">from</span> <span class="nn">create_data</span> <span class="kn">import</span> <span class="n">create_headturn_toy_example</span>
+<span class="n">X_u</span><span class="p">,</span> <span class="n">Y_u</span> <span class="o">=</span> <span class="n">create_headturn_toy_example</span><span class="p">(</span><span class="n">num_points</span><span class="o">=</span><span class="mf">1e5</span><span class="p">,</span> <span class="n">prop_positive</span><span class="o">=</span><span class="mf">0.05</span><span class="p">)</span>
+<span class="n">X</span><span class="p">,</span> <span class="n">Y</span> <span class="o">=</span> <span class="n">create_headturn_toy_example</span><span class="p">(</span><span class="n">num_points</span><span class="o">=</span><span class="mf">1e3</span><span class="p">,</span> <span class="n">prop_positive</span><span class="o">=</span><span class="mf">0.2</span><span class="p">)</span>
+
+<span class="kn">from</span> <span class="nn">stats</span> <span class="kn">import</span> <span class="n">feature_values_positive_to_negative_ratio</span>
+<span class="n">Xp</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">Y</span><span class="o">==</span><span class="mi">1</span><span class="p">];</span> <span class="n">Xn</span> <span class="o">=</span> <span class="n">X</span><span class="p">[</span><span class="n">Y</span><span class="o">==</span><span class="mi">0</span><span class="p">]</span>
+<span class="n">df</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">DataFrame</span><span class="p">({</span><span class="s1">&#39;X&#39;</span><span class="p">:</span><span class="n">X_u</span><span class="p">,</span><span class="s1">&#39;Y&#39;</span><span class="p">:</span><span class="n">Y_u</span><span class="p">});</span> 
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell tag_remove-output docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">[</span><span class="mi">15</span><span class="p">,</span><span class="mi">5</span><span class="p">])</span>
+<span class="c1"># In addition plot the empirical distribution for different number of datapoints. </span>
+<span class="n">num_bins</span> <span class="o">=</span> <span class="mi">200</span><span class="p">;</span> <span class="n">xmin</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">xmax</span><span class="o">=</span><span class="mi">5</span><span class="p">;</span> <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">Xp</span><span class="p">)</span>
+<span class="n">h</span> <span class="o">=</span> <span class="p">(</span><span class="n">xmax</span><span class="o">-</span><span class="n">xmin</span><span class="p">)</span><span class="o">/</span> <span class="n">num_bins</span><span class="p">;</span>  <span class="c1"># bin size</span>
+
+<span class="n">ns</span> <span class="o">=</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span><span class="mi">50</span><span class="p">,</span><span class="mi">200</span><span class="p">]</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="n">n</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ns</span><span class="p">):</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># Plot the ground truth comulative distribution (formally is an approximation with a lot of empirical points)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">kdeplot</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;Y==1&#39;</span><span class="p">)[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">cumulative</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">);</span>
+
+    <span class="n">x</span> <span class="o">=</span> <span class="n">Xp</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span>  <span class="c1"># Sample n points</span>
+    <span class="c1"># Count empirical points per-bin </span>
+    <span class="n">count</span><span class="p">,</span> <span class="n">edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="n">xmin</span><span class="p">,</span> <span class="n">xmax</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="n">num_bins</span><span class="p">)</span>  
+    <span class="c1"># Convert count to an estimation of the prob(x in B)</span>
+    <span class="n">prob_bin</span> <span class="o">=</span> <span class="n">count</span><span class="o">/</span><span class="n">n</span>
+    <span class="c1"># Convert from prob in interval to pdf (int(pdf)_B = proba_B)</span>
+    <span class="n">pdf</span> <span class="o">=</span> <span class="n">prob_bin</span><span class="o">/</span><span class="n">h</span>  
+    <span class="c1"># Compute the comulative probability</span>
+    <span class="n">cdf</span> <span class="o">=</span> <span class="n">prob_bin</span><span class="o">.</span><span class="n">cumsum</span><span class="p">()</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">edges</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">h</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">cdf</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">h</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=.</span><span class="mi">2</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mi">5</span><span class="p">]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Head-turn delay :: t&#39;</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;$P(X&lt;t)$&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;number of points: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">n</span><span class="p">));</span>
+    
+<span class="n">glue</span><span class="p">(</span><span class="s2">&quot;CDF_empirical_approximation&quot;</span><span class="p">,</span> <span class="n">fig</span><span class="p">,</span> <span class="n">display</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="figure align-default" id="fig-cdf-empirical-approximation" style="width: 80%">
+<div class="cell_output docutils container">
+<img alt="../_images/pdfestimation_7_0.png" src="../_images/pdfestimation_7_0.png" />
+</div>
+<p class="caption"><span class="caption-number">Fig. 4 </span><span class="caption-text">Empirical approximation of the CDF, as we increase the number of samples.</span><a class="headerlink" href="#fig-cdf-empirical-approximation" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+<div class="section" id="pdf-definition">
+<span id="sec-pdf-definition"></span><h2>PDF definition<a class="headerlink" href="#pdf-definition" title="Permalink to this headline">¶</a></h2>
+<p>Similar to the CDF, the probability density distribution (PDF) is defined as:</p>
+<div class="math notranslate nohighlight" id="equation-eq-pdf-definition">
+<span class="eqno">(5)<a class="headerlink" href="#equation-eq-pdf-definition" title="Permalink to this equation">¶</a></span>\[
+f(x) \stackrel{def}{=} \lim_{\delta\rightarrow 0} \frac{P(x\leq X &lt; x+\delta)}{\delta} = \lim_{\delta\rightarrow 0} \frac{F(x+\delta)-F(x)}{\delta} = F'(x).
+\]</div>
+<p>We will skip all the mathematical technicalities and assume all the limits introduced above exist (i.e., the CDFs considered are differentiable everywhere). We will also consider in all the practical applications we are working with, the CDFs are “smooth.” While <span class="math notranslate nohighlight">\(F(x)\)</span> has a very intuitive meaning: “the probability that <span class="math notranslate nohighlight">\(X\)</span> is lower than <span class="math notranslate nohighlight">\(x\)</span>,” the interpretation of <span class="math notranslate nohighlight">\(f(x)\)</span> is more difficult. <span class="math notranslate nohighlight">\(f(x)\)</span> can be understood as the derivative of <span class="math notranslate nohighlight">\(F\)</span>, but was no probabilist meaning unless we integrate it in a interval, i.e., <span class="math notranslate nohighlight">\(P(x\in A) = \int_A p(x)\,dx\)</span>.</p>
+<div class="admonition-working-with-the-pdf-requiers-additional-hypothesis-about-regularity admonition">
+<p class="admonition-title">Working with the PDF requiers additional hypothesis about regularity.</p>
+<p>As we will discuss, <strong>estimating the error and confidence intervals associated with the approximation of <span class="math notranslate nohighlight">\(F\)</span> is substantially simpler than <span class="math notranslate nohighlight">\(f\)</span>.</strong> For example, look at the approximations shown in <a class="reference internal" href="#fig-cdf-empirical-approximation"><span class="std std-numref">Fig. 4</span></a>, <span class="math notranslate nohighlight">\(\hat{F}\)</span> looks quite similar to <span class="math notranslate nohighlight">\(F\)</span> (when we have a decent amount of data). However, <span class="math notranslate nohighlight">\(\hat{F} '(x)\)</span> can be very different from <span class="math notranslate nohighlight">\(F'(x)\)</span>, and this is why working with <span class="math notranslate nohighlight">\(f\)</span> is more challenging. As we will see, to approximate <span class="math notranslate nohighlight">\(f\)</span>, we will have to add the hypothesis that “F” is smooth.</p>
+</div>
+</div>
+<div class="section" id="cdf-confidence-intervals">
+<span id="sec-cdf-confidence-intervals"></span><h2>CDF confidence intervals<a class="headerlink" href="#cdf-confidence-intervals" title="Permalink to this headline">¶</a></h2>
+<p>As we discussed in Section <a class="reference internal" href="#sec-cdf-definition"><span class="std std-ref">CDF Definition</span></a>, estimating the CDF is quite straight forward. The <strong>empirical distribution function</strong> <span class="math notranslate nohighlight">\(\hat{F}\)</span> is defined as:</p>
+<div class="math notranslate nohighlight" id="equation-eq-empirical-cdf">
+<span class="eqno">(6)<a class="headerlink" href="#equation-eq-empirical-cdf" title="Permalink to this equation">¶</a></span>\[
+\hat{F}(x) = \frac{1}{n} \sum_{i=1}^{n} I(X_i \leq x)
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(I(X_i \leq x) = 1\)</span> if <span class="math notranslate nohighlight">\(X_i\leq x\)</span>, <span class="math notranslate nohighlight">\(0\)</span> otherwise.</p>
+<p>It can be proved (Theorem 7.3 <a class="bibtex reference internal" href="bibliography.html#wasserman2013all" id="id1">[Was13]</a>) that at any fixed value of <span class="math notranslate nohighlight">\(x\)</span>,</p>
+<ul class="simple">
+<li><p><span class="math notranslate nohighlight">\(\mathbf{E}(\hat{F}(x)) = F(x)\)</span>,</p></li>
+<li><p><span class="math notranslate nohighlight">\(\displaystyle\mathbf{V}(\hat{F}(x)) = \frac{F(x)(1-F(x))}{n}\)</span>.</p></li>
+</ul>
+<p>These properties are general (no assumptions are made about <span class="math notranslate nohighlight">\(F\)</span>). Despite showing that the estimation makes sense (i.e., it will give as the right value as the number of samples increases), the previous expressions are of little practical advantage. The variance of <span class="math notranslate nohighlight">\(\hat{F}\)</span>, <span class="math notranslate nohighlight">\(V(\hat{F})\)</span>, could be used to compute confidence intervals; however, notice that to calculate it, we need <span class="math notranslate nohighlight">\(F\)</span> (which is what we were trying to estimate in the first place).</p>
+<p>In order to compute confidence intervals associated to <span class="math notranslate nohighlight">\(\hat{F}\)</span>, we can exploit Dvoretzky-Kiefer-Wolfowitz inequality. Let <span class="math notranslate nohighlight">\(X_1, ..., X_n \sim F\)</span>, then for any <span class="math notranslate nohighlight">\(\epsilon&gt;0\)</span>,</p>
+<div class="math notranslate nohighlight" id="equation-eq-dkw-inequality">
+<span class="eqno">(7)<a class="headerlink" href="#equation-eq-dkw-inequality" title="Permalink to this equation">¶</a></span>\[
+P\left(\sup_{x}|F(x)-\hat{F}(x)|&gt;\epsilon\right)\leq 2e^{-2n\epsilon^2}.
+\]</div>
+<p>From DKW inequality, we can construct a confidence interval for <span class="math notranslate nohighlight">\(\hat{F}\)</span> as follows.</p>
+<p><strong>Empirical CDF estimation confidence interval:</strong>
+Define <span class="math notranslate nohighlight">\(L(x) = \max\{\hat{F}-\epsilon,0\}\)</span> and <span class="math notranslate nohighlight">\(U(x) = \min\{\hat{F}+\epsilon, 1\}\)</span>, where</p>
+<div class="math notranslate nohighlight" id="equation-eq-conf-cdf">
+<span class="eqno">(8)<a class="headerlink" href="#equation-eq-conf-cdf" title="Permalink to this equation">¶</a></span>\[
+\epsilon = \sqrt{\frac{1}{2n}\log\left(\frac{2}{\alpha}\right)}.
+\]</div>
+<p>It follows from DKW that (for any <span class="math notranslate nohighlight">\(F\)</span>),</p>
+<div class="math notranslate nohighlight" id="equation-eq-conf-interval-cdf">
+<span class="eqno">(9)<a class="headerlink" href="#equation-eq-conf-interval-cdf" title="Permalink to this equation">¶</a></span>\[
+P\left(L(x) \leq F(x) \leq U(x) \ \ \mbox{for all } x \right) \geq 1 - \alpha.
+\]</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># This are the importan pieces of code:  (check &quot;estimate_cdf&quot; in stats.py)</span>
+<span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.05</span>  <span class="c1"># Set for example, a 5% confidence interval</span>
+<span class="n">cdf_epsilon</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">n</span><span class="p">,</span> <span class="n">alpha</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span> <span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">n</span><span class="p">))</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="mi">2</span><span class="o">/</span><span class="n">alpha</span><span class="p">)</span> <span class="p">)</span>
+<span class="n">U</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">hatF</span><span class="p">,</span> <span class="n">epsilon</span><span class="p">:</span> <span class="nb">min</span><span class="p">(</span><span class="n">hatF</span> <span class="o">+</span> <span class="n">epsilon</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">L</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">hatF</span><span class="p">,</span> <span class="n">epsilon</span><span class="p">:</span> <span class="nb">max</span><span class="p">(</span><span class="n">hatF</span> <span class="o">-</span> <span class="n">epsilon</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell tag_remove-output docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">stats</span> <span class="kn">import</span> <span class="n">estimate_cdf</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">[</span><span class="mi">15</span><span class="p">,</span><span class="mi">5</span><span class="p">])</span>
+<span class="c1"># In addition plot the empirical distribution for different number of datapoints. </span>
+<span class="n">num_bins</span> <span class="o">=</span> <span class="mi">200</span><span class="p">;</span> <span class="n">xmin</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">xmax</span><span class="o">=</span><span class="mi">5</span><span class="p">;</span> <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">Xp</span><span class="p">)</span>
+
+<span class="n">ns</span> <span class="o">=</span> <span class="p">[</span><span class="mi">10</span><span class="p">,</span><span class="mi">50</span><span class="p">,</span><span class="mi">200</span><span class="p">]</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="n">n</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ns</span><span class="p">):</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># Plot the ground truth comulative distribution (formally is an approximation with a lot of empirical points)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">kdeplot</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;Y==1&#39;</span><span class="p">)[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">cumulative</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">);</span>
+
+    <span class="n">x</span> <span class="o">=</span> <span class="n">Xp</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span>  <span class="c1"># Sample n points</span>
+    <span class="n">hatF</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">u</span> <span class="o">=</span> <span class="n">estimate_cdf</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">num_bins</span><span class="o">=</span><span class="n">num_bins</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> <span class="n">xmin</span><span class="o">=</span><span class="n">xmin</span><span class="p">,</span> <span class="n">xmax</span><span class="o">=</span><span class="n">xmax</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mi">5</span><span class="p">]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Head-turn delay :: t&#39;</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;$P(X&lt;t)$&#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;number of points: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">n</span><span class="p">));</span>
+
+<span class="n">glue</span><span class="p">(</span><span class="s2">&quot;CDF_empirical_approximation_with_conf&quot;</span><span class="p">,</span> <span class="n">fig</span><span class="p">,</span> <span class="n">display</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="figure align-default" id="fig-cdf-empirical-approximation-with-conf" style="width: 80%">
+<div class="cell_output docutils container">
+<img alt="../_images/pdfestimation_12_0.png" src="../_images/pdfestimation_12_0.png" />
+</div>
+<p class="caption"><span class="caption-number">Fig. 5 </span><span class="caption-text">Empirical approximation of the CDF and their associated 95% conf. inteval.</span><a class="headerlink" href="#fig-cdf-empirical-approximation-with-conf" title="Permalink to this image">¶</a></p>
+</div>
+<p><a class="reference internal" href="#fig-cdf-empirical-approximation-with-conf"><span class="std std-numref">Fig. 5</span></a> shows the estimation <span class="math notranslate nohighlight">\(\hat{F}\)</span> of the distribution <span class="math notranslate nohighlight">\(F\)</span>, for datasets of different size. In addition the 95% confident interval associated to each of these estimations is illustrated.</p>
+<p>(sec: pdf_confidence_intervals)=</p>
+</div>
+<div class="section" id="pdf-confidence-intervals">
+<h2>PDF confidence intervals<a class="headerlink" href="#pdf-confidence-intervals" title="Permalink to this headline">¶</a></h2>
+<p>We discussed that estimations of <span class="math notranslate nohighlight">\(F\)</span> could be obtained without any explicit assumptions about <span class="math notranslate nohighlight">\(F\)</span>. On the other hand, estimating the density probability distribution <span class="math notranslate nohighlight">\(f\)</span> requires some hypothesis about the regularity of the PDF.</p>
+<p>The simplest density estimator is a histogram. As before, let <span class="math notranslate nohighlight">\(X_1, ..., X_n\)</span> be IID with density <span class="math notranslate nohighlight">\(f\)</span> (<span class="math notranslate nohighlight">\(f=F'\)</span>), let assume the <span class="math notranslate nohighlight">\(X_i\)</span> is restricted to the interval <span class="math notranslate nohighlight">\([x_{min}, x_{max}]\)</span>, and let partition this interval into <span class="math notranslate nohighlight">\(m\)</span> bins. The bin size <span class="math notranslate nohighlight">\(h\)</span> can be computed as <span class="math notranslate nohighlight">\(h= (x_{max}-x_{min})/m\)</span>, the more bins (larger <span class="math notranslate nohighlight">\(m\)</span>) the smaller the bins size and vice-versa.</p>
+<p><a class="reference internal" href="#fig-pdf-examples"><span class="std std-numref">Fig. 6</span></a> illustrates the histograms computed from <span class="math notranslate nohighlight">\(50\)</span> empirical ASD samples of our toy head-turn delay example. We show the resulting histograms for three numbers of bins. Also (solid line), the ground truth PDF is plotted.</p>
+<div class="cell tag_remove-output docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Impact of the bin size on the estimation error. </span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">[</span><span class="mi">15</span><span class="p">,</span><span class="mi">5</span><span class="p">])</span>
+<span class="c1"># In addition plot the empirical distribution for different number of datapoints. </span>
+<span class="n">xmin</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">xmax</span><span class="o">=</span><span class="mi">5</span><span class="p">;</span> <span class="n">n</span> <span class="o">=</span> <span class="mi">200</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">Xp</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span>  <span class="c1"># Sample n points</span>
+
+<span class="n">num_bins_set</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span><span class="p">,</span><span class="mi">9</span><span class="p">,</span><span class="mi">90</span><span class="p">]</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="n">num_bins</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">num_bins_set</span><span class="p">):</span>
+    <span class="n">h</span> <span class="o">=</span> <span class="p">(</span><span class="n">xmax</span><span class="o">-</span><span class="n">xmin</span><span class="p">)</span><span class="o">/</span> <span class="n">num_bins</span><span class="p">;</span>  <span class="c1"># bin size</span>
+
+    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># Plot the ground truth comulative distribution (formally is an approximation with a lot of empirical points)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">kdeplot</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;Y==1&#39;</span><span class="p">)[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">cumulative</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">);</span>
+
+    <span class="c1"># Count empirical points per-bin </span>
+    <span class="n">count</span><span class="p">,</span> <span class="n">edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="n">xmin</span><span class="p">,</span> <span class="n">xmax</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="n">num_bins</span><span class="p">)</span>  
+    <span class="c1"># Convert count to an estimation of the prob(x in B)</span>
+    <span class="n">prob_bin</span> <span class="o">=</span> <span class="n">count</span><span class="o">/</span><span class="n">n</span>
+    <span class="c1"># Convert from prob in interval to pdf (int(pdf)_B = proba_B)</span>
+    <span class="n">pdf</span> <span class="o">=</span> <span class="n">prob_bin</span><span class="o">/</span><span class="n">h</span>  
+    
+    <span class="n">plt</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">edges</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">h</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">pdf</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">h</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=.</span><span class="mi">2</span><span class="p">)</span>    
+    <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Head-turn delay :: t&#39;</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;$\hat</span><span class="si">{f}</span><span class="s1">(x)$&#39;</span><span class="p">);</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Number of bins: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">num_bins</span><span class="p">));</span> <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mi">5</span><span class="p">]);</span>
+
+<span class="n">glue</span><span class="p">(</span><span class="s2">&quot;pdf_examples&quot;</span><span class="p">,</span> <span class="n">fig</span><span class="p">,</span> <span class="n">display</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="figure align-default" id="fig-pdf-examples" style="width: 80%">
+<div class="cell_output docutils container">
+<img alt="../_images/pdfestimation_16_0.png" src="../_images/pdfestimation_16_0.png" />
+</div>
+<p class="caption"><span class="caption-number">Fig. 6 </span><span class="caption-text">Approximating the pdf with a discrete histogram. We illustrate the impact of the number of bins on the pdf estimation.</span><a class="headerlink" href="#fig-pdf-examples" title="Permalink to this image">¶</a></p>
+</div>
+<p>To estimate <span class="math notranslate nohighlight">\(\hat{f}\)</span>, we first define the set of bins <span class="math notranslate nohighlight">\(\mathcal{B} = \{B_1, ..., B_m\}\)</span>. In our toy example, the bins are simply the intervals <span class="math notranslate nohighlight">\(B_i = (x_{min} + h(i-1), x_{min} + hi]\)</span>. The probability of <span class="math notranslate nohighlight">\(X\)</span> to be in <span class="math notranslate nohighlight">\(B_i\)</span> can be estimated as</p>
+<div class="math notranslate nohighlight">
+\[
+\hat{p}_i = \frac{1}{n} \sum_{i=1}^n I(X_i \in B_i),
+\]</div>
+<p>and the pdf estimator <span class="math notranslate nohighlight">\(\hat{f}\)</span> by</p>
+<div class="math notranslate nohighlight" id="equation-eq-pdf-discrete-approximation">
+<span class="eqno">(10)<a class="headerlink" href="#equation-eq-pdf-discrete-approximation" title="Permalink to this equation">¶</a></span>\[\begin{split}
+\hat{f}(x) = \left\{\begin{array}{l}
+\hat{p}_1/h  \ \ x\in B_1 \\ 
+\hat{p}_2/h  \ \ x\in B_2 \\ 
+... \\
+\hat{p}_m/h  \ \ x\in B_m \\ 
+\end{array}\right. .
+\end{split}\]</div>
+<p>Before discussing confidence intervals associated with these estimations, let us focus on the estimation error. As we can see, e.g., comparing the left and right examples in <a class="reference internal" href="#fig-pdf-examples"><span class="std std-numref">Fig. 6</span></a>, estimating <span class="math notranslate nohighlight">\(\hat{f}\)</span> requires setting the bin size which has a great impact. A small number of bins (first example in <a class="reference internal" href="#fig-pdf-examples"><span class="std std-numref">Fig. 6</span></a>) would fail to accurately approximate <span class="math notranslate nohighlight">\(f\)</span> do to the lack of spatial resolution. On the other extreme, (third example in <a class="reference internal" href="#fig-pdf-examples"><span class="std std-numref">Fig. 6</span></a>), too many bins would produce quantities prone to error (since only a few points lie in each segment).</p>
+<p>The problem discussed above can be formalized as follows. The integrated squared error (ISE) for the estimation <span class="math notranslate nohighlight">\(\hat{f}\)</span> can be defined as:</p>
+<div class="math notranslate nohighlight" id="equation-eq-ise-pdf">
+<span class="eqno">(11)<a class="headerlink" href="#equation-eq-ise-pdf" title="Permalink to this equation">¶</a></span>\[
+L\left(f, \hat{f}\right) = \int \left( f(x)-\hat{f}(x) \right)^2 dx. 
+\]</div>
+<p>The risk or mean integrated squared error (MISE) is,</p>
+<div class="math notranslate nohighlight" id="equation-eq-mise-pdf">
+<span class="eqno">(12)<a class="headerlink" href="#equation-eq-mise-pdf" title="Permalink to this equation">¶</a></span>\[
+R\left(f, \hat{f}\right) = \mathbf{E}\left(L\left(f, \hat{f}\right)\right).
+\]</div>
+<p><strong>Lemma 2.1 ([1] pag. 304)</strong> The risk can be written as</p>
+<div class="math notranslate nohighlight" id="equation-eq-risk-tradeoff">
+<span class="eqno">(13)<a class="headerlink" href="#equation-eq-risk-tradeoff" title="Permalink to this equation">¶</a></span>\[
+R\left(f, \hat{f}\right) = \int{b^2(x) dx} + \int{v(x) dx}
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(b(x) = \mathbf{E}\left(\hat{f}(x)-f(x)\right)\)</span> is the bias of <span class="math notranslate nohighlight">\(\hat{f}\)</span> (at <span class="math notranslate nohighlight">\(x\)</span>), and <span class="math notranslate nohighlight">\(v(x) = \mathbf{V}\left(\hat{f}(x)\right)\)</span> is the variance of the estimated value at <span class="math notranslate nohighlight">\(x\)</span>, <span class="math notranslate nohighlight">\(\hat{f}(x)\)</span>.</p>
+<div class="tip admonition">
+<p class="admonition-title">Risk trade-off</p>
+<p><strong>RISK = BIAS<span class="math notranslate nohighlight">\(^2\)</span> + VARIANCE</strong></p>
+</div>
+<p>If the bins width is too large, a large bias cause large errors, on the other hand, if the bins are too narrow, the variance of the estimator will be large leading also to a poor approximation. <strong>The optimal bin width is set by balancing these two factors such that the risk is minimized.</strong></p>
+<div class="section" id="setting-the-optimal-number-of-histograms">
+<h3>Setting the optimal number of histograms<a class="headerlink" href="#setting-the-optimal-number-of-histograms" title="Permalink to this headline">¶</a></h3>
+<p>Setting the optimal number of bins <span class="math notranslate nohighlight">\(m^*\)</span> by minimizing the risk function defined above is impractical, since it computation requires the knowledge of the ground truth density <span class="math notranslate nohighlight">\(f\)</span> (a chicken and egg problem). Instead, we can solve an approximation of the error loss function as defined below.</p>
+<div class="math notranslate nohighlight" id="equation-eq-loss-approximation">
+<span class="eqno">(14)<a class="headerlink" href="#equation-eq-loss-approximation" title="Permalink to this equation">¶</a></span>\[
+L(f,\hat{f}) = \int\left(\hat{f}(x)-f(x)\right)^2 dx = \int \hat{f}^2(x) dx - 2\int \hat{f}(x)f(x) dx + \int f^2(x) dx, 
+\]</div>
+<p>the last term doesn’t depend on <span class="math notranslate nohighlight">\(m\)</span> so minimizing the risk is equivalent to minimizing the expected value of</p>
+<div class="math notranslate nohighlight">
+\[
+J(f, \hat{f}) = \int \hat{f}^2(x) dx - 2\int \hat{f}(x)f(x) dx.
+\]</div>
+<p>We shall refer now to <span class="math notranslate nohighlight">\(\mathbf{E}(J)\)</span> as the risk (thought formally it differs from it by a constant factor). The cross-validation estimator for the risk is</p>
+<div class="math notranslate nohighlight">
+\[
+\hat{J}(\hat{f}) = \int \left( \hat{f}(x) \right)^2 dx - \frac 2 n \sum_{i=1}^{n} \hat{f}_{(-i)}(X_i)
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(\hat{f}_{(-i)}\)</span> is the histogram estimator obtained after removing the <span class="math notranslate nohighlight">\(i^{th}\)</span> observation.</p>
+<div class="admonition-theorem-2-1 admonition">
+<p class="admonition-title">Theorem 2.1</p>
+<p>The following identity holds (<a class="bibtex reference internal" href="bibliography.html#wasserman2013all" id="id2">[Was13]</a> pag. 310):</p>
+<div class="math notranslate nohighlight" id="equation-eq-risk-estimation">
+<span class="eqno">(15)<a class="headerlink" href="#equation-eq-risk-estimation" title="Permalink to this equation">¶</a></span>\[
+\hat{J}(\hat{f}) = \frac{2}{(n-1)h} - \frac{n+1}{(n-1)h}\sum_{i=1}^{m} \hat{p}_i^2. 
+\]</div>
+</div>
+<p>Equation <a class="reference internal" href="#equation-eq-risk-estimation">(15)</a> provides a practical alternative to compute the error associated with a bin size, and can be used to tune it as we illustrate below (<a class="reference internal" href="#fig-pdf-empirical-risk-estimation"><span class="std std-numref">Fig. 7</span></a>).</p>
+<div class="admonition caution">
+<p class="admonition-title">Caution</p>
+<p>In <a class="bibtex reference internal" href="bibliography.html#wasserman2013all" id="id3">[Was13]</a> the definition is incorrect in Eq. (20.14). <span class="math notranslate nohighlight">\(h\)</span> is missing in the second term, see the original reference (Mats Rudemo 1981, Empirical Choice of Histograms and Kernel Denisty Estimators; Eq. (2.8)).</p>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># To optimize the number of bins, we can use this expresion: (check bin_size_risk_estimator for more details).</span>
+<span class="k">def</span> <span class="nf">hat_J</span><span class="p">(</span><span class="n">hat_p</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span> 
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compute the cross-validation estimator of the risk. </span>
+<span class="sd">    hat_p: is N_i/n, where N_i is the number of datapoints in the ith bin</span>
+<span class="sd">    n: is the number of datapoints</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">hat_p</span><span class="p">)</span>  <span class="c1"># the number of p_i is the number of bins. </span>
+    <span class="n">h</span> <span class="o">=</span> <span class="mi">1</span><span class="o">/</span><span class="n">m</span>  <span class="c1"># When theorem 2.1 is obtained, the data is assumed to be mapped to the range [0,1]</span>
+    <span class="c1"># therefore, when m bins are selected, the bin width is h=1/m</span>
+    <span class="n">J</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">/</span> <span class="p">((</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span><span class="o">*</span><span class="n">h</span><span class="p">)</span> <span class="o">-</span> <span class="p">(</span><span class="n">n</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">/</span> <span class="n">h</span>  <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">square</span><span class="p">(</span><span class="n">hat_p</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">J</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell tag_remove-output docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span><span class="mi">5</span><span class="p">])</span>
+
+<span class="n">xmin</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">xmax</span><span class="o">=</span><span class="mi">5</span><span class="p">;</span> <span class="n">n</span> <span class="o">=</span> <span class="mi">200</span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">Xp</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span>  <span class="c1"># Sample n points</span>
+
+<span class="kn">from</span> <span class="nn">stats</span> <span class="kn">import</span> <span class="n">bin_size_risk_estimator</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">hat_J</span><span class="p">,</span> <span class="n">opt_num_bins</span> <span class="o">=</span> <span class="n">bin_size_risk_estimator</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">num_bins_range</span><span class="o">=</span><span class="p">[</span><span class="mi">1</span><span class="p">,</span><span class="mi">50</span><span class="p">],</span> <span class="n">xmin</span><span class="o">=</span><span class="n">xmin</span><span class="p">,</span> <span class="n">xmax</span><span class="o">=</span><span class="n">xmax</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">sns</span><span class="o">.</span><span class="n">kdeplot</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;Y==1&#39;</span><span class="p">)[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">cumulative</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">);</span>  <span class="c1"># plot grount truth</span>
+<span class="n">num_bins</span> <span class="o">=</span> <span class="n">opt_num_bins</span><span class="p">;</span> <span class="n">h</span> <span class="o">=</span> <span class="p">(</span><span class="n">xmax</span><span class="o">-</span><span class="n">xmin</span><span class="p">)</span><span class="o">/</span> <span class="n">num_bins</span><span class="p">;</span>  <span class="c1"># bin size</span>
+<span class="n">count</span><span class="p">,</span> <span class="n">edges</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">histogram</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="nb">range</span><span class="o">=</span><span class="p">[</span><span class="n">xmin</span><span class="p">,</span> <span class="n">xmax</span><span class="p">],</span> <span class="n">bins</span><span class="o">=</span><span class="n">num_bins</span><span class="p">)</span>  
+<span class="n">prob_bin</span> <span class="o">=</span> <span class="n">count</span><span class="o">/</span><span class="n">n</span><span class="p">;</span> <span class="n">pdf</span> <span class="o">=</span> <span class="n">prob_bin</span><span class="o">/</span><span class="n">h</span><span class="p">;</span> <span class="n">plt</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">edges</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="o">+</span><span class="n">h</span><span class="o">/</span><span class="mi">2</span><span class="p">,</span> <span class="n">pdf</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">h</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=.</span><span class="mi">2</span><span class="p">)</span>    
+<span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mi">5</span><span class="p">]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Head-turn delay :: t&#39;</span><span class="p">);</span> 
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;hat(f) and f,  number of bins: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">num_bins</span><span class="p">));</span>
+<span class="n">glue</span><span class="p">(</span><span class="s2">&quot;pdf_empirical_risk_estimation&quot;</span><span class="p">,</span> <span class="n">fig</span><span class="p">,</span> <span class="n">display</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="figure align-default" id="fig-pdf-empirical-risk-estimation" style="width: 80%">
+<div class="cell_output docutils container">
+<img alt="../_images/pdfestimation_21_0.png" src="../_images/pdfestimation_21_0.png" />
+</div>
+<p class="caption"><span class="caption-number">Fig. 7 </span><span class="caption-text">The left side illustrates the ground truth risk (dashed) and the empirical risk estimation (solid) as we change the number of bins (i.e., the bin width). The right plot illustrates the ground truth pdf distribution and the histogram estimation for the optimal number of bins.</span><a class="headerlink" href="#fig-pdf-empirical-risk-estimation" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+<div class="section" id="confidence-intervals-associated-to-a-pdf-estimation">
+<h3>Confidence intervals associated to a pdf estimation<a class="headerlink" href="#confidence-intervals-associated-to-a-pdf-estimation" title="Permalink to this headline">¶</a></h3>
+<p>Once a histogram estimation of a pdf is obtained (after setting the number of bins and the bin size), we can estimate confidence intervals associated to it. Suppose <span class="math notranslate nohighlight">\(\hat{f}\)</span> is a histogram with <span class="math notranslate nohighlight">\(m\)</span> bins and binwidth <span class="math notranslate nohighlight">\(h=1/m\)</span>, approximating the ground truth density <span class="math notranslate nohighlight">\(f\)</span>. We define <span class="math notranslate nohighlight">\(\bar{f}=p_i/h\)</span> where <span class="math notranslate nohighlight">\(p_i = \int_{B_i} f(x)dx\)</span>. As before, <span class="math notranslate nohighlight">\(B_i\)</span> represents the interval associated to the <span class="math notranslate nohighlight">\(i^{th}\)</span> bin. <span class="math notranslate nohighlight">\(\bar{f}\)</span> represents the ground truth “histogram version” of the pdf <span class="math notranslate nohighlight">\(f\)</span>.</p>
+<div class="admonition-definition admonition">
+<p class="admonition-title">Definition</p>
+<p>A pair of functions <span class="math notranslate nohighlight">\((l(x), u(x))\)</span> is a <span class="math notranslate nohighlight">\(1-\alpha\)</span> confidence band if,</p>
+<div class="math notranslate nohighlight" id="equation-eq-def-confidence-band">
+<span class="eqno">(16)<a class="headerlink" href="#equation-eq-def-confidence-band" title="Permalink to this equation">¶</a></span>\[
+\mathbf{P}\left( l(x) \leq \bar{f}(x) \leq u(x) \mbox{ for all } x \right) \geq 1-\alpha
+\]</div>
+</div>
+<div class="admonition-theorem admonition">
+<p class="admonition-title">Theorem</p>
+<p>Theorem 2.2 <a class="bibtex reference internal" href="bibliography.html#wasserman2013all" id="id4">[Was13]</a> Pag. 311: Let <span class="math notranslate nohighlight">\(m(n)\)</span> be the number of bins in the histogram <span class="math notranslate nohighlight">\(\hat{f}\)</span>. Assume <span class="math notranslate nohighlight">\(m(n)\rightarrow 0\)</span> and <span class="math notranslate nohighlight">\(m(n)\frac{\log(n)}{n}\rightarrow 0\)</span> as <span class="math notranslate nohighlight">\(n\rightarrow \infty\)</span>. Define</p>
+<div class="math notranslate nohighlight">
+\[
+l(x) = \left(\max\left\{ \sqrt{\hat{f}(x)} -c, 0\right\} \right)^2
+\]</div>
+<div class="math notranslate nohighlight">
+\[
+u(x) = \left(\sqrt{\hat{f}(x)} + c \right)^2
+\]</div>
+<p>where</p>
+<div class="math notranslate nohighlight" id="equation-eq-c-pdf-interval">
+<span class="eqno">(17)<a class="headerlink" href="#equation-eq-c-pdf-interval" title="Permalink to this equation">¶</a></span>\[
+c = \frac{z_{\alpha/(2m)}}{2}\sqrt{\frac{m}{n}}.
+\]</div>
+<p>Then, <span class="math notranslate nohighlight">\((l(x),u(x))\)</span> is an approximate <span class="math notranslate nohighlight">\(1-\alpha\)</span> confidence band.</p>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># (see compute_histogram_and_conf_interval)</span>
+<span class="k">def</span> <span class="nf">compute_hist_conf_constant</span><span class="p">(</span><span class="n">alpha</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>   
+    <span class="k">def</span> <span class="nf">z_u</span><span class="p">(</span><span class="n">u</span><span class="p">):</span>  <span class="c1"># Compute the upper u quantile of N(0,1)</span>
+        <span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">norm</span>
+        <span class="n">z</span> <span class="o">=</span> <span class="n">norm</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">u</span><span class="p">)</span>  <span class="c1"># z_u = Phi^-1(1-u)  with Phi = cdf_{N(0,1)}</span>
+        <span class="k">return</span> <span class="n">z</span>
+    <span class="n">c</span> <span class="o">=</span> <span class="n">z_u</span><span class="p">(</span><span class="n">alpha</span><span class="o">/</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">m</span><span class="p">))</span><span class="o">/</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">m</span><span class="o">/</span><span class="n">n</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">c</span>
+
+<span class="n">lf</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">hat_f</span><span class="p">,</span><span class="n">c</span><span class="p">:</span> <span class="p">(</span><span class="nb">max</span><span class="p">(</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">hat_f</span><span class="p">)</span><span class="o">-</span><span class="n">c</span><span class="p">,</span> <span class="mi">0</span> <span class="p">))</span><span class="o">**</span><span class="mi">2</span>
+<span class="n">uf</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">hat_f</span><span class="p">,</span><span class="n">c</span><span class="p">:</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">hat_f</span><span class="p">)</span><span class="o">+</span><span class="n">c</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell tag_remove-output docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Impact of the bin size on the estimation error. </span>
+<span class="kn">from</span> <span class="nn">stats</span> <span class="kn">import</span> <span class="n">compute_histogram_and_conf_interval</span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">[</span><span class="mi">15</span><span class="p">,</span><span class="mi">5</span><span class="p">])</span>
+<span class="c1"># In addition plot the empirical distribution for different number of datapoints. </span>
+<span class="n">xmin</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">xmax</span><span class="o">=</span><span class="mi">5</span><span class="p">;</span> <span class="n">num_bins</span> <span class="o">=</span> <span class="mi">10</span><span class="p">;</span> <span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.05</span> <span class="c1"># Conf interval</span>
+ 
+<span class="n">ns</span> <span class="o">=</span> <span class="p">[</span><span class="mi">20</span><span class="p">,</span> <span class="mi">100</span><span class="p">,</span> <span class="mi">200</span><span class="p">]</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="n">n</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">ns</span><span class="p">):</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">Xp</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span>  <span class="c1"># Sample n points</span>
+    
+    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">kdeplot</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;Y==1&#39;</span><span class="p">)[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">cumulative</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">);</span>
+
+    <span class="c1"># Count empirical points per-bin </span>
+    <span class="n">hat_f</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">u</span> <span class="o">=</span> <span class="n">compute_histogram_and_conf_interval</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">xmin</span><span class="o">=</span><span class="n">xmin</span><span class="p">,</span> <span class="n">xmax</span><span class="o">=</span><span class="n">xmax</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> 
+                                                      <span class="n">num_bins</span><span class="o">=</span><span class="n">num_bins</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Head-turn delay :: t&#39;</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;$\hat</span><span class="si">{f}</span><span class="s1">(x)$&#39;</span><span class="p">);</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39; &#39;</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Number empirical samples: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">n</span><span class="p">));</span> <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mi">5</span><span class="p">]);</span>
+<span class="n">glue</span><span class="p">(</span><span class="s2">&quot;pdf_histogram_confidence_intervals&quot;</span><span class="p">,</span> <span class="n">fig</span><span class="p">,</span> <span class="n">display</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="figure align-default" id="fig-pdf-histogram-confidence-intervals" style="width: 80%">
+<div class="cell_output docutils container">
+<img alt="../_images/pdfestimation_25_0.png" src="../_images/pdfestimation_25_0.png" />
+</div>
+<p class="caption"><span class="caption-number">Fig. 8 </span><span class="caption-text">Ground truth distribution (solid), and the estimated histograms with their associated 5-95% confidence intervals for different number of samples.</span><a class="headerlink" href="#fig-pdf-histogram-confidence-intervals" title="Permalink to this image">¶</a></p>
+</div>
+<p><a class="reference internal" href="#fig-pdf-histogram-confidence-intervals"><span class="std std-numref">Fig. 8</span></a> shows the ground truth <span class="math notranslate nohighlight">\(f\)</span>, and the estimated <span class="math notranslate nohighlight">\(\hat{f}\)</span> from 20, 100, and 200 empirical samples. (In all the cases we We used the optimal bin size estimated above.) The <span class="math notranslate nohighlight">\(5\%-95\%\)</span> confidence interval associated with each estimation is displayed.</p>
+<p>As we can see, the intervals get narrower as the number of samples increases. Even for 200 samples, the uncertainty bounds estimated is quite large; tighter estimations can be obtained using kernel based methods which we will address next.</p>
+</div>
+<div class="section" id="kernel-based-density-estimation">
+<h3>Kernel-based density estimation<a class="headerlink" href="#kernel-based-density-estimation" title="Permalink to this headline">¶</a></h3>
+<p>Kernel density estimators are smoother and converge faster to the true distributions, i.e., they are more accurate for the same amount of samples providing tighter confidence intervals. As above <span class="math notranslate nohighlight">\(X_1, ..., X_n\)</span> are IID samples from <span class="math notranslate nohighlight">\(f\)</span>. Given a kernel <span class="math notranslate nohighlight">\(K\)</span> and a positive number <span class="math notranslate nohighlight">\(h\)</span> (called <em>the bandwidth</em>), the kernel density estimator is defined</p>
+<div class="math notranslate nohighlight" id="equation-eq-kernel-estimation">
+<span class="eqno">(18)<a class="headerlink" href="#equation-eq-kernel-estimation" title="Permalink to this equation">¶</a></span>\[
+\hat{f}(x) = \frac{1}{n} \sum_{i=1}^{n} \frac 1 h K\left(\frac{x-X_i}{h}\right).
+\]</div>
+<p>To construct a kernel density estimator we need to choose a kernel <span class="math notranslate nohighlight">\(K\)</span> and a bandwidth <span class="math notranslate nohighlight">\(h\)</span>. It can be shown that the selection of <span class="math notranslate nohighlight">\(h\)</span> is important while the choice of <span class="math notranslate nohighlight">\(K\)</span> isn’t crucial <a class="bibtex reference internal" href="bibliography.html#wasserman2013all" id="id5">[Was13]</a>. Here, we will use the Gaussian kernel:</p>
+<div class="math notranslate nohighlight" id="equation-eq-gaussian-kernel">
+<span class="eqno">(19)<a class="headerlink" href="#equation-eq-gaussian-kernel" title="Permalink to this equation">¶</a></span>\[
+\displaystyle K(u) = \frac{1}{\sqrt{2\pi}} e^{\frac{-u^2}{2}}. 
+\]</div>
+<p><a class="reference internal" href="#fig-pdf-kernel"><span class="std std-numref">Fig. 9</span></a> shows the kernel density estimator for the head-turn delay example introduced above.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example of a kernel estimation implementation </span>
+<span class="k">def</span> <span class="nf">kernel_estimator</span><span class="p">(</span><span class="n">X</span><span class="p">,</span><span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">h</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
+    <span class="n">K</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">u</span><span class="p">:</span> <span class="mi">1</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">u</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>  <span class="c1"># number of samples    </span>
+    <span class="n">hat_f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>  <span class="c1"># init.</span>
+    <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">x_j</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">X_i</span> <span class="ow">in</span> <span class="n">X</span><span class="p">:</span>
+            <span class="n">hat_f</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span><span class="o">/</span><span class="p">(</span><span class="n">n</span><span class="o">*</span><span class="n">h</span><span class="p">)</span> <span class="o">*</span> <span class="n">K</span><span class="p">(</span> <span class="p">(</span><span class="n">x_j</span><span class="o">-</span><span class="n">X_i</span><span class="p">)</span> <span class="o">/</span> <span class="n">h</span> <span class="p">)</span>
+    <span class="k">return</span> <span class="n">hat_f</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell tag_remove-output docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">stats</span> <span class="kn">import</span> <span class="n">kernel_estimator</span>
+<span class="c1"># Impact of the bin size on the estimation error. </span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">[</span><span class="mi">15</span><span class="p">,</span><span class="mi">5</span><span class="p">])</span>
+<span class="c1"># In addition plot the empirical distribution for different number of datapoints. </span>
+<span class="n">xmin</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">xmax</span><span class="o">=</span><span class="mi">5</span><span class="p">;</span> <span class="n">n</span> <span class="o">=</span> <span class="mi">200</span><span class="p">;</span> <span class="n">X</span> <span class="o">=</span> <span class="n">Xp</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span> 
+<span class="n">h0</span> <span class="o">=</span> <span class="p">(</span><span class="n">xmax</span><span class="o">-</span><span class="n">xmin</span><span class="p">)</span><span class="o">/</span><span class="mi">10</span>  <span class="c1"># Bandwidth</span>
+<span class="n">N</span> <span class="o">=</span> <span class="mi">30</span>  <span class="c1"># x resolution for the estimation of the kernel. </span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">xmin</span><span class="p">,</span><span class="n">xmax</span><span class="p">,</span><span class="n">N</span><span class="p">)</span>  <span class="c1"># Define the points in which the density is estimated. </span>
+
+<span class="n">h_set</span> <span class="o">=</span> <span class="p">[</span><span class="n">h0</span><span class="o">/</span><span class="mi">10</span><span class="p">,</span><span class="n">h0</span><span class="p">,</span><span class="mi">2</span><span class="o">*</span><span class="n">h0</span><span class="p">]</span>  <span class="c1"># Define the set of bandwidths.</span>
+<span class="k">for</span> <span class="p">(</span><span class="n">i</span><span class="p">,</span><span class="n">h</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">h_set</span><span class="p">):</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># Plot the ground truth comulative distribution (formally is an approximation with a lot of empirical points)</span>
+    <span class="n">sns</span><span class="o">.</span><span class="n">kdeplot</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;Y==1&#39;</span><span class="p">)[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">cumulative</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">);</span>
+    <span class="c1"># Count empirical points per-bin </span>
+    <span class="n">hat_f</span> <span class="o">=</span> <span class="n">kernel_estimator</span><span class="p">(</span><span class="n">X</span><span class="p">,</span><span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span><span class="n">h</span><span class="o">=</span><span class="n">h</span><span class="p">)</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">hat_f</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=.</span><span class="mi">2</span><span class="p">)</span>    
+    <span class="k">if</span> <span class="n">i</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Head-turn delay :: t&#39;</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;$\hat</span><span class="si">{f}</span><span class="s1">(x)$&#39;</span><span class="p">);</span>
+    <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Bandwidth: </span><span class="si">{}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">h</span><span class="p">));</span> <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mi">5</span><span class="p">]);</span>
+<span class="n">glue</span><span class="p">(</span><span class="s2">&quot;pdf_kernel&quot;</span><span class="p">,</span> <span class="n">fig</span><span class="p">,</span> <span class="n">display</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="figure align-default" id="fig-pdf-kernel" style="width: 80%">
+<div class="cell_output docutils container">
+<img alt="../_images/pdfestimation_30_0.png" src="../_images/pdfestimation_30_0.png" />
+</div>
+<p class="caption"><span class="caption-number">Fig. 9 </span><span class="caption-text">Kernel estimation for 200 samples, for different bandwidth sizes.</span><a class="headerlink" href="#fig-pdf-kernel" title="Permalink to this image">¶</a></p>
+</div>
+<p>As we illustrate in <a class="reference internal" href="#fig-pdf-kernel"><span class="std std-numref">Fig. 9</span></a>, the bandwidth <span class="math notranslate nohighlight">\(h\)</span> plays a similar role to the number of bins in the histogram estimation. The smaller the bandwidth, the larger the error because of variance, the larger the bandwidth, the larger the error because of bias. As for the number of bins, we need to estimate the optimal bandwidth by minimizing the approximation error. Recall that:</p>
+<blockquote>
+<div><p>RISK = BIAS^2 + VARIANCE</p>
+</div></blockquote>
+<p>The cross-validation estimation of the risk <span class="math notranslate nohighlight">\(\hat{J}(h)\)</span> can be approximated using Theorem 2.3.</p>
+<div class="admonition-theorem admonition">
+<p class="admonition-title">Theorem</p>
+<p>Theorem 2.3 <a class="bibtex reference internal" href="bibliography.html#wasserman2013all" id="id6">[Was13]</a> Pag. 316: For any <span class="math notranslate nohighlight">\(h&gt;0\)</span>, <span class="math notranslate nohighlight">\(\mathbf{E}[\hat{J}(h)] = \mathbf{E}[J(h)]\)</span>, and</p>
+<div class="math notranslate nohighlight">
+\[
+\hat{J}(h) \approx \frac{1}{h n^2}\sum_{i}\sum_{j} K^*\left(\frac{X_i-X_j}{h}\right) + \frac{2}{nh}K(0)
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(K^*(u) = K^{(2)}(u)-2 K(u)\)</span> and <span class="math notranslate nohighlight">\(K^{(2)}(z) = \int K(z-y)K(y)dy\)</span>. In particular, if <span class="math notranslate nohighlight">\(K\)</span> is <span class="math notranslate nohighlight">\(N(0,1)\)</span>, then <span class="math notranslate nohighlight">\(K^{(2)}\)</span> is the <span class="math notranslate nohighlight">\(N(0,2)\)</span> density.</p>
+</div>
+<p><a class="reference internal" href="#fig-pdf-kernel-estimation-optimal-bandwidth"><span class="std std-numref">Fig. 10</span></a> shows the estimated risk (left) and the estimated density for the optimal bandwidth.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="k">def</span> <span class="nf">kernel_based_empirical_risk</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">h</span><span class="p">):</span>
+    <span class="c1"># Define shortcuts for K K2 and K_ast</span>
+    <span class="n">K</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">u</span><span class="p">:</span> <span class="mi">1</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">u</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>  <span class="c1"># Define the kernel N(0,1)</span>
+    <span class="n">K2</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">u</span><span class="p">:</span> <span class="mi">1</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">u</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="mi">2</span><span class="p">))</span>  <span class="c1"># Define the kernel with sigma^2=2</span>
+    <span class="n">K_ast</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">u</span><span class="p">:</span> <span class="n">K2</span><span class="p">(</span><span class="n">u</span><span class="p">)</span> <span class="o">-</span> <span class="mi">2</span><span class="o">*</span><span class="n">K</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>    
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+    <span class="n">J</span> <span class="o">=</span> <span class="mi">2</span><span class="o">/</span><span class="p">(</span><span class="n">n</span><span class="o">*</span><span class="n">h</span><span class="p">)</span> <span class="o">*</span> <span class="n">K</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>  <span class="c1">#  Left term [1] pag. 316, Eq (20.25)</span>
+    <span class="k">for</span> <span class="n">X_i</span> <span class="ow">in</span> <span class="n">X</span><span class="p">:</span>
+        <span class="k">for</span> <span class="n">X_j</span> <span class="ow">in</span> <span class="n">X</span><span class="p">:</span>
+            <span class="n">J</span> <span class="o">+=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="n">h</span> <span class="o">*</span> <span class="n">n</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">*</span> <span class="n">K_ast</span><span class="p">(</span> <span class="p">(</span><span class="n">X_i</span><span class="o">-</span><span class="n">X_j</span><span class="p">)</span> <span class="o">/</span> <span class="n">h</span> <span class="p">)</span>
+    <span class="k">return</span> <span class="n">J</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell tag_remove-output docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">stats</span> <span class="kn">import</span> <span class="n">kernel_estimator</span>
+<span class="c1"># Impact of the bin size on the estimation error. </span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span><span class="mi">5</span><span class="p">])</span>
+<span class="c1"># In addition plot the empirical distribution for different number of datapoints. </span>
+<span class="n">xmin</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">xmax</span><span class="o">=</span><span class="mi">5</span><span class="p">;</span> <span class="n">n</span> <span class="o">=</span> <span class="mi">200</span><span class="p">;</span> <span class="n">X</span> <span class="o">=</span> <span class="n">Xp</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span> <span class="p">;</span> <span class="n">N</span> <span class="o">=</span> <span class="mi">30</span>  <span class="c1"># x resolution for the estimation of the kernel. </span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">xmin</span><span class="p">,</span><span class="n">xmax</span><span class="p">,</span><span class="n">N</span><span class="p">)</span>  <span class="c1"># Define the points in which the density is estimated. </span>
+
+<span class="kn">from</span> <span class="nn">stats</span> <span class="kn">import</span> <span class="n">kernel_based_empirical_risk</span>
+<span class="n">hs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span><span class="mf">1.5</span><span class="p">,</span><span class="mi">20</span><span class="p">)</span>
+<span class="n">J</span> <span class="o">=</span> <span class="p">[</span><span class="n">kernel_based_empirical_risk</span><span class="p">(</span><span class="n">X</span><span class="p">,</span><span class="n">hh</span><span class="p">)</span> <span class="k">for</span> <span class="n">hh</span> <span class="ow">in</span> <span class="n">hs</span><span class="p">]</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">hs</span><span class="p">,</span><span class="n">J</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;h&#39;</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;$\hat{J(h)}$&#39;</span><span class="p">)</span>
+<span class="n">h_opt</span> <span class="o">=</span> <span class="n">hs</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">J</span><span class="p">)]</span>  <span class="c1"># get opt bandwidth</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">h_opt</span><span class="p">,</span> <span class="nb">min</span><span class="p">(</span><span class="n">J</span><span class="p">),</span> <span class="mi">150</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">kdeplot</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;Y==1&#39;</span><span class="p">)[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">cumulative</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">);</span>
+<span class="n">hat_f</span> <span class="o">=</span> <span class="n">kernel_estimator</span><span class="p">(</span><span class="n">X</span><span class="p">,</span><span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span><span class="n">h</span><span class="o">=</span><span class="n">h_opt</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">bar</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">hat_f</span><span class="p">,</span> <span class="n">width</span><span class="o">=</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">-</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=.</span><span class="mi">2</span><span class="p">)</span>    
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Head-turn delay :: t&#39;</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mi">5</span><span class="p">]);</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;PDF estimation for the optimal bandwidth: </span><span class="si">{:2.1f}</span><span class="s1">&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">h_opt</span><span class="p">));</span> 
+<span class="n">glue</span><span class="p">(</span><span class="s2">&quot;pdf_kernel_estimation_optimal_bandwidth&quot;</span><span class="p">,</span> <span class="n">fig</span><span class="p">,</span> <span class="n">display</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="figure align-default" id="fig-pdf-kernel-estimation-optimal-bandwidth" style="width: 80%">
+<div class="cell_output docutils container">
+<img alt="../_images/pdfestimation_34_0.png" src="../_images/pdfestimation_34_0.png" />
+</div>
+<p class="caption"><span class="caption-number">Fig. 10 </span><span class="caption-text">Kernel bandwidth optimization (left), and the kernel estimation for the optimal bandwidth)</span><a class="headerlink" href="#fig-pdf-kernel-estimation-optimal-bandwidth" title="Permalink to this image">¶</a></p>
+</div>
+</div>
+<div class="section" id="confidence-associated-with-a-kernel-estimation">
+<h3>Confidence associated with a kernel estimation<a class="headerlink" href="#confidence-associated-with-a-kernel-estimation" title="Permalink to this headline">¶</a></h3>
+<p>As for the estimated histograms, confidence intervals can be computed for the kernel density estimation. The confidence band is defined for a smoothed version <span class="math notranslate nohighlight">\(\bar{f}\)</span> of the ground truth distribution <span class="math notranslate nohighlight">\(f\)</span>, defined as</p>
+<div class="math notranslate nohighlight" id="equation-eq-bar-f-conf-interval">
+<span class="eqno">(20)<a class="headerlink" href="#equation-eq-bar-f-conf-interval" title="Permalink to this equation">¶</a></span>\[
+\bar{f}(x)=\int{\frac 1 h K \left( \frac{x-u}{h} \right) f(u)\, du } \ = \mathbf{E}(\hat{f}(x).
+\]</div>
+<p>When the normal kernel is used, a <span class="math notranslate nohighlight">\(1-\alpha\)</span> confidence interval <span class="math notranslate nohighlight">\((l(x),u(x))\)</span> is given by</p>
+<div class="math notranslate nohighlight">
+\[
+l(x) = \hat{f}(x)- q\, \mbox{se}(x), u(x) = \hat{f}(x) + q\, \mbox{se}(x)
+\]</div>
+<p>where</p>
+<div class="math notranslate nohighlight">
+\[
+\mbox{se}(x) = \frac{s(x)}{\sqrt{n}}, \ \ s^2(x) = \frac{1}{n-1} \sum_i (Y_i(x) - \bar{Y}(x))^2, \ \ \left(\bar{Y}(x) = \frac 1 n \sum_i Y_i(x)\right),\ Y_i(x) = \frac{1}{h} K\left(\frac{x-X_i}{h}\right),
+\]</div>
+<div class="math notranslate nohighlight">
+\[
+q = \Phi^{-1}\left(\frac{1 + (1-\alpha)^{1/m}}{2}\right), \mbox{ and } m=3h.
+\]</div>
+<p><a class="reference internal" href="#fig-kernel-estimation-with-ci"><span class="std std-numref">Fig. 11</span></a> illustrates the <span class="math notranslate nohighlight">\(95\%\)</span> confidence intervals for the kernel density estimation presented in <a class="reference internal" href="#fig-pdf-kernel-estimation-optimal-bandwidth"><span class="std std-numref">Fig. 10</span></a>. Compare this result with the ones obtained for the histogram estimator <a class="reference internal" href="#fig-pdf-histogram-confidence-intervals"><span class="std std-numref">Fig. 8</span></a>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example of implementation (see stats compute_kernel_estimator_and_conf_intervals for more details).</span>
+<span class="k">def</span> <span class="nf">compute_kernel_estimation_conf</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">hat_f</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">h</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="mf">0.05</span><span class="p">):</span>
+    <span class="n">K</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">u</span><span class="p">:</span> <span class="mi">1</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">u</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>  <span class="c1"># Define the kernel N(0,1)</span>
+    <span class="kn">from</span> <span class="nn">scipy.stats</span> <span class="kn">import</span> <span class="n">norm</span>
+    <span class="n">m</span> <span class="o">=</span> <span class="mi">3</span><span class="o">*</span><span class="n">h</span>
+    <span class="n">q</span> <span class="o">=</span> <span class="n">norm</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span> <span class="p">(</span> <span class="mi">1</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span><span class="o">-</span><span class="n">alpha</span><span class="p">)</span><span class="o">**</span><span class="p">(</span><span class="mi">1</span><span class="o">/</span><span class="n">m</span><span class="p">)</span> <span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span><span class="p">)</span> <span class="p">)</span>  <span class="c1"># ppf(x) = Phi^-1(x)  Phi = cdf_{N(0,1)}</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+    <span class="n">l</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">hat_f</span><span class="p">);</span> <span class="n">u</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">hat_f</span><span class="p">)</span>  <span class="c1"># init.</span>
+    <span class="k">for</span> <span class="n">j</span><span class="p">,</span><span class="n">xx</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>  <span class="c1"># for each x coordinate compute l(x) and u(x)</span>
+        <span class="n">Y_i</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span> <span class="mi">1</span><span class="o">/</span><span class="n">h</span> <span class="o">*</span> <span class="n">K</span><span class="p">((</span><span class="n">xx</span><span class="o">-</span><span class="n">XX</span><span class="p">)</span><span class="o">/</span><span class="n">h</span><span class="p">)</span> <span class="k">for</span> <span class="n">XX</span> <span class="ow">in</span> <span class="n">X</span><span class="p">])</span> 
+        <span class="n">bar_Y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">Y_i</span><span class="p">)</span>
+        <span class="n">s_square</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="p">(</span><span class="n">n</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span> <span class="p">(</span><span class="n">Y_i</span><span class="o">-</span><span class="n">bar_Y</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span> <span class="p">)</span>
+        <span class="n">se</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">s_square</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">n</span><span class="p">)</span>
+        <span class="n">l</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">hat_f</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">-</span> <span class="n">q</span><span class="o">*</span><span class="n">se</span>
+        <span class="n">u</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">hat_f</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+</span> <span class="n">q</span><span class="o">*</span><span class="n">se</span>
+    <span class="k">return</span> <span class="n">l</span><span class="p">,</span> <span class="n">u</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="cell tag_remove-output docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">stats</span> <span class="kn">import</span> <span class="n">kernel_estimator</span>
+<span class="c1"># Impact of the bin size on the estimation error. </span>
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span><span class="mi">5</span><span class="p">])</span>
+<span class="c1"># In addition plot the empirical distribution for different number of datapoints. </span>
+<span class="n">xmin</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">xmax</span><span class="o">=</span><span class="mi">5</span><span class="p">;</span> <span class="n">n</span> <span class="o">=</span> <span class="mi">200</span><span class="p">;</span> <span class="n">X</span> <span class="o">=</span> <span class="n">Xp</span><span class="p">[:</span><span class="n">n</span><span class="p">]</span> <span class="p">;</span> <span class="n">N</span> <span class="o">=</span> <span class="mi">30</span>  <span class="c1"># x resolution for the estimation of the kernel. </span>
+<span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">xmin</span><span class="p">,</span><span class="n">xmax</span><span class="p">,</span><span class="n">N</span><span class="p">)</span>  <span class="c1"># Define the points in which the density is estimated. </span>
+<span class="n">alpha</span><span class="o">=</span><span class="mf">0.05</span>  <span class="c1"># set conf. interval</span>
+
+<span class="kn">from</span> <span class="nn">stats</span> <span class="kn">import</span> <span class="n">compute_kernel_estimator_and_conf_interval</span>
+<span class="n">h</span> <span class="o">=</span> <span class="mf">0.3</span><span class="p">;</span> 
+<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">1</span><span class="p">);</span> <span class="n">sns</span><span class="o">.</span><span class="n">kdeplot</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;Y==1&#39;</span><span class="p">)[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">cumulative</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">);</span>
+<span class="n">hat_f</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">u</span> <span class="o">=</span> <span class="n">compute_kernel_estimator_and_conf_interval</span><span class="p">(</span><span class="n">X</span><span class="p">,</span><span class="n">x</span><span class="o">=</span><span class="n">x</span><span class="p">,</span><span class="n">xmin</span><span class="o">=</span><span class="n">xmin</span><span class="p">,</span><span class="n">xmax</span><span class="o">=</span><span class="n">xmax</span><span class="p">,</span><span class="n">h</span><span class="o">=</span><span class="n">h</span><span class="p">,</span>
+                                                         <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span><span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Head-turn delay :: t&#39;</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">([</span><span class="mi">0</span><span class="p">,</span><span class="mi">5</span><span class="p">]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([]);</span> 
+<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">);</span>  
+<span class="n">sns</span><span class="o">.</span><span class="n">kdeplot</span><span class="p">(</span><span class="n">df</span><span class="o">.</span><span class="n">query</span><span class="p">(</span><span class="s1">&#39;Y==1&#39;</span><span class="p">)[</span><span class="s1">&#39;X&#39;</span><span class="p">],</span> <span class="n">cumulative</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">linewidth</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">);</span>
+<span class="n">hat_f</span><span class="p">,</span> <span class="n">l</span><span class="p">,</span> <span class="n">u</span> <span class="o">=</span> <span class="n">compute_histogram_and_conf_interval</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">xmin</span><span class="o">=</span><span class="n">xmin</span><span class="p">,</span> <span class="n">xmax</span><span class="o">=</span><span class="n">xmax</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=</span><span class="n">alpha</span><span class="p">,</span> 
+                                                  <span class="n">num_bins</span><span class="o">=</span><span class="n">num_bins</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Histogram estimation with 95% CI&#39;</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([]);</span> 
+<span class="n">glue</span><span class="p">(</span><span class="s2">&quot;kernel_estimation_with_CI&quot;</span><span class="p">,</span> <span class="n">fig</span><span class="p">,</span> <span class="n">display</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="figure align-default" id="fig-kernel-estimation-with-ci" style="width: 80%">
+<div class="cell_output docutils container">
+<img alt="../_images/pdfestimation_38_0.png" src="../_images/pdfestimation_38_0.png" />
+</div>
+<p class="caption"><span class="caption-number">Fig. 11 </span><span class="caption-text">Kernel PDF estimation and its 95% CI (left), and the Histogram PDF estimation with its associated CI (right). In both cases the optima bandwidth/bin size was selected. 200 empirical samples were considered for both.</span><a class="headerlink" href="#fig-kernel-estimation-with-ci" title="Permalink to this image">¶</a></p>
+</div>
+<p>As discussed above, kernel estimations provide tighter approximations for the same amount of data, and have, in general, a faster convergence to the ground truth distribution.</p>
+</div>
+</div>
+<div class="section" id="parameter-estimation">
+<span id="sec-parameter-estimation"></span><h2>Parameter estimation<a class="headerlink" href="#parameter-estimation" title="Permalink to this headline">¶</a></h2>
+<p>In the previous sections, we focused on the estimation of distributions on a model agnostic fashion. Meaning, no hypothesis about the nature of the distribution was made. In contrast, if we know the distribution model, for example, that the distribution is Gaussian, we only need to estimate two number to characterize the process: the mean and standard deviation. In other scenarios, even if we don’t know the model of the distribution, we might still only care about certain properties of the distribution, such as its mean. The approximation of these quantities is described as the theory of parameter estimation.</p>
+<div class="admonition-theorem admonition">
+<p class="admonition-title">Theorem</p>
+<p>Theorem 2.4: The Central Limit Theorem (CLT)** Let <span class="math notranslate nohighlight">\(X_1, ..., X_n\)</span> be IID with mean <span class="math notranslate nohighlight">\(\mu\)</span> and variance <span class="math notranslate nohighlight">\(\sigma^2\)</span>. Let <span class="math notranslate nohighlight">\(\bar{X}_n = n^{-1} \sum_{i=1}^n X_i\)</span>. Then</p>
+<div class="math notranslate nohighlight">
+\[
+\frac{\bar{X}_n-\mu}{\sigma / \sqrt{n}} \stackrel{n\rightarrow \infty}{\rightsquigarrow} N\left(0, 1\right).
+\]</div>
+</div>
+<p>In Theorem 2.4 <span class="math notranslate nohighlight">\(X_n \rightsquigarrow F\)</span> means that <span class="math notranslate nohighlight">\(X_n\)</span> converges to <span class="math notranslate nohighlight">\(F\)</span> <em>in distribution</em>, i.e., <span class="math notranslate nohighlight">\(\lim_{n\rightarrow \infty} F_n(x) = F(x)\)</span> for all <span class="math notranslate nohighlight">\(x\)</span> for which <span class="math notranslate nohighlight">\(F\)</span> is continuous. (A formal and more exhaustive explanation is provided in <a class="bibtex reference internal" href="bibliography.html#wasserman2013all" id="id7">[Was13]</a> <a class="bibtex reference internal" href="bibliography.html#kay1993fundamentals" id="id8">[Kay93]</a>). This theorem is central to the objectives of this section. First, it tells us that a simple average of the samples is a good approximation of the mean of the distribution of <span class="math notranslate nohighlight">\(X_i\)</span>. As the number of samples increases, it tells us that the error tends to 0. It also gives an idea of the error (the variance) which, as we shall see, can be used to estimate confidence intervals. The most remarkable part is that it tells us that <span class="math notranslate nohighlight">\(\bar{X_n}\)</span> has a normal probability distribution, with no hypothesis about <span class="math notranslate nohighlight">\(F\)</span>! (the distribution of <span class="math notranslate nohighlight">\(X_i\)</span>).</p>
+<div class="admonition-theorem admonition">
+<p class="admonition-title">Theorem</p>
+<p>Theorem 2.5 (<a class="bibtex reference internal" href="bibliography.html#wasserman2013all" id="id9">[Was13]</a> pag. 78) Assume the same conditions as in Theorem 2.4. And define,</p>
+<div class="math notranslate nohighlight">
+\[
+S_n^2 = \frac{1}{n-1} \sum_{i=1}^{n}(X_i - \bar{X}_n)^2.
+\]</div>
+<p>Then,</p>
+<div class="math notranslate nohighlight">
+\[
+\frac{\bar{X}_n-\mu}{S_n / \sqrt{n}} \stackrel{n\rightarrow \infty}{\rightsquigarrow} N\left(0, 1\right).
+\]</div>
+</div>
+<p>Theorem 2.5 essentially tell us that we can still apply the CLT using the estimated variance <span class="math notranslate nohighlight">\(S_n\)</span> instead of the ground truth variance <span class="math notranslate nohighlight">\(\sigma\)</span>. This is very useful since <span class="math notranslate nohighlight">\(\sigma\)</span> is unknown in practice. Using Theorem 2.5, computing a <span class="math notranslate nohighlight">\(\alpha\)</span> confidence interval for <span class="math notranslate nohighlight">\(\bar{X}_n\)</span> is straightforward: <span class="math notranslate nohighlight">\(\bar{X}_n \pm z_{\alpha/2} \frac{S_n}{\sqrt{n}}\)</span>. (For <span class="math notranslate nohighlight">\(\alpha=0.05\)</span>, <span class="math notranslate nohighlight">\(z_{\alpha/2} = 1.96 \approx 2\)</span>, is common then to use the approximated rule of <span class="math notranslate nohighlight">\(\pm 2 \frac{S_n}{\sqrt{n}}\)</span>.) Below we provide computations examples for the toy data used across this section.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># As before, for compactness we refer to the positive class the class of ASD kids, </span>
+<span class="c1"># and negative class the clas of non-ASD kids. </span>
+<span class="n">num_p</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">Xp</span><span class="p">);</span> <span class="n">num_n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">Xn</span><span class="p">)</span>  <span class="c1"># number of samples in each group</span>
+
+<span class="n">bar_Xp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">Xp</span><span class="p">);</span> <span class="n">bar_Xn</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">Xn</span><span class="p">);</span>  <span class="c1"># Empirical mean of each sample</span>
+
+<span class="c1"># Shortcut for the emp. estimation of the std (numpy uses 1/n instead 1/n-1)</span>
+<span class="n">var</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">X</span><span class="p">:</span> <span class="mi">1</span><span class="o">/</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span> <span class="p">[(</span><span class="n">X_i</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">X</span><span class="p">))</span><span class="o">**</span><span class="mi">2</span> <span class="k">for</span> <span class="n">X_i</span> <span class="ow">in</span> <span class="n">X</span><span class="p">]</span> <span class="p">))</span>
+
+
+<span class="n">Sp</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">var</span><span class="p">(</span><span class="n">Xp</span><span class="p">));</span> <span class="n">Sn</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">var</span><span class="p">(</span><span class="n">Xn</span><span class="p">));</span>  <span class="c1"># Empirical estimation of the square root of the variance S</span>
+<span class="c1"># Compute the 5% conf. interval (we use the approx z_(5%/2) ~ 2)</span>
+<span class="n">conf_p</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">Sp</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">num_p</span><span class="p">);</span> <span class="n">conf_n</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">Sn</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">num_n</span><span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;The estimated mean for the head-tourn delay (mean and 95% CI).&#39;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;ASD group     :: </span><span class="si">{:2.2f}</span><span class="s1"> +- </span><span class="si">{:2.2f}</span><span class="s1"> seconds&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">bar_Xp</span><span class="p">,</span> <span class="n">conf_p</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;non-ASD group :: </span><span class="si">{:2.2f}</span><span class="s1"> +- </span><span class="si">{:2.2f}</span><span class="s1"> seconds&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">bar_Xn</span><span class="p">,</span> <span class="n">conf_n</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>The estimated mean for the head-tourn delay (mean and 95% CI).
+ASD group     :: 2.96 +- 0.14 seconds
+non-ASD group :: 1.41 +- 0.08 seconds
+</pre></div>
+</div>
+</div>
+</div>
+<p>What if we want to model the difference between the two means? We can use that the difference between to (independent) normally distributed variables is also normal. If <span class="math notranslate nohighlight">\(X_1\,\sim\,N(\mu_1,\sigma_1^2)\)</span>, <span class="math notranslate nohighlight">\(X_2\,\sim\,N(\mu_2,\sigma_2^2)\)</span>, then <span class="math notranslate nohighlight">\(Y = X_1-X_2\, \sim\, N(\mu_1-\mu_2,\sigma_1^2+\sigma_2^2)\)</span>.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">mean_diff</span> <span class="o">=</span> <span class="n">bar_Xp</span> <span class="o">-</span> <span class="n">bar_Xn</span>
+<span class="n">S_diff</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span> <span class="p">(</span><span class="n">Sp</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">num_p</span><span class="p">))</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="p">(</span><span class="n">Sn</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">num_n</span><span class="p">))</span><span class="o">**</span><span class="mi">2</span> <span class="p">)</span>
+<span class="n">conf_diff</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">S_diff</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;The ASD kids respond in average </span><span class="si">{:2.2f}</span><span class="s1"> +- </span><span class="si">{:2.2f}</span><span class="s1"> seconds slower than the non-ASD kids.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">mean_diff</span><span class="p">,</span> <span class="n">conf_diff</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>The ASD kids respond in average 1.55 +- 0.16 seconds slower than the non-ASD kids.
+</pre></div>
+</div>
+</div>
+</div>
+<div class="section" id="a-general-framework">
+<h3>A general framework<a class="headerlink" href="#a-general-framework" title="Permalink to this headline">¶</a></h3>
+<p>The ideas discussed in Sections <a class="reference internal" href="#sec-cdf-definition"><span class="std std-ref">CDF Definition</span></a>, <a class="reference internal" href="#sec-pdf-definition"><span class="std std-ref">PDF definition</span></a> and <a class="reference internal" href="#sec-parameter-estimation"><span class="std std-ref">Parameter estimation</span></a> can be unified in a more general framework. Let <span class="math notranslate nohighlight">\(X_1, ..., X_n\)</span> be IID samples from some distribution <span class="math notranslate nohighlight">\(F\)</span>. <span class="math notranslate nohighlight">\(\theta\)</span> denotes a parameter we want to estimate, e.g., the ground truth height of the histogram for some bin <span class="math notranslate nohighlight">\(B_i\)</span>, or the mean of <span class="math notranslate nohighlight">\(F\)</span> <span class="math notranslate nohighlight">\(\mu\)</span>. <span class="math notranslate nohighlight">\(\hat{\theta}\)</span> denotes our estimation of <span class="math notranslate nohighlight">\(\theta\)</span> from the observed data. <span class="math notranslate nohighlight">\(\hat{\theta}\)</span> can be expressed as a function of the random variables <span class="math notranslate nohighlight">\(X_i\)</span>: <span class="math notranslate nohighlight">\(\hat{\theta}=g(X_1, ..., X_n)\)</span>. As this is a function of random variables, <span class="math notranslate nohighlight">\(\hat{\theta}\)</span> is itself a random variable.</p>
+<p>For example, on the experiment discussed above, <span class="math notranslate nohighlight">\(\theta=\mu\)</span>, and we defined our estimator <span class="math notranslate nohighlight">\(\hat{\theta}=\bar{X_n}\)</span>. The CLT tells us that the distribution of the random variable <span class="math notranslate nohighlight">\(\hat{\theta}\)</span> is normal (regardless of what is the distribution <span class="math notranslate nohighlight">\(F\)</span> that generated the samples <span class="math notranslate nohighlight">\(X_i\)</span>).</p>
+<p>The bias of an estimator is defined by,</p>
+<div class="math notranslate nohighlight">
+\[
+\mbox{bias}(\hat{\theta}) = \mathbf{E}(\hat{\theta})-\theta,
+\]</div>
+<p>and the standard error <span class="math notranslate nohighlight">\(\mbox{se} = \sqrt{\mathcal{V}(\hat{\theta})}\)</span>.</p>
+<p>The mean squared error is defined as</p>
+<div class="math notranslate nohighlight">
+\[ 
+MSE = \mathbf{E}(\hat{\theta}-\theta)^2.
+\]</div>
+<div class="admonition-theorem admonition">
+<p class="admonition-title">Theorem</p>
+<p>Theorem 2.6 (<a class="bibtex reference internal" href="bibliography.html#wasserman2013all" id="id10">[Was13]</a> pag. 91) The MSE can be written as</p>
+<div class="math notranslate nohighlight">
+\[
+MSE = \mbox{bias}^2(\hat{\theta}) + \mathbf{V}(\hat{\theta}).
+\]</div>
+</div>
+<div class="admonition-definition admonition">
+<p class="admonition-title">Definition</p>
+<p>An estimator is asymptotically normal if</p>
+<div class="math notranslate nohighlight">
+\[
+\frac{\hat{\theta}-\theta}{\mbox{se}} \stackrel{n\rightarrow \infty}{\rightsquigarrow} N\left(0, 1\right).
+\]</div>
+</div>
+<p>For example, in the experiment illustrated above, we estimated the mean by the empirical mean, we had an asymptotically normal estimator with <span class="math notranslate nohighlight">\(\mbox{se}=\sigma/\sqrt{n}\)</span>. Obtaining confidence intervals for asymptotically normal estimators is straight forward, an <span class="math notranslate nohighlight">\(\alpha\)</span> confidence interval is <span class="math notranslate nohighlight">\(\hat{\theta}\pm z_{\alpha/2}\mbox{se}\)</span>. (Remember that for <span class="math notranslate nohighlight">\(\alpha=5\%\)</span>, <span class="math notranslate nohighlight">\(z_{\alpha/2}=1.96 \approx 2\)</span>.</p>
+</div>
+<div class="section" id="bootstrap-method">
+<h3>Bootstrap method<a class="headerlink" href="#bootstrap-method" title="Permalink to this headline">¶</a></h3>
+<p>The bootstrap is a method for estimating standard errors and computing confidence intervals. Let <span class="math notranslate nohighlight">\(X_1, ..., X_n\sim F\)</span> be a set of random variables and <span class="math notranslate nohighlight">\(\hat{\theta} = g(X_1,...,X_n)\)</span> any function of the data. The goal is to estimate the variance <span class="math notranslate nohighlight">\(\mathbf{V}_F(\hat{\theta})\)</span>. We write <span class="math notranslate nohighlight">\(\mathbf{V}_F(\hat{\theta})\)</span> to emphasize that the variance usually depends on the unknown distribution <span class="math notranslate nohighlight">\(F\)</span>. Bootstrap has two main step: (i) estimate <span class="math notranslate nohighlight">\(\mathbf{V}_F(\hat{\theta})\)</span> with <span class="math notranslate nohighlight">\(\mathbf{V}_{\hat{F}}(\hat{\theta})\)</span>, and (ii) approximate <span class="math notranslate nohighlight">\(\mathbf{V}_{\hat{F}}(\hat{\theta})\)</span>.</p>
+<div class="section" id="estimating-the-variance">
+<h4>Estimating the variance<a class="headerlink" href="#estimating-the-variance" title="Permalink to this headline">¶</a></h4>
+<p>The first step consists of estimating the variance of <span class="math notranslate nohighlight">\(\hat{\theta}\)</span> assuming <span class="math notranslate nohighlight">\(F=\hat{F}\)</span> where <span class="math notranslate nohighlight">\(\hat{F}\)</span> is the empirical distribution of the data. Since <span class="math notranslate nohighlight">\(\hat{F}\)</span> puts <span class="math notranslate nohighlight">\(1/n\)</span> probability in each sample, simulating new samples <span class="math notranslate nohighlight">\(X^*_1, ..., X^*_n\sim \hat{F}\)</span> is equivalent of sampling with replacement <span class="math notranslate nohighlight">\(n\)</span> samples from <span class="math notranslate nohighlight">\(\{X_1, ..., X_n\}\)</span>. The method can be summarized as follows.</p>
+<ol class="simple">
+<li><p>Draw <span class="math notranslate nohighlight">\(X_1^*, ..., X_n^*\sim \hat{F}\)</span>.</p></li>
+<li><p>Compute <span class="math notranslate nohighlight">\(\hat{\theta}^* = g(X_1^*, ..., X_n^*)\)</span>.</p></li>
+<li><p>Repeat steps 1 and 2, <span class="math notranslate nohighlight">\(B\)</span> times, to get <span class="math notranslate nohighlight">\(\hat{\theta}^*_1, ..., \hat{\theta}^*_B\)</span>.</p></li>
+<li><p>Let</p></li>
+</ol>
+<div class="math notranslate nohighlight">
+\[
+v_{boot} = \frac 1 B \sum_{b = 1}^{B} \left( \hat{\theta}^*_b - \bar{\theta}^* \right)^2,
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(\bar{\theta}^* = \frac 1 B \sum_b \hat{\theta}^*_b\)</span>.</p>
+<p>Remember we are doing two approximations:</p>
+<div class="math notranslate nohighlight">
+\[
+\mathbf{V}_F(\hat{\theta}) \stackrel{\mbox{not so small}}{\approx} \mathbf{V}_{\hat{F}}(\hat{\theta}) \stackrel{\mbox{small}}{\approx} v_{boot}. 
+\]</div>
+</div>
+<div class="section" id="bootstrap-confidence-intervals">
+<h4>Bootstrap confidence intervals<a class="headerlink" href="#bootstrap-confidence-intervals" title="Permalink to this headline">¶</a></h4>
+<p>There are several methods to construct bootstrap confidence intervals. We discuss two: <em>The Normal Interval</em>, and <em>the pivotal interval</em>.</p>
+<div class="admonition-method-1-the-normal-interval admonition">
+<p class="admonition-title">Method 1: The normal interval.</p>
+<p>This method is straight forward but has a limitation: it assumes the distribution of <span class="math notranslate nohighlight">\(\hat{\theta}\)</span> is approximately normal (if we estimate the mean <span class="math notranslate nohighlight">\(\hat{X}\)</span>, for example, this is true thanks to the CLT). Then, the <span class="math notranslate nohighlight">\(1-\alpha\)</span> confidence interval is simply <span class="math notranslate nohighlight">\(\hat{\theta} \pm z_{\alpha / 2}\sqrt{v_{boot}}\)</span>.</p>
+</div>
+<div class="admonition-method-2-pivotal-interval admonition">
+<p class="admonition-title">Method 2: Pivotal Interval.</p>
+<p>We define the error <span class="math notranslate nohighlight">\(R=\hat{\theta}-\theta\)</span>, and <span class="math notranslate nohighlight">\(H(r)\)</span> the CDF of <span class="math notranslate nohighlight">\(R\)</span>, i.e., <span class="math notranslate nohighlight">\(H(r)=P(R\leq r)\)</span>. Of course the ground truth value of <span class="math notranslate nohighlight">\(\theta\)</span> is unknown so we can’t compute directly <span class="math notranslate nohighlight">\(R\)</span> or <span class="math notranslate nohighlight">\(H\)</span>. Instead, we will approximate <span class="math notranslate nohighlight">\(H\)</span> using the bootstrap estimations of <span class="math notranslate nohighlight">\(\hat{\theta}^*_b\)</span>. We define</p>
+<div class="math notranslate nohighlight">
+\[
+\hat{H}(r) \stackrel{def}{=} \frac{1}{B} \sum_{b=1}^{B} I(R^*_b \leq r)
+\]</div>
+<p>where <span class="math notranslate nohighlight">\(R^*_b \stackrel{def}{=} \hat{\theta}^*_b - \hat{\theta}\)</span>. It follows that an approximate <span class="math notranslate nohighlight">\(1-\alpha\)</span> confidence interval is <span class="math notranslate nohighlight">\((\hat{a},\hat{b})\)</span> where,</p>
+<div class="math notranslate nohighlight">
+\[
+\hat{a} = \hat{\theta} - \hat{H}^{-1}\left(1-\frac{\alpha}{2}\right) = \hat{\theta} - (\hat{\theta}^*_{1-\alpha/2} - \hat{\theta}) = 2\hat{\theta} - \hat{\theta}^*_{1-\alpha/2}.
+\]</div>
+<div class="math notranslate nohighlight">
+\[
+\hat{b} = \hat{\theta} - \hat{H}^{-1}\left(\frac{\alpha}{2}\right) = \hat{\theta} - (\hat{\theta}^*_{\alpha/2} - \hat{\theta}) = 2\hat{\theta} - \hat{\theta}^*_{\alpha/2}.
+\]</div>
+<p><span class="math notranslate nohighlight">\(\hat{\theta}^*_{\beta}\)</span> is the <span class="math notranslate nohighlight">\(\beta\)</span> quantile of the sample <span class="math notranslate nohighlight">\(\{\hat{\theta}^*_{1}, ..., \hat{\theta}^*_{B}\}\)</span>. For example, <span class="math notranslate nohighlight">\(\hat{\theta}^*_{0.05}\)</span> is the sample <span class="math notranslate nohighlight">\(\hat{\theta}^*_{i}\)</span> for which <span class="math notranslate nohighlight">\(95\%\)</span> of <span class="math notranslate nohighlight">\(\hat{\theta}^*_{j}\)</span> are larger.</p>
+</div>
+<p>Below we illustrate the implementation of this methods on our toy numerical example.</p>
+<div class="cell tag_remove-output docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Example: estimate the confidence interval for the mean of the head-turn delay on the ASD group </span>
+<span class="c1"># using bootstrap and the pivotal interval method. </span>
+<span class="n">X</span> <span class="o">=</span> <span class="n">Xp</span> <span class="p">;</span> <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">);</span> <span class="n">bar_X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">X</span><span class="p">)</span> 
+<span class="c1"># Recall our previous confidence interval estimation using the CLT. </span>
+<span class="c1"># Empirical variance (un-biased estimator using 1/n-1). </span>
+<span class="n">var</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">X</span><span class="p">:</span> <span class="mi">1</span><span class="o">/</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span> <span class="p">[(</span><span class="n">X_i</span><span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">X</span><span class="p">))</span><span class="o">**</span><span class="mi">2</span> <span class="k">for</span> <span class="n">X_i</span> <span class="ow">in</span> <span class="n">X</span><span class="p">]</span> <span class="p">))</span>
+<span class="n">se</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">var</span><span class="p">(</span><span class="n">X</span><span class="p">)</span><span class="o">/</span><span class="n">n</span><span class="p">)</span>  <span class="c1"># Using CLT </span>
+
+<span class="c1"># Now using bootstrap</span>
+<span class="k">def</span> <span class="nf">bootstrap</span><span class="p">(</span><span class="n">X</span><span class="p">,</span><span class="n">B</span><span class="p">):</span>
+    <span class="n">bar_X_b</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">B</span><span class="p">):</span>
+        <span class="n">X_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># Get n samples from {X_1,...,X_n} with replacement. </span>
+        <span class="n">bar_X_b</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">X_b</span><span class="p">))</span>  <span class="c1"># Estimate the mean from the sample</span>
+    <span class="c1"># Compute the mean of the estimated values</span>
+    <span class="n">v_boot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">var</span><span class="p">(</span><span class="n">bar_X_b</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">v_boot</span>
+
+<span class="n">fig</span> <span class="o">=</span> <span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">()</span>
+<span class="n">Bs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">1000</span><span class="p">,</span><span class="mi">250</span><span class="p">);</span> <span class="n">v_boots</span> <span class="o">=</span> <span class="p">[</span><span class="n">bootstrap</span><span class="p">(</span><span class="n">X</span><span class="p">,</span><span class="nb">int</span><span class="p">(</span><span class="n">B</span><span class="p">))</span> <span class="k">for</span> <span class="n">B</span> <span class="ow">in</span> <span class="n">Bs</span><span class="p">];</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">Bs</span><span class="p">,</span> <span class="n">v_boots</span><span class="p">,</span> <span class="s1">&#39;-&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;orange&#39;</span><span class="p">);</span> 
+<span class="n">plt</span><span class="o">.</span><span class="n">plot</span><span class="p">(</span><span class="n">Bs</span><span class="p">,</span> <span class="p">[</span><span class="n">se</span><span class="o">**</span><span class="mi">2</span> <span class="k">for</span> <span class="n">B</span> <span class="ow">in</span> <span class="n">Bs</span><span class="p">],</span> <span class="s1">&#39;--&#39;</span><span class="p">,</span> <span class="n">color</span><span class="o">=</span><span class="s1">&#39;steelblue&#39;</span><span class="p">);</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">legend</span><span class="p">([</span><span class="s1">&#39;bootstrap estimation&#39;</span><span class="p">,</span> <span class="s1">&#39;variance from CLT&#39;</span><span class="p">]);</span> 
+<span class="n">plt</span><span class="o">.</span><span class="n">xlabel</span><span class="p">(</span><span class="s1">&#39;Number of bootstrap iterations&#39;</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">ylabel</span><span class="p">(</span><span class="s1">&#39;Variance of the estimator&#39;</span><span class="p">);</span>
+<span class="n">glue</span><span class="p">(</span><span class="s2">&quot;bootstrap_variance_estimation&quot;</span><span class="p">,</span> <span class="n">fig</span><span class="p">,</span> <span class="n">display</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+</div>
+<div class="figure align-default" id="fig-bootstrap-variance-estimation" style="width: 80%">
+<div class="cell_output docutils container">
+<img alt="../_images/pdfestimation_49_0.png" src="../_images/pdfestimation_49_0.png" />
+</div>
+<p class="caption"><span class="caption-number">Fig. 12 </span><span class="caption-text">Bootstrap variance estimation.</span><a class="headerlink" href="#fig-bootstrap-variance-estimation" title="Permalink to this image">¶</a></p>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Compare 95% confidence intervals from bootstrap and from the CLT. </span>
+<span class="n">alpha</span> <span class="o">=</span> <span class="mf">0.05</span>
+<span class="n">B</span> <span class="o">=</span> <span class="mi">200</span><span class="p">;</span> <span class="n">bar_X_b</span> <span class="o">=</span> <span class="p">[]</span>
+<span class="k">for</span> <span class="n">b</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">B</span><span class="p">):</span>
+    <span class="n">X_b</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">choice</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">replace</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>  <span class="c1"># Get n samples from {X_1,...,X_n} with replacement. </span>
+    <span class="n">bar_X_b</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">X_b</span><span class="p">))</span>  <span class="c1"># Estimate the mean from the sample</span>
+
+<span class="n">bar_X_u</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="n">bar_X_b</span><span class="p">,</span> <span class="mi">1</span><span class="o">-</span><span class="n">alpha</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">bar_X_l</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">quantile</span><span class="p">(</span><span class="n">bar_X_b</span><span class="p">,</span> <span class="n">alpha</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>
+<span class="n">hat_a</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">bar_X</span> <span class="o">-</span> <span class="n">bar_X_u</span>
+<span class="n">hat_b</span> <span class="o">=</span> <span class="mi">2</span><span class="o">*</span><span class="n">bar_X</span> <span class="o">-</span> <span class="n">bar_X_l</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Mean 95</span><span class="si">% c</span><span class="s1">onf interval from bootstrap :: (</span><span class="si">{:2.2f}</span><span class="s1">, </span><span class="si">{:2.2f}</span><span class="s1">) seconds&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">hat_a</span><span class="p">,</span> <span class="n">hat_b</span><span class="p">))</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Mean 95</span><span class="si">% c</span><span class="s1">onf interval from CLT :: (</span><span class="si">{:2.2f}</span><span class="s1">, </span><span class="si">{:2.2f}</span><span class="s1">) seconds&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">bar_X</span><span class="o">-</span><span class="mi">2</span><span class="o">*</span><span class="n">se</span><span class="p">,</span> <span class="n">bar_X</span><span class="o">+</span><span class="mi">2</span><span class="o">*</span><span class="n">se</span><span class="p">))</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Mean 95% conf interval from bootstrap :: (2.83, 3.11) seconds
+Mean 95% conf interval from CLT :: (2.82, 3.10) seconds
+</pre></div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+
+    <script type="text/x-thebe-config">
+    {
+        requestKernel: true,
+        binderOptions: {
+            repo: "binder-examples/jupyter-stacks-datascience",
+            ref: "master",
+        },
+        codeMirrorConfig: {
+            theme: "abcdef",
+            mode: "stats"
+        },
+        kernelOptions: {
+            kernelName: "stats",
+            path: "./sections"
+        },
+        predefinedOutput: true
+    }
+    </script>
+    <script>kernelName = 'stats'</script>
+
+              </div>
+              
+        </div>
+    </div>
+    
+    
+    <div class='prev-next-bottom'>
+        
+    <a class='left-prev' id="prev-link" href="bayes.html" title="previous page">Introduction to Bayesian Inference</a>
+    <a class='right-next' id="next-link" href="hypothesisTesting.html" title="next page">Hypothesis testing and effect size</a>
+
+    </div>
+    <footer class="footer mt-5 mt-md-0">
+    <div class="container">
+      <p>
+        
+          By J. Matias Di Martino<br/>
+        
+            &copy; Copyright 2020.<br/>
+      </p>
+    </div>
+  </footer>
+</main>
+
+
+      </div>
+    </div>
+
+    <script src="../_static/js/index.js"></script>
+    
+  </body>
+</html>
