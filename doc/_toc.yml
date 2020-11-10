@@ -4,5 +4,6 @@
     - file: sections/bayes
     - file: sections/pdfestimation
     - file: sections/hypothesisTesting
+    - file: sections/complexity
     - file: sections/bibliography
     

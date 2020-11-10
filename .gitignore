@@ -1,3 +1,5 @@
+doc/_build
+
 *.key
 
 # Byte-compiled / optimized / DLL files

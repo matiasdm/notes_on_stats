@@ -342,8 +342,6 @@ def feature_values_positive_to_negative_ratio(Xp=None, Xn=None, verbose=0,
         # Define a colormap function 
         min_val = -2; max_val = 1.5  # Recall these are in a log scale!
         colormap = define_colormap(min_value=min_val, max_value=max_val, zero=0., num_tones=20)
-        
-        plt.figure(figsize=[20,5]); 
         plt.subplot(121)  # Plot raw histogram distribution per-class
         plt.bar(edges[:-1], pdf_Xn, width = edges[1]-edges[0], alpha=.5, color=colormap(-1)); 
         plt.bar(edges[:-1], pdf_Xp, width = edges[1]-edges[0], alpha=.5, color=colormap(.7))

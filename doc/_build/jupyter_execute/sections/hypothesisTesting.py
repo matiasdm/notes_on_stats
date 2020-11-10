@@ -2,6 +2,7 @@
 
 # Hypothesis testing and effect size
 
+TODO. Follow {cite}`wasserman2013all`
 
 
 
