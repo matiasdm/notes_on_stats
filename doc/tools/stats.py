@@ -387,3 +387,93 @@ def define_colormap(min_value=-1., max_value=1., zero=0., num_tones=10):
         return color
     
     return colormap
+
+
+def F(X,x=None,h=1,verbose=0):
+    """
+    Kernel estimation of the pdf of a random variable, F(x)~PDF_x(X=x). A gaussian multidimensional gaussian kernel 
+    of bandwith h is used (h is constant for all the k dimensions). X represents the input data 
+    X = [X_1, X_2, ..., X_n]. Each of the X_i i=1:n is a k-dimensional vector samples from the distribution PDF_x. 
+    This methods return the value of the pdf estimated at x (k-dimensional coordinates where we want to evaluate F). 
+    
+    Verbose set the level of verbosity of the function, 0 runs quietly without displaying any info, 1 prints some 
+    information, and 2 displays even more info (usefull duriong development and debugging). 
+    
+    Check the documentation so see how missing data is handeled. Both x and each element of X can have missing values. 
+    
+    Example: 
+    X = np.random.random((10,3))  # ten samples of a 3d problem
+    h = 1  # bandwidth 
+    x = [0.1, 0.1, 0.1]  # where we want to evaluate the pdf (in the 3d space)
+    pdf_x = F(X,x=x,h=h,verbose=0)
+    print('The prob at {} is {}.format(x,pdf_x))
+
+    """
+    n = X.shape[0]  # number "training" samples   
+    
+    if verbose>1:
+        print('Using {} training samples.'.format(n))       
+    
+    # Average the contribution of each individual sample. 
+    hat_f = 0  # init 
+    for X_i in X:
+        hat_f += f_xi(X,X_i,x,h)
+    hat_f /= n         
+        
+    return hat_f
+
+
+def f_xi(X,X_i,x,h):
+    """
+    Contribution of the X_i sample the the estimation of the pdf of X at x. 
+    """
+    k = X.shape[1]  # dimension of the space of samples. 
+    
+    # Since we are using a isomorph kernel, each axis can be handeled independently. 
+    hat_fi = 1
+    for j in range(k):
+        X_j = X[:,j]  # the k-th component of the data
+        X_ij = X_i[j]  # the k-th component of the train sample
+        x_j = x[j]  # the k-th component of the coordinate where the pdf is estimated.
+        hat_fi *= f_xi_j(X_j,X_ij,x_j,h)
+    
+    return hat_fi
+
+
+def f_xi_j(X,X_i,x,h):
+    """
+    Since our kernel is symmetric, we can compute the contribution of each sample 
+    for each axis independently. Here we compute the contriution of a single 
+    train sample, associated with the "j" coordinate. X, X_i, and x are associated 
+    to this "jth" axis, hence they are 1-dimensional here. 
+    """
+    
+    # There is two cases, if X_i is know, the contribution is the standard weight 
+    # given by the kernel. If X_i is unknow, the rest of the data X is used to 
+    # estimate the contribution from the prior. 
+    K = lambda u: 1/np.sqrt(2*np.pi) * np.exp(-u**2 / 2)  # Define the kernel
+    
+    if not np.isnan(X_i):
+        hat_fij = 1/h * K( (x-X_i)/h )
+    
+    if np.isnan(X_i):
+        # Get the trainning data with existing values 
+        X_with_know_j = [xx for xx in X if not np.isnan(xx)]
+        hat_fij = 0
+        for XX in X_with_know_j:
+            hat_fij += 1/h * K( (x-XX)/h )
+        hat_fij /= len(X_with_know_j)
+    
+    return hat_fij
+
+
+if __name__=='__main__':
+    # Testing ...
+    print('Testing stats.py ...')
+    
+    # Define some toy data and test the estimation of pdf kernel estimation for missing data
+    X = np.array([[1.,1.,1.],[-1,1,np.nan],[np.nan,-1,-1],[.5,.5,np.nan]])  # the collected data
+    x = [0,0,0]  # where the pdf is estimated
+    h = .2 # kernel bandwidth
+    
+    hat_f = F(X,x=x,h=h)

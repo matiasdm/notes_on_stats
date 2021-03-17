@@ -21,3 +21,6 @@ Check this references.
 - https://web.stanford.edu/~lutian/coursepdf/unitweek3.pdf
 - https://web.stanford.edu/~lutian/coursepdf/survweek3.pdf
 - http://sphweb.bumc.bu.edu/otlt/MPH-Modules/BS/BS704_Survival/BS704_Survival5.html
+- https://machinelearningmastery.com/statistical-significance-tests-for-comparing-machine-learning-algorithms/
+
+

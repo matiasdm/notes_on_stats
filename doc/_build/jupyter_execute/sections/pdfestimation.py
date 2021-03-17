@@ -823,3 +823,192 @@ hat_a = 2*bar_X - bar_X_u
 hat_b = 2*bar_X - bar_X_l
 print('Mean 95% conf interval from bootstrap :: ({:2.2f}, {:2.2f}) seconds'.format(hat_a, hat_b))
 print('Mean 95% conf interval from CLT :: ({:2.2f}, {:2.2f}) seconds'.format(bar_X-2*se, bar_X+2*se))
+
+(sec: pdf_estimation_with_missing_values)=
+## PDF estimation with missing values
+
+![missing_data](../figs/pdf_missing_data.jpeg)
+
+
+### Draft code, playing with some toy data and interesting 2D distributions. 
+
+# Source: 
+# https://scikit-learn.org/stable/auto_examples/cluster/plot_linkage_comparison.html#sphx-glr-auto-examples-cluster-plot-linkage-comparison-py
+
+import time
+import warnings
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+from sklearn import cluster, datasets
+from sklearn.preprocessing import StandardScaler
+from itertools import cycle, islice
+
+n_samples = 1500
+noisy_circles = datasets.make_circles(n_samples=n_samples, factor=.5,
+                                      noise=.05)
+noisy_moons = datasets.make_moons(n_samples=n_samples, noise=.05)
+blobs = datasets.make_blobs(n_samples=n_samples, random_state=8)
+
+
+# Set up cluster parameters
+plt.figure(figsize=(9 * 1.3 + 2, 14.5))
+plt.subplots_adjust(left=.02, right=.98, bottom=.001, top=.96, wspace=.05,
+                    hspace=.01)
+
+plot_num = 1
+
+default_base = {'n_neighbors': 10,
+                'n_clusters': 3}
+
+datasets = [
+    (noisy_circles, {'n_clusters': 2}),
+    (noisy_moons, {'n_clusters': 2}),
+    (blobs, {})]
+   
+for i_dataset, (dataset, algo_params) in enumerate(datasets):
+    X, y = dataset
+
+    # normalize dataset for easier parameter selection
+    X = StandardScaler().fit_transform(X)
+    
+    # ============
+    # Create cluster objects
+    # ============
+    ward = cluster.AgglomerativeClustering(
+        n_clusters=2, linkage='ward')
+    complete = cluster.AgglomerativeClustering(
+        n_clusters=2, linkage='complete')
+    average = cluster.AgglomerativeClustering(
+        n_clusters=2, linkage='average')
+    single = cluster.AgglomerativeClustering(
+        n_clusters=2, linkage='single')
+    
+    clustering_algorithms = (
+        ('Single Linkage', single),
+        ('Average Linkage', average),
+        ('Complete Linkage', complete),
+        ('Ward Linkage', ward),
+    )
+
+    for name, algorithm in clustering_algorithms:
+        t0 = time.time()
+
+        # catch warnings related to kneighbors_graph
+        with warnings.catch_warnings():
+            warnings.filterwarnings(
+                "ignore",
+                message="the number of connected components of the " +
+                "connectivity matrix is [0-9]{1,2}" +
+                " > 1. Completing it to avoid stopping the tree early.",
+                category=UserWarning)
+            algorithm.fit(X)
+
+        t1 = time.time()
+        if hasattr(algorithm, 'labels_'):
+            y_pred = algorithm.labels_.astype(int)
+        else:
+            y_pred = algorithm.predict(X)
+
+        plt.subplot(len(datasets), len(clustering_algorithms), plot_num)
+        if i_dataset == 0:
+            plt.title(name, size=18)
+
+        colors = np.array(list(islice(cycle(['#377eb8', '#ff7f00', '#4daf4a',
+                                             '#f781bf', '#a65628', '#984ea3',
+                                             '#999999', '#e41a1c', '#dede00']),
+                                      int(max(y_pred) + 1))))
+        plt.scatter(X[:, 0], X[:, 1], s=10, color=colors[y_pred])
+
+        plt.xlim(-2.5, 2.5)
+        plt.ylim(-2.5, 2.5)
+        plt.xticks(())
+        plt.yticks(())
+        plt.text(.99, .01, ('%.2fs' % (t1 - t0)).lstrip('0'),
+                 transform=plt.gca().transAxes, size=15,
+                 horizontalalignment='right')
+        plot_num += 1
+
+plt.show()
+
+
+
+# Define the mask of missing data
+
+# ==== set experiments parameters ==== #
+missing_data_severity = .2 # 1 --> all missing data, 0 --> none missing data
+n_samples = 100
+# ==================================== #
+
+from sklearn import cluster, datasets
+noisy_moons = datasets.make_moons(n_samples=n_samples, noise=.25)
+X,y = noisy_moons
+M = np.random.random(X.shape) > missing_data_severity 
+X_missing = X
+X_missing[~M] = np.nan
+
+colors = np.array(['#377eb8', '#ff7f00']) #,'#4daf4a'])
+plt.scatter(X_missing[:,0], X_missing[:,1], c=colors[y])
+
+XX = X_missing[y==0]
+XX
+
+
+
+x = XX[1,:]
+x
+
+def f_x(z):
+    """
+    """
+    return 
+
+def F(X,x=None,h=1,verbose=0):
+    """
+    Kernel estimation of the pdf of a random variable, F(x)~PDF_x(X=x). A gaussian multidimensional gaussian kernel 
+    of bandwith h is used (h is constant for all the k dimensions). X represents the input data 
+    X = [X_1, X_2, ..., X_n]. Each of the X_i i=1:n is a k-dimensional vector samples from the distribution PDF_x. 
+    This methods return the value of the pdf estimated at x (k-dimensional coordinates where we want to evaluate F). 
+    
+    Verbose set the level of verbosity of the function, 0 runs quietly without displaying any info, 1 prints some 
+    information, and 2 displays even more info (usefull duriong development and debugging). 
+    
+    Check the documentation so see how missing data is handeled. Both x and each element of X can have missing values. 
+    
+    Example: 
+    X = np.random.random((10,3))  # ten samples of a 3d problem
+    h = 1  # bandwidth 
+    x = [0.1, 0.1, 0.1]  # where we want to evaluate the pdf (in the 3d space)
+    pdf_x = F(X,x=x,h=h,verbose=0)
+    print('The prob at {} is {}.format(x,pdf_x))
+
+    """
+    K = lambda u: 1/np.sqrt(2*np.pi) * np.exp(-u**2 / 2)  # Define the kernel
+    n = X.shape[0]  # number "training" samples   
+    k = X.shape[1]  # dimension of the space of samples. 
+    
+    if verbose>1:
+        print('Solving a {}-dimensional problem.'.format(k))
+        print('Using {} training samples.'.format(n))       
+            
+    for j, x_j in enumerate(x):
+        for X_i in X:
+            hat_f[j] += 1/(n*h) * K( (x_j-X_i) / h )
+    return hat_f
+        
+    
+    # Average the contribution of each individual sample. 
+    hat_f = 0  # init 
+    for X_i in X:
+        hat_f += f(X_i,x,h)
+    hat_f /= n 
+    1/h * K( (x_j-X_i) / h )
+        
+        
+    return hat_f
+
+XX.shape[1]
+
+np.nan
+
