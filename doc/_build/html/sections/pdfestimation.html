@@ -259,13 +259,6 @@
   <a class="reference internal nav-link" href="#pdf-estimation-with-missing-values">
    PDF estimation with missing values
   </a>
-  <ul class="nav section-nav flex-column">
-   <li class="toc-h3 nav-item toc-entry">
-    <a class="reference internal nav-link" href="#draft-code-playing-with-some-toy-data-and-interesting-2d-distributions">
-     Draft code, playing with some toy data and interesting 2D distributions.
-    </a>
-   </li>
-  </ul>
  </li>
 </ul>
 
@@ -630,7 +623,7 @@ J(f, \hat{f}) = \int \hat{f}^2(x) dx - 2\int \hat{f}(x)f(x) dx.
 </div>
 <div class="figure align-default" id="fig-pdf-empirical-risk-estimation" style="width: 80%">
 <div class="cell_output docutils container">
-<img alt="../_images/pdfestimation_21_0.png" src="../_images/pdfestimation_21_0.png" />
+<img alt="../_images/pdfestimation_21_1.png" src="../_images/pdfestimation_21_1.png" />
 </div>
 <p class="caption"><span class="caption-number">Fig. 7 </span><span class="caption-text">The left side illustrates the ground truth risk (dashed) and the empirical risk estimation (solid) as we change the number of bins (i.e., the bin width). The right plot illustrates the ground truth pdf distribution and the histogram estimation for the optimal number of bins.</span><a class="headerlink" href="#fig-pdf-empirical-risk-estimation" title="Permalink to this image">¶</a></p>
 </div>
@@ -972,8 +965,8 @@ S_n^2 = \frac{1}{n-1} \sum_{i=1}^{n}(X_i - \bar{X}_n)^2.
 </div>
 <div class="cell_output docutils container">
 <div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>The estimated mean for the head-tourn delay (mean and 95% CI).
-ASD group     :: 2.94 +- 0.13 seconds
-non-ASD group :: 1.44 +- 0.08 seconds
+ASD group     :: 3.04 +- 0.14 seconds
+non-ASD group :: 1.43 +- 0.08 seconds
 </pre></div>
 </div>
 </div>
@@ -989,7 +982,7 @@ non-ASD group :: 1.44 +- 0.08 seconds
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>The ASD kids respond in average 1.50 +- 0.15 seconds slower than the non-ASD kids.
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>The ASD kids respond in average 1.61 +- 0.16 seconds slower than the non-ASD kids.
 </pre></div>
 </div>
 </div>
@@ -1132,8 +1125,8 @@ v_{boot} = \frac 1 B \sum_{b = 1}^{B} \left( \hat{\theta}^*_b - \bar{\theta}^* \
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Mean 95% conf interval from bootstrap :: (2.81, 3.07) seconds
-Mean 95% conf interval from CLT :: (2.81, 3.07) seconds
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>Mean 95% conf interval from bootstrap :: (2.92, 3.20) seconds
+Mean 95% conf interval from CLT :: (2.92, 3.18) seconds
 </pre></div>
 </div>
 </div>
@@ -1144,9 +1137,113 @@ Mean 95% conf interval from CLT :: (2.81, 3.07) seconds
 </div>
 <div class="section" id="pdf-estimation-with-missing-values">
 <h2>PDF estimation with missing values<a class="headerlink" href="#pdf-estimation-with-missing-values" title="Permalink to this headline">¶</a></h2>
+<p>We compare different techniques to estimate the pdf using multidimensional kernel methods and when there is missing data in the fitting sample.</p>
 <p><img alt="missing_data" src="../_images/pdf_missing_data.jpeg" /></p>
-<div class="section" id="draft-code-playing-with-some-toy-data-and-interesting-2d-distributions">
-<h3>Draft code, playing with some toy data and interesting 2D distributions.<a class="headerlink" href="#draft-code-playing-with-some-toy-data-and-interesting-2d-distributions" title="Permalink to this headline">¶</a></h3>
+<p>TODO: clean the equations presented in the figure and describe here.</p>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Experiments: </span>
+<span class="c1"># 3 distribution shapes (one class)</span>
+<span class="c1"># 3 inputation techniques (including our method)</span>
+<span class="c1"># 3 levels of missing data (compare estimating using only the data for which all the coordinates are available)</span>
+
+<span class="c1"># Define datasets:</span>
+<span class="n">dataset_names</span> <span class="o">=</span> <span class="p">[</span><span class="s1">&#39;moons&#39;</span><span class="p">,</span><span class="s1">&#39;circles&#39;</span><span class="p">,</span><span class="s1">&#39;blobs&#39;</span><span class="p">]</span>
+
+<span class="c1"># ====================================== #</span>
+<span class="c1"># Define the dataset                     #</span>
+<span class="c1"># ====================================== #</span>
+<span class="n">n</span> <span class="o">=</span> <span class="mi">200</span>
+<span class="n">ratio_of_missing_values</span><span class="o">=.</span><span class="mi">9</span>
+<span class="n">dataset_name</span> <span class="o">=</span> <span class="n">dataset_names</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+<span class="k">def</span> <span class="nf">create_dataset</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">num_samples</span><span class="o">=</span><span class="mi">10</span><span class="p">,</span> <span class="n">ratio_of_missing_values</span><span class="o">=.</span><span class="mi">5</span><span class="p">):</span>
+    <span class="kn">from</span> <span class="nn">sklearn</span> <span class="kn">import</span> <span class="n">datasets</span>
+    <span class="kn">from</span> <span class="nn">sklearn.preprocessing</span> <span class="kn">import</span> <span class="n">StandardScaler</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="n">num_samples</span> <span class="o">+</span> <span class="mi">2000</span>  <span class="c1"># we generate num_samples for testing and 2k as ground truth </span>
+    <span class="k">if</span> <span class="n">name</span><span class="o">==</span><span class="s1">&#39;moons&#39;</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">datasets</span><span class="o">.</span><span class="n">make_moons</span><span class="p">(</span><span class="n">n_samples</span><span class="o">=</span><span class="n">n</span><span class="p">,</span> <span class="n">noise</span><span class="o">=.</span><span class="mi">05</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">name</span><span class="o">==</span><span class="s1">&#39;circles&#39;</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">datasets</span><span class="o">.</span><span class="n">make_circles</span><span class="p">(</span><span class="n">n_samples</span><span class="o">=</span><span class="n">n</span><span class="p">,</span> <span class="n">factor</span><span class="o">=.</span><span class="mi">5</span><span class="p">,</span> <span class="n">noise</span><span class="o">=.</span><span class="mi">05</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">name</span><span class="o">==</span><span class="s1">&#39;blobs&#39;</span><span class="p">:</span>
+        <span class="n">data</span> <span class="o">=</span> <span class="n">datasets</span><span class="o">.</span><span class="n">make_blobs</span><span class="p">(</span><span class="n">n_samples</span><span class="o">=</span><span class="n">n</span><span class="p">,</span> <span class="n">random_state</span><span class="o">=</span><span class="mi">8</span><span class="p">)</span>
+    
+    <span class="n">X_all</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">data</span>  <span class="c1"># keep the 2D samples ignore the labels</span>
+    <span class="c1"># normalize dataset for easier parameter selection</span>
+    <span class="n">X_all</span> <span class="o">=</span> <span class="n">StandardScaler</span><span class="p">()</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">X_all</span><span class="p">)</span>
+    
+    <span class="n">X</span> <span class="o">=</span> <span class="n">X_all</span><span class="p">[:</span><span class="n">num_samples</span><span class="p">,:]</span> 
+    <span class="n">Xgt</span> <span class="o">=</span> <span class="n">X_all</span><span class="p">[</span><span class="n">num_samples</span><span class="p">:,:]</span>
+    
+    <span class="c1"># Simulate missing samples</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">ratio_of_missing_values</span>
+    <span class="n">X</span><span class="p">[</span><span class="o">~</span><span class="n">M</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+
+    <span class="k">return</span> <span class="n">X</span><span class="p">,</span> <span class="n">Xgt</span>
+
+<span class="n">X</span><span class="p">,</span> <span class="n">Xgt</span> <span class="o">=</span> <span class="n">create_dataset</span><span class="p">(</span><span class="n">dataset_name</span><span class="p">,</span> <span class="n">num_samples</span><span class="o">=</span><span class="n">n</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="s1">&#39;</span><span class="si">{}</span><span class="s1"> samples created&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">figure</span><span class="p">(</span><span class="n">figsize</span><span class="o">=</span><span class="p">[</span><span class="mi">10</span><span class="p">,</span><span class="mi">10</span><span class="p">]);</span> <span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">1</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">X</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span><span class="n">X</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]);</span> 
+<span class="n">plt</span><span class="o">.</span><span class="n">title</span><span class="p">(</span><span class="s1">&#39;Toy data (missing values are excluded)&#39;</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">xlim</span><span class="p">(</span><span class="o">-</span><span class="mf">2.5</span><span class="p">,</span> <span class="mf">2.5</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">ylim</span><span class="p">(</span><span class="mf">2.5</span><span class="p">,</span> <span class="o">-</span><span class="mf">2.5</span><span class="p">);</span> 
+<span class="n">plt</span><span class="o">.</span><span class="n">xticks</span><span class="p">(());</span> <span class="n">plt</span><span class="o">.</span><span class="n">yticks</span><span class="p">(());</span> <span class="n">plt</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;equal&#39;</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+
+<span class="c1"># ====================================== #</span>
+<span class="c1"># Estimate the pdf                       #</span>
+<span class="c1"># ====================================== #</span>
+<span class="k">def</span> <span class="nf">estimate_pdf</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;our&#39;</span><span class="p">,</span> <span class="n">resolution</span><span class="o">=</span><span class="mi">40</span><span class="p">):</span>
+    <span class="n">xygrid</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mf">2.5</span><span class="p">,</span><span class="mf">2.5</span><span class="p">,</span><span class="n">resolution</span><span class="p">),</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mf">2.5</span><span class="p">,</span><span class="mf">2.5</span><span class="p">,</span><span class="n">resolution</span><span class="p">))</span>
+    <span class="n">H</span><span class="p">,</span><span class="n">W</span> <span class="o">=</span> <span class="n">xygrid</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">hat_f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">xygrid</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>  <span class="c1"># init. the pdf estimation</span>
+
+    <span class="k">if</span> <span class="n">method</span><span class="o">==</span><span class="s1">&#39;our&#39;</span><span class="p">:</span>
+        <span class="c1"># See documentation</span>
+        <span class="kn">from</span> <span class="nn">stats</span> <span class="kn">import</span> <span class="n">F</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="o">.</span><span class="mi">1</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">H</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">W</span><span class="p">):</span>
+                <span class="n">x</span> <span class="o">=</span> <span class="n">xygrid</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">]</span>
+                <span class="n">y</span> <span class="o">=</span> <span class="n">xygrid</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">]</span>
+                <span class="n">hat_f</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">F</span><span class="p">(</span><span class="n">data</span><span class="p">,[</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">],</span><span class="n">h</span><span class="o">=</span><span class="n">h</span><span class="p">)</span>
+                
+    <span class="k">if</span> <span class="n">method</span><span class="o">==</span><span class="s1">&#39;naive&#39;</span><span class="p">:</span>
+        <span class="c1"># Ignore missing values</span>
+        <span class="kn">from</span> <span class="nn">stats</span> <span class="kn">import</span> <span class="n">F</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="o">.</span><span class="mi">1</span>
+        <span class="n">data_without_missing_values</span> <span class="o">=</span> <span class="n">data</span><span class="p">[</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">data</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]),:]</span>
+        <span class="n">data_without_missing_values</span> <span class="o">=</span> <span class="n">data_without_missing_values</span><span class="p">[</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">data_without_missing_values</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]),:]</span>        
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">H</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">W</span><span class="p">):</span>
+                <span class="n">x</span> <span class="o">=</span> <span class="n">xygrid</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">]</span>
+                <span class="n">y</span> <span class="o">=</span> <span class="n">xygrid</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">]</span>
+                <span class="n">hat_f</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">F</span><span class="p">(</span><span class="n">data_without_missing_values</span><span class="p">,[</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">],</span><span class="n">h</span><span class="o">=</span><span class="n">h</span><span class="p">)</span>
+        
+    <span class="k">return</span> <span class="n">hat_f</span>
+
+    
+<span class="n">hat_f</span> <span class="o">=</span> <span class="n">estimate_pdf</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;our&#39;</span><span class="p">)</span>  
+<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">2</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">hat_f</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+<span class="n">hat_f</span> <span class="o">=</span> <span class="n">estimate_pdf</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">X</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="s1">&#39;naive&#39;</span><span class="p">)</span>  
+<span class="n">plt</span><span class="o">.</span><span class="n">subplot</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span><span class="mi">3</span><span class="p">,</span><span class="mi">3</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">imshow</span><span class="p">(</span><span class="n">hat_f</span><span class="p">);</span> <span class="n">plt</span><span class="o">.</span><span class="n">axis</span><span class="p">(</span><span class="s1">&#39;off&#39;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>200 samples created
+</pre></div>
+</div>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>(-0.5, 39.5, 39.5, -0.5)
+</pre></div>
+</div>
+<img alt="../_images/pdfestimation_53_2.png" src="../_images/pdfestimation_53_2.png" />
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">numba</span> <span class="kn">import</span> <span class="n">jit</span>
+</pre></div>
+</div>
+</div>
+</div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Source: </span>
@@ -1252,7 +1349,12 @@ Mean 95% conf interval from CLT :: (2.81, 3.07) seconds
 </div>
 </div>
 <div class="cell_output docutils container">
-<img alt="../_images/pdfestimation_54_0.png" src="../_images/pdfestimation_54_0.png" />
+<div class="output traceback highlight-ipythontb notranslate"><div class="highlight"><pre><span></span><span class="gt">  File</span><span class="nn"> &quot;&lt;ipython-input-4-3795087f1052&gt;&quot;</span><span class="gt">, line </span><span class="mi">14</span>
+    <span class="k">def</span> <span class="nf">create_dataset</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">num_samples</span><span class="o">=</span><span class="mi">10</span><span class="p">)</span>
+                                            <span class="o">^</span>
+<span class="ne">SyntaxError</span>: invalid syntax
+</pre></div>
+</div>
 </div>
 </div>
 <div class="cell docutils container">
@@ -1261,7 +1363,7 @@ Mean 95% conf interval from CLT :: (2.81, 3.07) seconds
 
 <span class="c1"># ==== set experiments parameters ==== #</span>
 <span class="n">missing_data_severity</span> <span class="o">=</span> <span class="o">.</span><span class="mi">2</span> <span class="c1"># 1 --&gt; all missing data, 0 --&gt; none missing data</span>
-<span class="n">n_samples</span> <span class="o">=</span> <span class="mi">100</span>
+<span class="n">n_samples</span> <span class="o">=</span> <span class="mi">200</span>
 <span class="c1"># ==================================== #</span>
 
 <span class="kn">from</span> <span class="nn">sklearn</span> <span class="kn">import</span> <span class="n">cluster</span><span class="p">,</span> <span class="n">datasets</span>
@@ -1277,154 +1379,360 @@ Mean 95% conf interval from CLT :: (2.81, 3.07) seconds
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;matplotlib.collections.PathCollection at 0x7fdd903b2990&gt;
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;matplotlib.collections.PathCollection at 0x7fda5db31390&gt;
 </pre></div>
 </div>
-<img alt="../_images/pdfestimation_56_1.png" src="../_images/pdfestimation_56_1.png" />
+<img alt="../_images/pdfestimation_57_1.png" src="../_images/pdfestimation_57_1.png" />
 </div>
 </div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
 <div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">XX</span> <span class="o">=</span> <span class="n">X_missing</span><span class="p">[</span><span class="n">y</span><span class="o">==</span><span class="mi">0</span><span class="p">]</span>
 <span class="n">XX</span>
+
+<span class="n">xx</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>array([[-0.94899172, -0.3170857 ],
-       [-0.83634921,  0.65379389],
-       [-0.06452622,  0.8450759 ],
-       [        nan,  0.88187108],
-       [ 0.49754447,         nan],
-       [        nan,  0.7427235 ],
-       [-0.95879975,  0.51385324],
-       [        nan,  0.36591229],
-       [ 0.30297613,         nan],
-       [        nan,  0.82068934],
-       [ 0.64765319,  0.77602265],
-       [        nan,  1.24363317],
-       [ 0.20338407,  1.02552652],
-       [ 1.08013377,  0.5433436 ],
-       [-0.39218177,  0.96506464],
-       [ 0.84023794,  1.09410546],
-       [-0.97589784,  0.36398237],
-       [ 0.28293097,  0.12071017],
-       [        nan,  0.59110934],
-       [ 0.53334402,  0.71163417],
-       [        nan,  0.06389637],
-       [-0.60233836,  0.54328427],
-       [ 0.87509009,  0.52032735],
-       [-1.20387694,  0.32859177],
-       [ 0.95180528, -0.12737681],
-       [        nan,  1.29576015],
-       [-0.5122746 ,  1.26684041],
-       [ 0.64247567,         nan],
-       [        nan,  0.04784528],
-       [-0.90696933, -0.27334172],
-       [        nan,         nan],
-       [        nan,         nan],
-       [        nan,  1.24663458],
-       [ 0.95672836,  0.44502127],
-       [        nan,  0.72166508],
-       [ 0.67856562,  0.65208943],
-       [        nan, -0.11536562],
-       [-0.88725987,  0.57543233],
-       [-0.52117717,  0.66133599],
-       [-0.58238131,  1.35176012],
-       [ 0.08224186,  0.95873727],
-       [ 0.72188364,         nan],
-       [-0.48945047,         nan],
-       [ 0.28129985,  0.4702458 ],
-       [-0.90998374,  1.0849573 ],
-       [ 0.48881593,         nan],
-       [-1.04557982,         nan],
-       [-0.67746351,  0.84265366],
-       [-0.75698413,  1.18552962],
-       [-1.30700652,         nan]])
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>[array([[-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ],
+        [-2.        , -1.83333333, -1.66666667, -1.5       , -1.33333333,
+         -1.16666667, -1.        , -0.83333333, -0.66666667, -0.5       ,
+         -0.33333333, -0.16666667,  0.        ,  0.16666667,  0.33333333,
+          0.5       ,  0.66666667,  0.83333333,  1.        ,  1.16666667,
+          1.33333333,  1.5       ,  1.66666667,  1.83333333,  2.        ]]),
+ array([[-2.        , -2.        , -2.        , -2.        , -2.        ,
+         -2.        , -2.        , -2.        , -2.        , -2.        ,
+         -2.        , -2.        , -2.        , -2.        , -2.        ,
+         -2.        , -2.        , -2.        , -2.        , -2.        ,
+         -2.        , -2.        , -2.        , -2.        , -2.        ],
+        [-1.83333333, -1.83333333, -1.83333333, -1.83333333, -1.83333333,
+         -1.83333333, -1.83333333, -1.83333333, -1.83333333, -1.83333333,
+         -1.83333333, -1.83333333, -1.83333333, -1.83333333, -1.83333333,
+         -1.83333333, -1.83333333, -1.83333333, -1.83333333, -1.83333333,
+         -1.83333333, -1.83333333, -1.83333333, -1.83333333, -1.83333333],
+        [-1.66666667, -1.66666667, -1.66666667, -1.66666667, -1.66666667,
+         -1.66666667, -1.66666667, -1.66666667, -1.66666667, -1.66666667,
+         -1.66666667, -1.66666667, -1.66666667, -1.66666667, -1.66666667,
+         -1.66666667, -1.66666667, -1.66666667, -1.66666667, -1.66666667,
+         -1.66666667, -1.66666667, -1.66666667, -1.66666667, -1.66666667],
+        [-1.5       , -1.5       , -1.5       , -1.5       , -1.5       ,
+         -1.5       , -1.5       , -1.5       , -1.5       , -1.5       ,
+         -1.5       , -1.5       , -1.5       , -1.5       , -1.5       ,
+         -1.5       , -1.5       , -1.5       , -1.5       , -1.5       ,
+         -1.5       , -1.5       , -1.5       , -1.5       , -1.5       ],
+        [-1.33333333, -1.33333333, -1.33333333, -1.33333333, -1.33333333,
+         -1.33333333, -1.33333333, -1.33333333, -1.33333333, -1.33333333,
+         -1.33333333, -1.33333333, -1.33333333, -1.33333333, -1.33333333,
+         -1.33333333, -1.33333333, -1.33333333, -1.33333333, -1.33333333,
+         -1.33333333, -1.33333333, -1.33333333, -1.33333333, -1.33333333],
+        [-1.16666667, -1.16666667, -1.16666667, -1.16666667, -1.16666667,
+         -1.16666667, -1.16666667, -1.16666667, -1.16666667, -1.16666667,
+         -1.16666667, -1.16666667, -1.16666667, -1.16666667, -1.16666667,
+         -1.16666667, -1.16666667, -1.16666667, -1.16666667, -1.16666667,
+         -1.16666667, -1.16666667, -1.16666667, -1.16666667, -1.16666667],
+        [-1.        , -1.        , -1.        , -1.        , -1.        ,
+         -1.        , -1.        , -1.        , -1.        , -1.        ,
+         -1.        , -1.        , -1.        , -1.        , -1.        ,
+         -1.        , -1.        , -1.        , -1.        , -1.        ,
+         -1.        , -1.        , -1.        , -1.        , -1.        ],
+        [-0.83333333, -0.83333333, -0.83333333, -0.83333333, -0.83333333,
+         -0.83333333, -0.83333333, -0.83333333, -0.83333333, -0.83333333,
+         -0.83333333, -0.83333333, -0.83333333, -0.83333333, -0.83333333,
+         -0.83333333, -0.83333333, -0.83333333, -0.83333333, -0.83333333,
+         -0.83333333, -0.83333333, -0.83333333, -0.83333333, -0.83333333],
+        [-0.66666667, -0.66666667, -0.66666667, -0.66666667, -0.66666667,
+         -0.66666667, -0.66666667, -0.66666667, -0.66666667, -0.66666667,
+         -0.66666667, -0.66666667, -0.66666667, -0.66666667, -0.66666667,
+         -0.66666667, -0.66666667, -0.66666667, -0.66666667, -0.66666667,
+         -0.66666667, -0.66666667, -0.66666667, -0.66666667, -0.66666667],
+        [-0.5       , -0.5       , -0.5       , -0.5       , -0.5       ,
+         -0.5       , -0.5       , -0.5       , -0.5       , -0.5       ,
+         -0.5       , -0.5       , -0.5       , -0.5       , -0.5       ,
+         -0.5       , -0.5       , -0.5       , -0.5       , -0.5       ,
+         -0.5       , -0.5       , -0.5       , -0.5       , -0.5       ],
+        [-0.33333333, -0.33333333, -0.33333333, -0.33333333, -0.33333333,
+         -0.33333333, -0.33333333, -0.33333333, -0.33333333, -0.33333333,
+         -0.33333333, -0.33333333, -0.33333333, -0.33333333, -0.33333333,
+         -0.33333333, -0.33333333, -0.33333333, -0.33333333, -0.33333333,
+         -0.33333333, -0.33333333, -0.33333333, -0.33333333, -0.33333333],
+        [-0.16666667, -0.16666667, -0.16666667, -0.16666667, -0.16666667,
+         -0.16666667, -0.16666667, -0.16666667, -0.16666667, -0.16666667,
+         -0.16666667, -0.16666667, -0.16666667, -0.16666667, -0.16666667,
+         -0.16666667, -0.16666667, -0.16666667, -0.16666667, -0.16666667,
+         -0.16666667, -0.16666667, -0.16666667, -0.16666667, -0.16666667],
+        [ 0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+          0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+          0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+          0.        ,  0.        ,  0.        ,  0.        ,  0.        ,
+          0.        ,  0.        ,  0.        ,  0.        ,  0.        ],
+        [ 0.16666667,  0.16666667,  0.16666667,  0.16666667,  0.16666667,
+          0.16666667,  0.16666667,  0.16666667,  0.16666667,  0.16666667,
+          0.16666667,  0.16666667,  0.16666667,  0.16666667,  0.16666667,
+          0.16666667,  0.16666667,  0.16666667,  0.16666667,  0.16666667,
+          0.16666667,  0.16666667,  0.16666667,  0.16666667,  0.16666667],
+        [ 0.33333333,  0.33333333,  0.33333333,  0.33333333,  0.33333333,
+          0.33333333,  0.33333333,  0.33333333,  0.33333333,  0.33333333,
+          0.33333333,  0.33333333,  0.33333333,  0.33333333,  0.33333333,
+          0.33333333,  0.33333333,  0.33333333,  0.33333333,  0.33333333,
+          0.33333333,  0.33333333,  0.33333333,  0.33333333,  0.33333333],
+        [ 0.5       ,  0.5       ,  0.5       ,  0.5       ,  0.5       ,
+          0.5       ,  0.5       ,  0.5       ,  0.5       ,  0.5       ,
+          0.5       ,  0.5       ,  0.5       ,  0.5       ,  0.5       ,
+          0.5       ,  0.5       ,  0.5       ,  0.5       ,  0.5       ,
+          0.5       ,  0.5       ,  0.5       ,  0.5       ,  0.5       ],
+        [ 0.66666667,  0.66666667,  0.66666667,  0.66666667,  0.66666667,
+          0.66666667,  0.66666667,  0.66666667,  0.66666667,  0.66666667,
+          0.66666667,  0.66666667,  0.66666667,  0.66666667,  0.66666667,
+          0.66666667,  0.66666667,  0.66666667,  0.66666667,  0.66666667,
+          0.66666667,  0.66666667,  0.66666667,  0.66666667,  0.66666667],
+        [ 0.83333333,  0.83333333,  0.83333333,  0.83333333,  0.83333333,
+          0.83333333,  0.83333333,  0.83333333,  0.83333333,  0.83333333,
+          0.83333333,  0.83333333,  0.83333333,  0.83333333,  0.83333333,
+          0.83333333,  0.83333333,  0.83333333,  0.83333333,  0.83333333,
+          0.83333333,  0.83333333,  0.83333333,  0.83333333,  0.83333333],
+        [ 1.        ,  1.        ,  1.        ,  1.        ,  1.        ,
+          1.        ,  1.        ,  1.        ,  1.        ,  1.        ,
+          1.        ,  1.        ,  1.        ,  1.        ,  1.        ,
+          1.        ,  1.        ,  1.        ,  1.        ,  1.        ,
+          1.        ,  1.        ,  1.        ,  1.        ,  1.        ],
+        [ 1.16666667,  1.16666667,  1.16666667,  1.16666667,  1.16666667,
+          1.16666667,  1.16666667,  1.16666667,  1.16666667,  1.16666667,
+          1.16666667,  1.16666667,  1.16666667,  1.16666667,  1.16666667,
+          1.16666667,  1.16666667,  1.16666667,  1.16666667,  1.16666667,
+          1.16666667,  1.16666667,  1.16666667,  1.16666667,  1.16666667],
+        [ 1.33333333,  1.33333333,  1.33333333,  1.33333333,  1.33333333,
+          1.33333333,  1.33333333,  1.33333333,  1.33333333,  1.33333333,
+          1.33333333,  1.33333333,  1.33333333,  1.33333333,  1.33333333,
+          1.33333333,  1.33333333,  1.33333333,  1.33333333,  1.33333333,
+          1.33333333,  1.33333333,  1.33333333,  1.33333333,  1.33333333],
+        [ 1.5       ,  1.5       ,  1.5       ,  1.5       ,  1.5       ,
+          1.5       ,  1.5       ,  1.5       ,  1.5       ,  1.5       ,
+          1.5       ,  1.5       ,  1.5       ,  1.5       ,  1.5       ,
+          1.5       ,  1.5       ,  1.5       ,  1.5       ,  1.5       ,
+          1.5       ,  1.5       ,  1.5       ,  1.5       ,  1.5       ],
+        [ 1.66666667,  1.66666667,  1.66666667,  1.66666667,  1.66666667,
+          1.66666667,  1.66666667,  1.66666667,  1.66666667,  1.66666667,
+          1.66666667,  1.66666667,  1.66666667,  1.66666667,  1.66666667,
+          1.66666667,  1.66666667,  1.66666667,  1.66666667,  1.66666667,
+          1.66666667,  1.66666667,  1.66666667,  1.66666667,  1.66666667],
+        [ 1.83333333,  1.83333333,  1.83333333,  1.83333333,  1.83333333,
+          1.83333333,  1.83333333,  1.83333333,  1.83333333,  1.83333333,
+          1.83333333,  1.83333333,  1.83333333,  1.83333333,  1.83333333,
+          1.83333333,  1.83333333,  1.83333333,  1.83333333,  1.83333333,
+          1.83333333,  1.83333333,  1.83333333,  1.83333333,  1.83333333],
+        [ 2.        ,  2.        ,  2.        ,  2.        ,  2.        ,
+          2.        ,  2.        ,  2.        ,  2.        ,  2.        ,
+          2.        ,  2.        ,  2.        ,  2.        ,  2.        ,
+          2.        ,  2.        ,  2.        ,  2.        ,  2.        ,
+          2.        ,  2.        ,  2.        ,  2.        ,  2.        ]])]
 </pre></div>
 </div>
 </div>
 </div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">x</span> <span class="o">=</span> <span class="n">XX</span><span class="p">[</span><span class="mi">1</span><span class="p">,:]</span>
-<span class="n">x</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># ==== set experiments parameters ==== #</span>
+<span class="n">missing_data_severity</span> <span class="o">=</span> <span class="o">.</span><span class="mi">5</span> <span class="c1"># 1 --&gt; all missing data, 0 --&gt; none missing data</span>
+<span class="n">n_samples</span> <span class="o">=</span> <span class="mi">400</span>
+<span class="c1"># ==================================== #</span>
 
-<span class="k">def</span> <span class="nf">f_x</span><span class="p">(</span><span class="n">z</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> 
+<span class="kn">from</span> <span class="nn">sklearn</span> <span class="kn">import</span> <span class="n">cluster</span><span class="p">,</span> <span class="n">datasets</span>
+<span class="n">noisy_moons</span> <span class="o">=</span> <span class="n">datasets</span><span class="o">.</span><span class="n">make_moons</span><span class="p">(</span><span class="n">n_samples</span><span class="o">=</span><span class="n">n_samples</span><span class="p">,</span> <span class="n">noise</span><span class="o">=.</span><span class="mi">25</span><span class="p">)</span>
+<span class="n">X</span><span class="p">,</span><span class="n">y</span> <span class="o">=</span> <span class="n">noisy_moons</span>
+<span class="n">M</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">random</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">missing_data_severity</span> 
+<span class="n">X_missing</span> <span class="o">=</span> <span class="n">X</span>
+<span class="n">X_missing</span><span class="p">[</span><span class="o">~</span><span class="n">M</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+<span class="n">XX</span> <span class="o">=</span> <span class="n">X_missing</span><span class="p">[</span><span class="n">y</span><span class="o">==</span><span class="mi">0</span><span class="p">]</span>
 
-<span class="k">def</span> <span class="nf">F</span><span class="p">(</span><span class="n">X</span><span class="p">,</span><span class="n">x</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">h</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span><span class="n">verbose</span><span class="o">=</span><span class="mi">0</span><span class="p">):</span>
-    <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Kernel estimation of the pdf of a random variable, F(x)~PDF_x(X=x). A gaussian multidimensional gaussian kernel </span>
-<span class="sd">    of bandwith h is used (h is constant for all the k dimensions). X represents the input data </span>
-<span class="sd">    X = [X_1, X_2, ..., X_n]. Each of the X_i i=1:n is a k-dimensional vector samples from the distribution PDF_x. </span>
-<span class="sd">    This methods return the value of the pdf estimated at x (k-dimensional coordinates where we want to evaluate F). </span>
-<span class="sd">    </span>
-<span class="sd">    Verbose set the level of verbosity of the function, 0 runs quietly without displaying any info, 1 prints some </span>
-<span class="sd">    information, and 2 displays even more info (usefull duriong development and debugging). </span>
-<span class="sd">    </span>
-<span class="sd">    Check the documentation so see how missing data is handeled. Both x and each element of X can have missing values. </span>
-<span class="sd">    </span>
-<span class="sd">    Example: </span>
-<span class="sd">    X = np.random.random((10,3))  # ten samples of a 3d problem</span>
-<span class="sd">    h = 1  # bandwidth </span>
-<span class="sd">    x = [0.1, 0.1, 0.1]  # where we want to evaluate the pdf (in the 3d space)</span>
-<span class="sd">    pdf_x = F(X,x=x,h=h,verbose=0)</span>
-<span class="sd">    print(&#39;The prob at {} is {}.format(x,pdf_x))</span>
+<span class="n">colors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="s1">&#39;#377eb8&#39;</span><span class="p">,</span> <span class="s1">&#39;#ff7f00&#39;</span><span class="p">])</span> <span class="c1">#,&#39;#4daf4a&#39;])</span>
+<span class="c1">#plt.scatter(X_missing[:,0], X_missing[:,1], c=colors[y])</span>
 
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">K</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">u</span><span class="p">:</span> <span class="mi">1</span><span class="o">/</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">u</span><span class="o">**</span><span class="mi">2</span> <span class="o">/</span> <span class="mi">2</span><span class="p">)</span>  <span class="c1"># Define the kernel</span>
-    <span class="n">n</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># number &quot;training&quot; samples   </span>
-    <span class="n">k</span> <span class="o">=</span> <span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># dimension of the space of samples. </span>
-    
-    <span class="k">if</span> <span class="n">verbose</span><span class="o">&gt;</span><span class="mi">1</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Solving a </span><span class="si">{}</span><span class="s1">-dimensional problem.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">k</span><span class="p">))</span>
-        <span class="nb">print</span><span class="p">(</span><span class="s1">&#39;Using </span><span class="si">{}</span><span class="s1"> training samples.&#39;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="n">n</span><span class="p">))</span>       
-            
-    <span class="k">for</span> <span class="n">j</span><span class="p">,</span> <span class="n">x_j</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">x</span><span class="p">):</span>
-        <span class="k">for</span> <span class="n">X_i</span> <span class="ow">in</span> <span class="n">X</span><span class="p">:</span>
-            <span class="n">hat_f</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span><span class="o">/</span><span class="p">(</span><span class="n">n</span><span class="o">*</span><span class="n">h</span><span class="p">)</span> <span class="o">*</span> <span class="n">K</span><span class="p">(</span> <span class="p">(</span><span class="n">x_j</span><span class="o">-</span><span class="n">X_i</span><span class="p">)</span> <span class="o">/</span> <span class="n">h</span> <span class="p">)</span>
-    <span class="k">return</span> <span class="n">hat_f</span>
-        
-    
-    <span class="c1"># Average the contribution of each individual sample. </span>
-    <span class="n">hat_f</span> <span class="o">=</span> <span class="mi">0</span>  <span class="c1"># init </span>
-    <span class="k">for</span> <span class="n">X_i</span> <span class="ow">in</span> <span class="n">X</span><span class="p">:</span>
-        <span class="n">hat_f</span> <span class="o">+=</span> <span class="n">f</span><span class="p">(</span><span class="n">X_i</span><span class="p">,</span><span class="n">x</span><span class="p">,</span><span class="n">h</span><span class="p">)</span>
-    <span class="n">hat_f</span> <span class="o">/=</span> <span class="n">n</span> 
-    <span class="mi">1</span><span class="o">/</span><span class="n">h</span> <span class="o">*</span> <span class="n">K</span><span class="p">(</span> <span class="p">(</span><span class="n">x_j</span><span class="o">-</span><span class="n">X_i</span><span class="p">)</span> <span class="o">/</span> <span class="n">h</span> <span class="p">)</span>
-        
-        
-    <span class="k">return</span> <span class="n">hat_f</span>
+<span class="kn">from</span> <span class="nn">stats</span> <span class="kn">import</span> <span class="n">F</span>
+<span class="n">xx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">meshgrid</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">25</span><span class="p">),</span><span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="o">-</span><span class="mi">2</span><span class="p">,</span><span class="mi">2</span><span class="p">,</span><span class="mi">25</span><span class="p">))</span>
+<span class="n">h</span> <span class="o">=</span> <span class="o">.</span><span class="mi">3</span>
+
+<span class="n">H</span><span class="p">,</span><span class="n">W</span> <span class="o">=</span> <span class="n">xx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span>
+<span class="n">hat_f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">xx</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">H</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">W</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">xx</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">]</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">xx</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">]</span>
+        <span class="n">hat_f</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">F</span><span class="p">(</span><span class="n">XX</span><span class="p">,[</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">],</span><span class="n">h</span><span class="o">=</span><span class="n">h</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">pcolormesh</span><span class="p">(</span><span class="n">xx</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">xx</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">hat_f</span><span class="p">,</span> <span class="n">shading</span><span class="o">=</span><span class="s1">&#39;auto&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=.</span><span class="mi">6</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">XX</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span><span class="n">XX</span><span class="p">[:,</span><span class="mi">1</span><span class="p">])</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;matplotlib.collections.PathCollection at 0x7fda5e3ac690&gt;
+</pre></div>
+</div>
+<img alt="../_images/pdfestimation_59_1.png" src="../_images/pdfestimation_59_1.png" />
+</div>
+</div>
+<div class="cell docutils container">
+<div class="cell_input docutils container">
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="c1"># Sanity check </span>
+<span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">hat_f</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="cell_output docutils container">
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>0.15865293483887224
 </pre></div>
 </div>
 </div>
 </div>
 <div class="cell docutils container">
 <div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">XX</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="nb">print</span><span class="p">(</span><span class="n">XX</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+<span class="n">XX2</span> <span class="o">=</span> <span class="n">XX</span><span class="p">[</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">XX</span><span class="p">[:,</span><span class="mi">0</span><span class="p">]),:]</span>
+<span class="n">XX2</span> <span class="o">=</span> <span class="n">XX2</span><span class="p">[</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">XX2</span><span class="p">[:,</span><span class="mi">1</span><span class="p">]),:]</span>
+<span class="nb">print</span><span class="p">(</span><span class="n">XX2</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+
+<span class="n">H</span><span class="p">,</span><span class="n">W</span> <span class="o">=</span> <span class="n">xx</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span>
+<span class="n">hat_f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">xx</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+<span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">H</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">W</span><span class="p">):</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">xx</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">]</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">xx</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">]</span>
+        <span class="n">hat_f</span><span class="p">[</span><span class="n">i</span><span class="p">,</span><span class="n">j</span><span class="p">]</span> <span class="o">=</span> <span class="n">F</span><span class="p">(</span><span class="n">XX2</span><span class="p">,[</span><span class="n">x</span><span class="p">,</span><span class="n">y</span><span class="p">],</span><span class="n">h</span><span class="o">=</span><span class="n">h</span><span class="p">)</span>
+
+<span class="n">plt</span><span class="o">.</span><span class="n">pcolormesh</span><span class="p">(</span><span class="n">xx</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">xx</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">hat_f</span><span class="p">,</span> <span class="n">shading</span><span class="o">=</span><span class="s1">&#39;auto&#39;</span><span class="p">,</span> <span class="n">alpha</span><span class="o">=.</span><span class="mi">6</span><span class="p">)</span>
+<span class="n">plt</span><span class="o">.</span><span class="n">scatter</span><span class="p">(</span><span class="n">XX</span><span class="p">[:,</span><span class="mi">0</span><span class="p">],</span><span class="n">XX</span><span class="p">[:,</span><span class="mi">1</span><span class="p">])</span>
 </pre></div>
 </div>
 </div>
 <div class="cell_output docutils container">
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>2
+<div class="output stream highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>(200, 2)
+(46, 2)
 </pre></div>
 </div>
-</div>
-</div>
-<div class="cell docutils container">
-<div class="cell_input docutils container">
-<div class="highlight-ipython3 notranslate"><div class="highlight"><pre><span></span><span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>&lt;matplotlib.collections.PathCollection at 0x7fda5e451210&gt;
 </pre></div>
 </div>
-</div>
-<div class="cell_output docutils container">
-<div class="output text_plain highlight-myst-ansi notranslate"><div class="highlight"><pre><span></span>nan
-</pre></div>
-</div>
-</div>
+<img alt="../_images/pdfestimation_61_2.png" src="../_images/pdfestimation_61_2.png" />
 </div>
 </div>
 </div>

@@ -827,10 +827,97 @@ print('Mean 95% conf interval from CLT :: ({:2.2f}, {:2.2f}) seconds'.format(bar
 (sec: pdf_estimation_with_missing_values)=
 ## PDF estimation with missing values
 
+We compare different techniques to estimate the pdf using multidimensional kernel methods and when there is missing data in the fitting sample. 
+
 ![missing_data](../figs/pdf_missing_data.jpeg)
 
+TODO: clean the equations presented in the figure and describe here. 
 
-### Draft code, playing with some toy data and interesting 2D distributions. 
+# Experiments: 
+# 3 distribution shapes (one class)
+# 3 inputation techniques (including our method)
+# 3 levels of missing data (compare estimating using only the data for which all the coordinates are available)
+
+# Define datasets:
+dataset_names = ['moons','circles','blobs']
+
+# ====================================== #
+# Define the dataset                     #
+# ====================================== #
+n = 200
+ratio_of_missing_values=.9
+dataset_name = dataset_names[0]
+
+def create_dataset(name, num_samples=10, ratio_of_missing_values=.5):
+    from sklearn import datasets
+    from sklearn.preprocessing import StandardScaler
+    n = num_samples + 2000  # we generate num_samples for testing and 2k as ground truth 
+    if name=='moons':
+        data = datasets.make_moons(n_samples=n, noise=.05)
+    if name=='circles':
+        data = datasets.make_circles(n_samples=n, factor=.5, noise=.05)
+    if name=='blobs':
+        data = datasets.make_blobs(n_samples=n, random_state=8)
+    
+    X_all, _ = data  # keep the 2D samples ignore the labels
+    # normalize dataset for easier parameter selection
+    X_all = StandardScaler().fit_transform(X_all)
+    
+    X = X_all[:num_samples,:] 
+    Xgt = X_all[num_samples:,:]
+    
+    # Simulate missing samples
+    M = np.random.random(X.shape) > ratio_of_missing_values
+    X[~M] = np.nan
+
+    return X, Xgt
+
+X, Xgt = create_dataset(dataset_name, num_samples=n)
+print('{} samples created'.format(X.shape[0]))
+plt.figure(figsize=[10,10]); plt.subplot(1,3,1); plt.scatter(X[:,0],X[:,1]); 
+plt.title('Toy data (missing values are excluded)'); plt.xlim(-2.5, 2.5); plt.ylim(2.5, -2.5); 
+plt.xticks(()); plt.yticks(()); plt.axis('equal'); plt.axis('off')
+
+# ====================================== #
+# Estimate the pdf                       #
+# ====================================== #
+def estimate_pdf(data=None, method='our', resolution=40):
+    xygrid = np.meshgrid(np.linspace(-2.5,2.5,resolution),np.linspace(-2.5,2.5,resolution))
+    H,W = xygrid[0].shape
+    hat_f = np.zeros_like(xygrid[0])  # init. the pdf estimation
+
+    if method=='our':
+        # See documentation
+        from stats import F
+        h = .1
+        for i in range(H):
+            for j in range(W):
+                x = xygrid[0][i,j]
+                y = xygrid[1][i,j]
+                hat_f[i,j] = F(data,[x,y],h=h)
+                
+    if method=='naive':
+        # Ignore missing values
+        from stats import F
+        h = .1
+        data_without_missing_values = data[~np.isnan(data[:,0]),:]
+        data_without_missing_values = data_without_missing_values[~np.isnan(data_without_missing_values[:,1]),:]        
+        for i in range(H):
+            for j in range(W):
+                x = xygrid[0][i,j]
+                y = xygrid[1][i,j]
+                hat_f[i,j] = F(data_without_missing_values,[x,y],h=h)
+        
+    return hat_f
+
+    
+hat_f = estimate_pdf(data=X, method='our')  
+plt.subplot(1,3,2); plt.imshow(hat_f); plt.axis('off')
+hat_f = estimate_pdf(data=X, method='naive')  
+plt.subplot(1,3,3); plt.imshow(hat_f); plt.axis('off')
+
+
+from numba import jit
 
 # Source: 
 # https://scikit-learn.org/stable/auto_examples/cluster/plot_linkage_comparison.html#sphx-glr-auto-examples-cluster-plot-linkage-comparison-py
@@ -938,7 +1025,7 @@ plt.show()
 
 # ==== set experiments parameters ==== #
 missing_data_severity = .2 # 1 --> all missing data, 0 --> none missing data
-n_samples = 100
+n_samples = 200
 # ==================================== #
 
 from sklearn import cluster, datasets
@@ -954,61 +1041,58 @@ plt.scatter(X_missing[:,0], X_missing[:,1], c=colors[y])
 XX = X_missing[y==0]
 XX
 
+xx
+
+# ==== set experiments parameters ==== #
+missing_data_severity = .5 # 1 --> all missing data, 0 --> none missing data
+n_samples = 400
+# ==================================== #
+
+from sklearn import cluster, datasets
+noisy_moons = datasets.make_moons(n_samples=n_samples, noise=.25)
+X,y = noisy_moons
+M = np.random.random(X.shape) > missing_data_severity 
+X_missing = X
+X_missing[~M] = np.nan
+XX = X_missing[y==0]
+
+colors = np.array(['#377eb8', '#ff7f00']) #,'#4daf4a'])
+#plt.scatter(X_missing[:,0], X_missing[:,1], c=colors[y])
+
+from stats import F
+xx = np.meshgrid(np.linspace(-2,2,25),np.linspace(-2,2,25))
+h = .3
+
+H,W = xx[0].shape
+hat_f = np.zeros_like(xx[0])
+for i in range(H):
+    for j in range(W):
+        x = xx[0][i,j]
+        y = xx[1][i,j]
+        hat_f[i,j] = F(XX,[x,y],h=h)
+
+plt.pcolormesh(xx[0], xx[1], hat_f, shading='auto', alpha=.6)
+plt.scatter(XX[:,0],XX[:,1])
+
+# Sanity check 
+np.sum(hat_f)
 
 
-x = XX[1,:]
-x
+print(XX.shape)
+XX2 = XX[~np.isnan(XX[:,0]),:]
+XX2 = XX2[~np.isnan(XX2[:,1]),:]
+print(XX2.shape)
 
-def f_x(z):
-    """
-    """
-    return 
+H,W = xx[0].shape
+hat_f = np.zeros_like(xx[0])
+for i in range(H):
+    for j in range(W):
+        x = xx[0][i,j]
+        y = xx[1][i,j]
+        hat_f[i,j] = F(XX2,[x,y],h=h)
 
-def F(X,x=None,h=1,verbose=0):
-    """
-    Kernel estimation of the pdf of a random variable, F(x)~PDF_x(X=x). A gaussian multidimensional gaussian kernel 
-    of bandwith h is used (h is constant for all the k dimensions). X represents the input data 
-    X = [X_1, X_2, ..., X_n]. Each of the X_i i=1:n is a k-dimensional vector samples from the distribution PDF_x. 
-    This methods return the value of the pdf estimated at x (k-dimensional coordinates where we want to evaluate F). 
-    
-    Verbose set the level of verbosity of the function, 0 runs quietly without displaying any info, 1 prints some 
-    information, and 2 displays even more info (usefull duriong development and debugging). 
-    
-    Check the documentation so see how missing data is handeled. Both x and each element of X can have missing values. 
-    
-    Example: 
-    X = np.random.random((10,3))  # ten samples of a 3d problem
-    h = 1  # bandwidth 
-    x = [0.1, 0.1, 0.1]  # where we want to evaluate the pdf (in the 3d space)
-    pdf_x = F(X,x=x,h=h,verbose=0)
-    print('The prob at {} is {}.format(x,pdf_x))
+plt.pcolormesh(xx[0], xx[1], hat_f, shading='auto', alpha=.6)
+plt.scatter(XX[:,0],XX[:,1])
 
-    """
-    K = lambda u: 1/np.sqrt(2*np.pi) * np.exp(-u**2 / 2)  # Define the kernel
-    n = X.shape[0]  # number "training" samples   
-    k = X.shape[1]  # dimension of the space of samples. 
-    
-    if verbose>1:
-        print('Solving a {}-dimensional problem.'.format(k))
-        print('Using {} training samples.'.format(n))       
-            
-    for j, x_j in enumerate(x):
-        for X_i in X:
-            hat_f[j] += 1/(n*h) * K( (x_j-X_i) / h )
-    return hat_f
-        
-    
-    # Average the contribution of each individual sample. 
-    hat_f = 0  # init 
-    for X_i in X:
-        hat_f += f(X_i,x,h)
-    hat_f /= n 
-    1/h * K( (x_j-X_i) / h )
-        
-        
-    return hat_f
 
-XX.shape[1]
-
-np.nan
 

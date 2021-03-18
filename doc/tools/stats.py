@@ -17,7 +17,7 @@ matias.di.martino.uy@gmail.com,    Durham 2020.
 
 import numpy as np
 import matplotlib.pyplot as plt
-
+from numba import jit
 
 def kernel_based_empirical_risk(X, h):
     """
@@ -388,7 +388,7 @@ def define_colormap(min_value=-1., max_value=1., zero=0., num_tones=10):
     
     return colormap
 
-
+@jit(nopython=True, parallel=True)
 def F(X,x=None,h=1,verbose=0):
     """
     Kernel estimation of the pdf of a random variable, F(x)~PDF_x(X=x). A gaussian multidimensional gaussian kernel 
@@ -411,9 +411,6 @@ def F(X,x=None,h=1,verbose=0):
     """
     n = X.shape[0]  # number "training" samples   
     
-    if verbose>1:
-        print('Using {} training samples.'.format(n))       
-    
     # Average the contribution of each individual sample. 
     hat_f = 0  # init 
     for X_i in X:
@@ -423,9 +420,10 @@ def F(X,x=None,h=1,verbose=0):
     return hat_f
 
 
+@jit(nopython=True, parallel=True)
 def f_xi(X,X_i,x,h):
     """
-    Contribution of the X_i sample the the estimation of the pdf of X at x. 
+    Contribution of the X_i sample to the estimation of the pdf of X at x. 
     """
     k = X.shape[1]  # dimension of the space of samples. 
     
@@ -440,16 +438,17 @@ def f_xi(X,X_i,x,h):
     return hat_fi
 
 
+@jit(nopython=True, parallel=True)
 def f_xi_j(X,X_i,x,h):
     """
     Since our kernel is symmetric, we can compute the contribution of each sample 
-    for each axis independently. Here we compute the contriution of a single 
+    for each axis independently. Here we compute the contribution of a single 
     train sample, associated with the "j" coordinate. X, X_i, and x are associated 
     to this "jth" axis, hence they are 1-dimensional here. 
     """
     
     # There is two cases, if X_i is know, the contribution is the standard weight 
-    # given by the kernel. If X_i is unknow, the rest of the data X is used to 
+    # given by the kernel. If X_i is unknown, the rest of the data X is used to 
     # estimate the contribution from the prior. 
     K = lambda u: 1/np.sqrt(2*np.pi) * np.exp(-u**2 / 2)  # Define the kernel
     
@@ -457,7 +456,7 @@ def f_xi_j(X,X_i,x,h):
         hat_fij = 1/h * K( (x-X_i)/h )
     
     if np.isnan(X_i):
-        # Get the trainning data with existing values 
+        # Get the training data with existing values 
         X_with_know_j = [xx for xx in X if not np.isnan(xx)]
         hat_fij = 0
         for XX in X_with_know_j:
