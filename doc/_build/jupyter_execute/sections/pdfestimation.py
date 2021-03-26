@@ -827,272 +827,81 @@ print('Mean 95% conf interval from CLT :: ({:2.2f}, {:2.2f}) seconds'.format(bar
 (sec: pdf_estimation_with_missing_values)=
 ## PDF estimation with missing values
 
-We compare different techniques to estimate the pdf using multidimensional kernel methods and when there is missing data in the fitting sample. 
+We compare different techniques to estimate the pdf using multidimensional kernel methods, in particular, in the context of samples with missing data. 
 
-![missing_data](../figs/pdf_missing_data.jpeg)
+### Adapting the kernel method
+As discussed before, the pdf estimation can be expressed as a liner combination of the contribution of each training samples, weighted by a kernel function. For example, we can estimate the pdf at $u$, given a set of observations $X_i$, $i=1\,...\,n$ as,
 
-TODO: clean the equations presented in the figure and describe here. 
+$$
+\hat{f}(u) = \frac 1 n \sum_i f_{X_i}(u),
+$$(eq:kernel_estimation_mdim)
 
-# Experiments: 
-# 3 distribution shapes (one class)
-# 3 inputation techniques (including our method)
-# 3 levels of missing data (compare estimating using only the data for which all the coordinates are available)
+we denote $f_{X_i}$ the contribution of the $i^{th}$ observation to the estimation. For a canonical kernel estimations, using a Gaussian kernel, $f_{X_i}$ is defined as, 
 
-# Define datasets:
+$$
+\displaystyle f_{X_i}(u) = \frac{1}{\sqrt{(2\pi)^k|\Sigma|}}e^{-\frac 1 2 (u-X_i)^t \Sigma^{-1} (u-X_i)}
+$$(eq:k-dim_kernel)
+ 
+Equations {eq}`eq:kernel_estimation_mdim` and {eq}`eq:k-dim_kernel` generalize Eq. {eq}`eq:kernel_estimation` for the case of k-dimensional problem. We set consider a symmetric kernel (i.e. $\Sigma=h^2 Id$), with an fixed bandwidth $h$ for all axis. Under this consideration, {eq}`eq:k-dim_kernel` can be simplified as, 
+
+$$
+\displaystyle f_{X_i}(u) = \frac{1}{h^k\sqrt{(2\pi)^k}}e^{-\frac{1}{2 h^2} (u-X_i)^t(u-X_i)}.
+$$(eq:k-dim_kernel2)
+
+Using standard properties of the exponential functions, Eq. {eq}`eq:k-dim_kernel2` can be expressed as, 
+
+$$
+f_{X_i}(u) = \prod_j \frac{1}{h\sqrt{2\pi}} e^{-\frac{1}{2 h^2} (u_j-X_{ij})^2}.
+$$
+
+Notice that the first subindex (i) indicates which observation is considered, while the second index (j) refers to the coordinate number in the k-dimensional feature space. This expression is practical, since decouples the axis during the computation of the joint probability. Observe that the decomposition comes from the symmetry of the kernel and not from assuming any independence hypothesis between the features. 
+
+Putting everything together, Eq. {eq}`eq:kernel_estimation_mdim` can be expressed as, 
+
+$$
+\hat{f}(u) = \frac 1 n \sum_i \prod_j \frac{1}{h\sqrt{2\pi}} e^{-\frac{1}{2 h^2} (u_j-X_{ij})^2}.
+$$(eq:kernel_estimation_mdim2)
+
+The computation of Eq. {eq}`eq:kernel_estimation_mdim2` requires the knowledge of all the elements for each single observation, in that sense, can not be computed for partial observations. However, the factorization into individual observations and coordinates provides a suitable representation to handle missing data as we discuss before. 
+
+We generalize {eq}`eq:kernel_estimation_mdim2` as
+
+$$
+\hat{f}(u) = \frac 1 n \sum_i \prod_j f_{ij}(u).
+$$(eq:kernel_estimation_mdim3)
+
+$f_{ij}(u)$ represents the contribution of the $j^{th}$ coordinate of the $i^{th}$ observation at the location $u$. 
+
+$$
+f_{ij}(u) \stackrel{def}{=} \frac{1}{h\sqrt{2\pi}} e^{-\frac{1}{2 h^2} (u_j-X_{ij})^2}
+$$(eq:fij_known_j)
+
+if the $j^{th}$ coordinate of the $i^{th}$ observation is known, otherwise, 
+
+$$
+f_{ij}(u) \stackrel{def}{=} \frac{1}{n'} \frac{\sum_{i'\in I} w_{i'} f_{i'j}(u)}{\sum_{i'\in I} w_{i'}}
+$$(eq:fij_unknown_j)
+
+with $I$ the set of indices of observations for which all the coordinates are known, $w_{i'} = \frac{1}{h\sqrt{2\pi}}e^{-\frac{1}{2h} d_{X_{i}}(X_{i'}, X_{i})^2}$, $d_{X_{i}}(X_{i'}, X_{i})$ represents the euclidian distance between the k-dimensional vectors $X_{i'}$ and $X_i$ constrained to the coordinates for which the observation $X_i$ is defined.  
+
+Intuitively, this generalized kernel approximation, computes the standard contribution for the $j^{th}$ component of the $i^{th}$ observation if it is known. If the $j^{th}$ coordinate of $X_i$ is missing, that term is replaced by a prior computed from the data for which all the components are known. This prior, is weighted for each sample, projecting each complete observation $X_{i'}$ into the hyperplane defined by the missing coordinates of $X_i$.
+
+# The approach described above is implemented in 
+from stats import kernel_based_pdf_estimation
+help(kernel_based_pdf_estimation)
+
+### Other state of the art approaches
+
+The most common approach to handle missing data, consists of defining an imputation criteria, then generate a set observations for which all the coordinates of all the observations are available, and finally, use standard pdf estimation algorithms. We compare the approximation method described before with classical imputation methods: mean, median, MICE, and Knn. Check sklearn documentation and the references listed below for more information about these algorithms. 
+
+https://www.statsmodels.org/stable/user-guide.html#background
+https://machinelearningmastery.com/iterative-imputation-for-missing-values-in-machine-learning/
+
+from utils import compare_imputation_methods
+
 dataset_names = ['moons','circles','blobs']
-
-# ====================================== #
-# Define the dataset                     #
-# ====================================== #
-n = 200
-ratio_of_missing_values=.9
-dataset_name = dataset_names[0]
-
-def create_dataset(name, num_samples=10, ratio_of_missing_values=.5):
-    from sklearn import datasets
-    from sklearn.preprocessing import StandardScaler
-    n = num_samples + 2000  # we generate num_samples for testing and 2k as ground truth 
-    if name=='moons':
-        data = datasets.make_moons(n_samples=n, noise=.05)
-    if name=='circles':
-        data = datasets.make_circles(n_samples=n, factor=.5, noise=.05)
-    if name=='blobs':
-        data = datasets.make_blobs(n_samples=n, random_state=8)
-    
-    X_all, _ = data  # keep the 2D samples ignore the labels
-    # normalize dataset for easier parameter selection
-    X_all = StandardScaler().fit_transform(X_all)
-    
-    X = X_all[:num_samples,:] 
-    Xgt = X_all[num_samples:,:]
-    
-    # Simulate missing samples
-    M = np.random.random(X.shape) > ratio_of_missing_values
-    X[~M] = np.nan
-
-    return X, Xgt
-
-X, Xgt = create_dataset(dataset_name, num_samples=n)
-print('{} samples created'.format(X.shape[0]))
-plt.figure(figsize=[10,10]); plt.subplot(1,3,1); plt.scatter(X[:,0],X[:,1]); 
-plt.title('Toy data (missing values are excluded)'); plt.xlim(-2.5, 2.5); plt.ylim(2.5, -2.5); 
-plt.xticks(()); plt.yticks(()); plt.axis('equal'); plt.axis('off')
-
-# ====================================== #
-# Estimate the pdf                       #
-# ====================================== #
-def estimate_pdf(data=None, method='our', resolution=40):
-    xygrid = np.meshgrid(np.linspace(-2.5,2.5,resolution),np.linspace(-2.5,2.5,resolution))
-    H,W = xygrid[0].shape
-    hat_f = np.zeros_like(xygrid[0])  # init. the pdf estimation
-
-    if method=='our':
-        # See documentation
-        from stats import F
-        h = .1
-        for i in range(H):
-            for j in range(W):
-                x = xygrid[0][i,j]
-                y = xygrid[1][i,j]
-                hat_f[i,j] = F(data,[x,y],h=h)
-                
-    if method=='naive':
-        # Ignore missing values
-        from stats import F
-        h = .1
-        data_without_missing_values = data[~np.isnan(data[:,0]),:]
-        data_without_missing_values = data_without_missing_values[~np.isnan(data_without_missing_values[:,1]),:]        
-        for i in range(H):
-            for j in range(W):
-                x = xygrid[0][i,j]
-                y = xygrid[1][i,j]
-                hat_f[i,j] = F(data_without_missing_values,[x,y],h=h)
-        
-    return hat_f
-
-    
-hat_f = estimate_pdf(data=X, method='our')  
-plt.subplot(1,3,2); plt.imshow(hat_f); plt.axis('off')
-hat_f = estimate_pdf(data=X, method='naive')  
-plt.subplot(1,3,3); plt.imshow(hat_f); plt.axis('off')
-
-
-from numba import jit
-
-# Source: 
-# https://scikit-learn.org/stable/auto_examples/cluster/plot_linkage_comparison.html#sphx-glr-auto-examples-cluster-plot-linkage-comparison-py
-
-import time
-import warnings
-
-import numpy as np
-import matplotlib.pyplot as plt
-
-from sklearn import cluster, datasets
-from sklearn.preprocessing import StandardScaler
-from itertools import cycle, islice
-
-n_samples = 1500
-noisy_circles = datasets.make_circles(n_samples=n_samples, factor=.5,
-                                      noise=.05)
-noisy_moons = datasets.make_moons(n_samples=n_samples, noise=.05)
-blobs = datasets.make_blobs(n_samples=n_samples, random_state=8)
-
-
-# Set up cluster parameters
-plt.figure(figsize=(9 * 1.3 + 2, 14.5))
-plt.subplots_adjust(left=.02, right=.98, bottom=.001, top=.96, wspace=.05,
-                    hspace=.01)
-
-plot_num = 1
-
-default_base = {'n_neighbors': 10,
-                'n_clusters': 3}
-
-datasets = [
-    (noisy_circles, {'n_clusters': 2}),
-    (noisy_moons, {'n_clusters': 2}),
-    (blobs, {})]
-   
-for i_dataset, (dataset, algo_params) in enumerate(datasets):
-    X, y = dataset
-
-    # normalize dataset for easier parameter selection
-    X = StandardScaler().fit_transform(X)
-    
-    # ============
-    # Create cluster objects
-    # ============
-    ward = cluster.AgglomerativeClustering(
-        n_clusters=2, linkage='ward')
-    complete = cluster.AgglomerativeClustering(
-        n_clusters=2, linkage='complete')
-    average = cluster.AgglomerativeClustering(
-        n_clusters=2, linkage='average')
-    single = cluster.AgglomerativeClustering(
-        n_clusters=2, linkage='single')
-    
-    clustering_algorithms = (
-        ('Single Linkage', single),
-        ('Average Linkage', average),
-        ('Complete Linkage', complete),
-        ('Ward Linkage', ward),
-    )
-
-    for name, algorithm in clustering_algorithms:
-        t0 = time.time()
-
-        # catch warnings related to kneighbors_graph
-        with warnings.catch_warnings():
-            warnings.filterwarnings(
-                "ignore",
-                message="the number of connected components of the " +
-                "connectivity matrix is [0-9]{1,2}" +
-                " > 1. Completing it to avoid stopping the tree early.",
-                category=UserWarning)
-            algorithm.fit(X)
-
-        t1 = time.time()
-        if hasattr(algorithm, 'labels_'):
-            y_pred = algorithm.labels_.astype(int)
-        else:
-            y_pred = algorithm.predict(X)
-
-        plt.subplot(len(datasets), len(clustering_algorithms), plot_num)
-        if i_dataset == 0:
-            plt.title(name, size=18)
-
-        colors = np.array(list(islice(cycle(['#377eb8', '#ff7f00', '#4daf4a',
-                                             '#f781bf', '#a65628', '#984ea3',
-                                             '#999999', '#e41a1c', '#dede00']),
-                                      int(max(y_pred) + 1))))
-        plt.scatter(X[:, 0], X[:, 1], s=10, color=colors[y_pred])
-
-        plt.xlim(-2.5, 2.5)
-        plt.ylim(-2.5, 2.5)
-        plt.xticks(())
-        plt.yticks(())
-        plt.text(.99, .01, ('%.2fs' % (t1 - t0)).lstrip('0'),
-                 transform=plt.gca().transAxes, size=15,
-                 horizontalalignment='right')
-        plot_num += 1
-
-plt.show()
-
-
-
-# Define the mask of missing data
-
-# ==== set experiments parameters ==== #
-missing_data_severity = .2 # 1 --> all missing data, 0 --> none missing data
-n_samples = 200
-# ==================================== #
-
-from sklearn import cluster, datasets
-noisy_moons = datasets.make_moons(n_samples=n_samples, noise=.25)
-X,y = noisy_moons
-M = np.random.random(X.shape) > missing_data_severity 
-X_missing = X
-X_missing[~M] = np.nan
-
-colors = np.array(['#377eb8', '#ff7f00']) #,'#4daf4a'])
-plt.scatter(X_missing[:,0], X_missing[:,1], c=colors[y])
-
-XX = X_missing[y==0]
-XX
-
-xx
-
-# ==== set experiments parameters ==== #
-missing_data_severity = .5 # 1 --> all missing data, 0 --> none missing data
-n_samples = 400
-# ==================================== #
-
-from sklearn import cluster, datasets
-noisy_moons = datasets.make_moons(n_samples=n_samples, noise=.25)
-X,y = noisy_moons
-M = np.random.random(X.shape) > missing_data_severity 
-X_missing = X
-X_missing[~M] = np.nan
-XX = X_missing[y==0]
-
-colors = np.array(['#377eb8', '#ff7f00']) #,'#4daf4a'])
-#plt.scatter(X_missing[:,0], X_missing[:,1], c=colors[y])
-
-from stats import F
-xx = np.meshgrid(np.linspace(-2,2,25),np.linspace(-2,2,25))
-h = .3
-
-H,W = xx[0].shape
-hat_f = np.zeros_like(xx[0])
-for i in range(H):
-    for j in range(W):
-        x = xx[0][i,j]
-        y = xx[1][i,j]
-        hat_f[i,j] = F(XX,[x,y],h=h)
-
-plt.pcolormesh(xx[0], xx[1], hat_f, shading='auto', alpha=.6)
-plt.scatter(XX[:,0],XX[:,1])
-
-# Sanity check 
-np.sum(hat_f)
-
-
-print(XX.shape)
-XX2 = XX[~np.isnan(XX[:,0]),:]
-XX2 = XX2[~np.isnan(XX2[:,1]),:]
-print(XX2.shape)
-
-H,W = xx[0].shape
-hat_f = np.zeros_like(xx[0])
-for i in range(H):
-    for j in range(W):
-        x = xx[0][i,j]
-        y = xx[1][i,j]
-        hat_f[i,j] = F(XX2,[x,y],h=h)
-
-plt.pcolormesh(xx[0], xx[1], hat_f, shading='auto', alpha=.6)
-plt.scatter(XX[:,0],XX[:,1])
-
-
-
+for dataset in dataset_names:
+    compare_imputation_methods(dataset=dataset, 
+                               num_samples=150, 
+                               percent_missing=70, 
+                               kernel_bandwidth=.2)

@@ -388,82 +388,98 @@ def define_colormap(min_value=-1., max_value=1., zero=0., num_tones=10):
     
     return colormap
 
-@jit(nopython=True, parallel=True)
-def F(X,x=None,h=1,verbose=0):
+
+def kernel_based_pdf_estimation(X,x=None,h=1,verbose=0):
     """
-    Kernel estimation of the pdf of a random variable, F(x)~PDF_x(X=x). A gaussian multidimensional gaussian kernel 
-    of bandwith h is used (h is constant for all the k dimensions). X represents the input data 
-    X = [X_1, X_2, ..., X_n]. Each of the X_i i=1:n is a k-dimensional vector samples from the distribution PDF_x. 
-    This methods return the value of the pdf estimated at x (k-dimensional coordinates where we want to evaluate F). 
-    
-    Verbose set the level of verbosity of the function, 0 runs quietly without displaying any info, 1 prints some 
-    information, and 2 displays even more info (usefull duriong development and debugging). 
-    
-    Check the documentation so see how missing data is handeled. Both x and each element of X can have missing values. 
+    Estimate the pdf distribution of "X" at "x" using the set of observations X[i,:]. x has lenght k (the dimension of the problem), X has shape nxk (n observations of dimension k). X can have missing values which should be filled with np.nan. A Kernel approximation is computed when the coordinates of the observations are know. If a coordinate is unknown, the contribution of this term is replaced by a weighed average prior computed from the subset of observation for which we have complete data. . 
     
     Example: 
-    X = np.random.random((10,3))  # ten samples of a 3d problem
-    h = 1  # bandwidth 
+    X = np.random.random((10,3))  # 10 Observations of a 3d problem
+    X[0,1] = np.nan; X[4,2] = np.nan  # We don't know some entries. 
+    h = .1  # bandwidth of the gaussian kernel
     x = [0.1, 0.1, 0.1]  # where we want to evaluate the pdf (in the 3d space)
-    pdf_x = F(X,x=x,h=h,verbose=0)
+    pdf_x = kernel_based_pdf_estimation(X,x=x,h=h,verbose=0)
     print('The prob at {} is {}.format(x,pdf_x))
 
     """
     n = X.shape[0]  # number "training" samples   
     
-    # Average the contribution of each individual sample. 
-    hat_f = 0  # init 
-    for X_i in X:
-        hat_f += f_xi(X,X_i,x,h)
-    hat_f /= n         
-        
+    # Define the set of samples for which all the data is available. 
+    # (This set is used to compute priors)
+    m = [not np.isnan(np.sum(X[i,:])) for i in range(X.shape[0])]
+    X_prior = X[m,:]
+    hat_f = F(X=X, X_prior=X_prior, x=x, h=h)
     return hat_f
 
 
 @jit(nopython=True, parallel=True)
-def f_xi(X,X_i,x,h):
-    """
-    Contribution of the X_i sample to the estimation of the pdf of X at x. 
-    """
-    k = X.shape[1]  # dimension of the space of samples. 
-    
-    # Since we are using a isomorph kernel, each axis can be handeled independently. 
-    hat_fi = 1
-    for j in range(k):
-        X_j = X[:,j]  # the k-th component of the data
-        X_ij = X_i[j]  # the k-th component of the train sample
-        x_j = x[j]  # the k-th component of the coordinate where the pdf is estimated.
-        hat_fi *= f_xi_j(X_j,X_ij,x_j,h)
-    
-    return hat_fi
-
+def F(X=None, X_prior=None, x=None, h=1, verbose=0):
+    n = X.shape[0]  # number "training" samples       
+    # Average the contribution of each individual sample. 
+    hat_f = []  # init 
+    for X_i in X:
+        hat_f.append(f_xi(X_prior,X_i,x,h))
+        
+    hat_f = np.mean(np.array(hat_f))         
+        
+    return hat_f
 
 @jit(nopython=True, parallel=True)
-def f_xi_j(X,X_i,x,h):
+def f_xi(X_prior,X_i,x,h):
     """
-    Since our kernel is symmetric, we can compute the contribution of each sample 
-    for each axis independently. Here we compute the contribution of a single 
-    train sample, associated with the "j" coordinate. X, X_i, and x are associated 
-    to this "jth" axis, hence they are 1-dimensional here. 
+    Contribution of the X_i sample to the estimation of the pdf of X at x. 
+    X_prior contains the samples for which there is no missing values, which are used as prior when the contribution of sample with partially missing data is calculated.
     """
-    
-    # There is two cases, if X_i is know, the contribution is the standard weight 
-    # given by the kernel. If X_i is unknown, the rest of the data X is used to 
-    # estimate the contribution from the prior. 
+    k = X_prior.shape[1]  # dimension of the space of samples. 
     K = lambda u: 1/np.sqrt(2*np.pi) * np.exp(-u**2 / 2)  # Define the kernel
     
-    if not np.isnan(X_i):
-        hat_fij = 1/h * K( (x-X_i)/h )
-    
-    if np.isnan(X_i):
-        # Get the training data with existing values 
-        X_with_know_j = [xx for xx in X if not np.isnan(xx)]
-        hat_fij = 0
-        for XX in X_with_know_j:
-            hat_fij += 1/h * K( (x-XX)/h )
-        hat_fij /= len(X_with_know_j)
-    
-    return hat_fij
+    def W(X_1,X_2):
+        """
+        Weight between two samples X_1 and X_2 to measure the proximity of the hyperplane (in the case of missing values.)
+        W(X_1,X_2) = e^( -1/2 1/h**2 sum_k(x_1k-x_2k)**2 )  for k s.t. x_1k and x_2k isn't nan. 
+        """
+        def dist(X_1,X_2):
+            ks = [i for i in range(len(X_1)) if not np.isnan(X_1[i]) and not np.isnan(X_2[i])]
+            if not ks:  # if ks is empty the distance can't be computed
+                return np.nan
+            
+            d = 0
+            for k in ks:
+                x_1 = X_1[k]
+                x_2 = X_2[k]
+                d += (x_1-x_2)**2
+            return np.sqrt(d)
+        
+        d = dist(X_1, X_2)
+        if np.isnan(d):
+            # Is the vectors don't share at least one common coordinate 
+            return 0
+        
+        W = K( d/h )
+        return W
+        
+    # Since we are using a isomorph kernel, each axis can be handeled independently. 
+    hat_fi = 1
+    coords_missing = np.isnan(X_i)  # unknown coordinates of X_i
+    for j in range(k):
+        if not coords_missing[j]: # we know the j-th coordinate of X_i 
+            # We can compute the contribution of the jth coordinate using the standard term
+            hat_fi *= 1/h * K( (x[j]-X_i[j])/h )
+        
+        if coords_missing[j]:  # we don't know the j-th coordinate, 
+            # We use the term associate to the j-th coordinate for the 
+            # rest of the samples in the training set (for which the j-th component is know).
+            # The contribution of each term is weighted with the distance to the sample hyperplane.
+            hat_fip = 0
+            Ws = 1e-10  # eps
+            for X_p in X_prior:
+                w_p = W(X_i, X_p)
+                hat_fip += w_p * 1/h * K( (x[j]-X_p[j])/h )
+                Ws += w_p
+            hat_fip /= Ws
+            
+            hat_fi *= hat_fip    
+    return hat_fi
 
 
 if __name__=='__main__':
@@ -471,8 +487,8 @@ if __name__=='__main__':
     print('Testing stats.py ...')
     
     # Define some toy data and test the estimation of pdf kernel estimation for missing data
-    X = np.array([[1.,1.,1.],[-1,1,np.nan],[np.nan,-1,-1],[.5,.5,np.nan]])  # the collected data
-    x = [0,0,0]  # where the pdf is estimated
+    X = np.array([[1.,1.],[-1,1],[np.nan,-1],[.5,np.nan]])  # the collected data
+    x = [0,0.5]  # where the pdf is estimated
     h = .2 # kernel bandwidth
     
-    hat_f = F(X,x=x,h=h)
+    hat_f = kernel_based_pdf_estimation(X,x=x,h=h)
