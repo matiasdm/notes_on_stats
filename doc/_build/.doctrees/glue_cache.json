@@ -1,6 +1,6 @@
 {
   "sections/bayes": {
-    "hist_with_prior_head_turn_lab": {
+    "hist_head_turn_lab": {
       "data": {
         "application/papermill.record/image/png": null,
         "application/papermill.record/text/plain": "<Figure size 432x288 with 1 Axes>"
@@ -8,10 +8,10 @@
       "metadata": {
         "scrapbook": {
           "mime_prefix": "application/papermill.record/",
-          "name": "hist_with_prior_head_turn_lab"
+          "name": "hist_head_turn_lab"
         },
         "filenames": {
-          "image/png": "/Users/matiasdimartino/Dropbox/Work/research/2020/notes_on_stats/doc/_build/jupyter_execute/sections/bayes_10_1.png"
+          "image/png": "/Users/samperochon/Duke/Ongoing/Multimodal/notes_on_stats/doc/_build/jupyter_execute/sections/bayes_5_0.png"
         }
       },
       "output_type": "display_data"
@@ -27,12 +27,12 @@
           "name": "posterior_odds_normalized"
         },
         "filenames": {
-          "image/png": "/Users/matiasdimartino/Dropbox/Work/research/2020/notes_on_stats/doc/_build/jupyter_execute/sections/bayes_14_0.png"
+          "image/png": "/Users/samperochon/Duke/Ongoing/Multimodal/notes_on_stats/doc/_build/jupyter_execute/sections/bayes_14_0.png"
         }
       },
       "output_type": "display_data"
     },
-    "hist_head_turn_lab": {
+    "hist_with_prior_head_turn_lab": {
       "data": {
         "application/papermill.record/image/png": null,
         "application/papermill.record/text/plain": "<Figure size 432x288 with 1 Axes>"
@@ -40,16 +40,32 @@
       "metadata": {
         "scrapbook": {
           "mime_prefix": "application/papermill.record/",
-          "name": "hist_head_turn_lab"
+          "name": "hist_with_prior_head_turn_lab"
         },
         "filenames": {
-          "image/png": "/Users/matiasdimartino/Dropbox/Work/research/2020/notes_on_stats/doc/_build/jupyter_execute/sections/bayes_5_1.png"
+          "image/png": "/Users/samperochon/Duke/Ongoing/Multimodal/notes_on_stats/doc/_build/jupyter_execute/sections/bayes_10_0.png"
         }
       },
       "output_type": "display_data"
     }
   },
   "sections/pdfestimation": {
+    "CDF_empirical_approximation_with_conf": {
+      "data": {
+        "application/papermill.record/image/png": null,
+        "application/papermill.record/text/plain": "<Figure size 1080x360 with 3 Axes>"
+      },
+      "metadata": {
+        "scrapbook": {
+          "mime_prefix": "application/papermill.record/",
+          "name": "CDF_empirical_approximation_with_conf"
+        },
+        "filenames": {
+          "image/png": "/Users/samperochon/Duke/Ongoing/Multimodal/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_12_0.png"
+        }
+      },
+      "output_type": "display_data"
+    },
     "CDF_empirical_approximation": {
       "data": {
         "application/papermill.record/image/png": null,
@@ -61,71 +77,7 @@
           "name": "CDF_empirical_approximation"
         },
         "filenames": {
-          "image/png": "/Users/matiasdimartino/Dropbox/Work/research/2020/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_7_0.png"
-        }
-      },
-      "output_type": "display_data"
-    },
-    "kernel_estimation_with_CI": {
-      "data": {
-        "application/papermill.record/image/png": null,
-        "application/papermill.record/text/plain": "<Figure size 720x360 with 2 Axes>"
-      },
-      "metadata": {
-        "scrapbook": {
-          "mime_prefix": "application/papermill.record/",
-          "name": "kernel_estimation_with_CI"
-        },
-        "filenames": {
-          "image/png": "/Users/matiasdimartino/Dropbox/Work/research/2020/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_38_0.png"
-        }
-      },
-      "output_type": "display_data"
-    },
-    "pdf_histogram_confidence_intervals": {
-      "data": {
-        "application/papermill.record/image/png": null,
-        "application/papermill.record/text/plain": "<Figure size 1080x360 with 3 Axes>"
-      },
-      "metadata": {
-        "scrapbook": {
-          "mime_prefix": "application/papermill.record/",
-          "name": "pdf_histogram_confidence_intervals"
-        },
-        "filenames": {
-          "image/png": "/Users/matiasdimartino/Dropbox/Work/research/2020/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_25_0.png"
-        }
-      },
-      "output_type": "display_data"
-    },
-    "pdf_kernel": {
-      "data": {
-        "application/papermill.record/image/png": null,
-        "application/papermill.record/text/plain": "<Figure size 1080x360 with 3 Axes>"
-      },
-      "metadata": {
-        "scrapbook": {
-          "mime_prefix": "application/papermill.record/",
-          "name": "pdf_kernel"
-        },
-        "filenames": {
-          "image/png": "/Users/matiasdimartino/Dropbox/Work/research/2020/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_30_0.png"
-        }
-      },
-      "output_type": "display_data"
-    },
-    "pdf_examples": {
-      "data": {
-        "application/papermill.record/image/png": null,
-        "application/papermill.record/text/plain": "<Figure size 1080x360 with 3 Axes>"
-      },
-      "metadata": {
-        "scrapbook": {
-          "mime_prefix": "application/papermill.record/",
-          "name": "pdf_examples"
-        },
-        "filenames": {
-          "image/png": "/Users/matiasdimartino/Dropbox/Work/research/2020/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_16_0.png"
+          "image/png": "/Users/samperochon/Duke/Ongoing/Multimodal/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_7_0.png"
         }
       },
       "output_type": "display_data"
@@ -141,7 +93,71 @@
           "name": "pdf_empirical_risk_estimation"
         },
         "filenames": {
-          "image/png": "/Users/matiasdimartino/Dropbox/Work/research/2020/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_21_0.png"
+          "image/png": "/Users/samperochon/Duke/Ongoing/Multimodal/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_21_0.png"
+        }
+      },
+      "output_type": "display_data"
+    },
+    "kernel_estimation_with_CI": {
+      "data": {
+        "application/papermill.record/image/png": null,
+        "application/papermill.record/text/plain": "<Figure size 720x360 with 2 Axes>"
+      },
+      "metadata": {
+        "scrapbook": {
+          "mime_prefix": "application/papermill.record/",
+          "name": "kernel_estimation_with_CI"
+        },
+        "filenames": {
+          "image/png": "/Users/samperochon/Duke/Ongoing/Multimodal/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_38_0.png"
+        }
+      },
+      "output_type": "display_data"
+    },
+    "pdf_kernel": {
+      "data": {
+        "application/papermill.record/image/png": null,
+        "application/papermill.record/text/plain": "<Figure size 1080x360 with 3 Axes>"
+      },
+      "metadata": {
+        "scrapbook": {
+          "mime_prefix": "application/papermill.record/",
+          "name": "pdf_kernel"
+        },
+        "filenames": {
+          "image/png": "/Users/samperochon/Duke/Ongoing/Multimodal/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_30_0.png"
+        }
+      },
+      "output_type": "display_data"
+    },
+    "pdf_histogram_confidence_intervals": {
+      "data": {
+        "application/papermill.record/image/png": null,
+        "application/papermill.record/text/plain": "<Figure size 1080x360 with 3 Axes>"
+      },
+      "metadata": {
+        "scrapbook": {
+          "mime_prefix": "application/papermill.record/",
+          "name": "pdf_histogram_confidence_intervals"
+        },
+        "filenames": {
+          "image/png": "/Users/samperochon/Duke/Ongoing/Multimodal/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_25_0.png"
+        }
+      },
+      "output_type": "display_data"
+    },
+    "pdf_examples": {
+      "data": {
+        "application/papermill.record/image/png": null,
+        "application/papermill.record/text/plain": "<Figure size 1080x360 with 3 Axes>"
+      },
+      "metadata": {
+        "scrapbook": {
+          "mime_prefix": "application/papermill.record/",
+          "name": "pdf_examples"
+        },
+        "filenames": {
+          "image/png": "/Users/samperochon/Duke/Ongoing/Multimodal/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_16_0.png"
         }
       },
       "output_type": "display_data"
@@ -157,23 +173,7 @@
           "name": "pdf_kernel_estimation_optimal_bandwidth"
         },
         "filenames": {
-          "image/png": "/Users/matiasdimartino/Dropbox/Work/research/2020/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_34_0.png"
-        }
-      },
-      "output_type": "display_data"
-    },
-    "CDF_empirical_approximation_with_conf": {
-      "data": {
-        "application/papermill.record/image/png": null,
-        "application/papermill.record/text/plain": "<Figure size 1080x360 with 3 Axes>"
-      },
-      "metadata": {
-        "scrapbook": {
-          "mime_prefix": "application/papermill.record/",
-          "name": "CDF_empirical_approximation_with_conf"
-        },
-        "filenames": {
-          "image/png": "/Users/matiasdimartino/Dropbox/Work/research/2020/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_12_0.png"
+          "image/png": "/Users/samperochon/Duke/Ongoing/Multimodal/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_34_0.png"
         }
       },
       "output_type": "display_data"
@@ -189,7 +189,7 @@
           "name": "bootstrap_variance_estimation"
         },
         "filenames": {
-          "image/png": "/Users/matiasdimartino/Dropbox/Work/research/2020/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_49_0.png"
+          "image/png": "/Users/samperochon/Duke/Ongoing/Multimodal/notes_on_stats/doc/_build/jupyter_execute/sections/pdfestimation_49_0.png"
         }
       },
       "output_type": "display_data"
