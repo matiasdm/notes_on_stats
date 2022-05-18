@@ -17,12 +17,12 @@ from scipy.stats import wasserstein_distance
 # add tools path and import our own tools
 sys.path.insert(0, '../tools')
 
-from const import ROOT_DIR, DATA_DIR
+from const import (DATA_DIR, RATIO_OF_MISSING_VALUES, RATIO_MISSING_PER_CLASS, IMBALANCE_RATIO)
 from utils import fi
 from generateToyDataset import DatasetGenerator
 
 class Experiment(object):
-    def __init__(self, dataset_name, previous_experiment=None, num_samples=1000, ratio_of_missing_values=.2, imbalance_ratio=.5, num_samples_gt=2000, create_experiment=True, verbosity=1, random_state=47):
+    def __init__(self, dataset_name, previous_experiment=None, num_samples=1000, ratio_of_missing_values=RATIO_OF_MISSING_VALUES, imbalance_ratio=IMBALANCE_RATIO, num_samples_gt=2000, create_experiment=True, verbosity=1, random_state=47):
 
         # Set definitions attributes (also used for log purposes)
         self.dataset_name = dataset_name
