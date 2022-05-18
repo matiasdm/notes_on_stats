@@ -11,7 +11,7 @@ import json
 # add tools path and import our own tools
 sys.path.insert(0, '../tools')
 
-from const import ROOT_DIR, DATA_DIR, MAX_TRY_MISSSINGNESS, RATIO_OF_MISSING_VALUES, IMBALANCE_RATIO,RATIO_MISSING_PER_CLASS, IMBALANCE_RATIO
+from const import *
 
 class DatasetGenerator(object):
     """
@@ -47,7 +47,7 @@ class DatasetGenerator(object):
     """
 
     
-    def __init__(self, dataset_name, num_samples=1000, ratio_of_missing_values=RATIO_OF_MISSING_VALUES, imbalance_ratio=IMBALANCE_RATIO, num_samples_gt=2000, fast=False, verbosity=1, random_state=47):
+    def __init__(self, dataset_name, num_samples=1000, ratio_of_missing_values=RATIO_OF_MISSING_VALUES, imbalance_ratio=IMBALANCE_RATIO, num_samples_gt=2000, fast=False, verbosity=1, debug=False, random_state=RANDOM_STATE):
         
         self.dataset_name = dataset_name
 
@@ -83,6 +83,7 @@ class DatasetGenerator(object):
         self.missingness_description = ''
         self.cmap = sns.color_palette(plt.get_cmap('tab20')(np.arange(0,2)))
         self.verbosity = verbosity    
+        self.debug=debug
         self.random_state = random_state
         np.random.seed(random_state)
         
@@ -137,8 +138,7 @@ class DatasetGenerator(object):
         self.X_raw, self.y = shuffle(X, y, random_state=random_state)
         self.X_gt, self.y_gt = shuffle(X_gt, y_gt, random_state=random_state)
         
-        
-    def generate_missing_coordinates(self, missingness_mechanism='MCAR', allow_missing_both_coordinates=False, missing_first_quarter=False, ratio_missing_per_class=[.1, .5], missingness_pattern=None, verbosity=1):
+    def generate_missing_coordinates(self, missingness_mechanism='MCAR', ratio_of_missing_values=RATIO_OF_MISSING_VALUES, missing_first_quarter=False, missing_X1=False, missing_X2=False, ratio_missing_per_class=[.1, .5], missingness_pattern=None, verbosity=1):
 
         """
         Example of the currently implemented Missingness mechanisms and settings.
@@ -162,7 +162,6 @@ class DatasetGenerator(object):
         self.generate_missing_coordinates(missingness_mechanism='MNAR', missing_first_quarter=True, ratio_missing_per_class=[.1, .3])
 
         """
-        self.missingness_description = ''
         if missingness_pattern is not None:
             self._retrieve_missingness_parameters(missingness_pattern)
 
@@ -172,9 +171,7 @@ class DatasetGenerator(object):
                                             'missing_X1' : missing_X1,
                                             'missing_X2' : missing_X2,
                                             'missing_first_quarter' : missing_first_quarter,
-                                            'ratio_missing_per_class' : ratio_missing_per_class}  
-            
-            
+                                            'ratio_missing_per_class' : ratio_missing_per_class}              
         self.X = deepcopy(self.X_raw)
 
         excedded_time = 0
@@ -207,13 +204,13 @@ class DatasetGenerator(object):
                     # Simulate missing samples
                     for i in range(self.X.shape[0]):  # randomly remove features
 
-                        if self.X[i,0] > 0 and self.X[i,1] > 0 and  np.random.random() < self.missingness_parameters['ratio_of_missing_values']:
+                        if self.X_raw[i,0] > 0 and self.X_raw[i,1] > 0:
 
-                            if self.missingness_parameters['missing_X1'] and np.random.random() < .5:  
+                            if self.missingness_parameters['missing_X1'] and np.random.random() < self.missingness_parameters['ratio_of_missing_values']:  
                                 # equal probability
                                 self.X[i,0] = np.nan
 
-                            if self.missingness_parameters['missing_X2'] and np.random.random() < .5:  
+                            if self.missingness_parameters['missing_X2'] and np.random.random() < self.missingness_parameters['ratio_of_missing_values']:  
                                 self.X[i,1] = np.nan
 
                         if self.met_missingness_rate():
@@ -229,10 +226,10 @@ class DatasetGenerator(object):
 
                         if np.random.random() < self.missingness_parameters['ratio_of_missing_values']:
 
-                            if self.missingness_parameters['missing_X1'] and np.random.random() < .5:  
+                            if self.missingness_parameters['missing_X1'] and np.random.random() < self.missingness_parameters['ratio_of_missing_values']:  
                                 self.X[i,0] = np.nan
 
-                            if self.missingness_parameters['missing_X1'] and np.random.random() < .5:  
+                            if self.missingness_parameters['missing_X2'] and np.random.random() < self.missingness_parameters['ratio_of_missing_values']:  
                                 self.X[i,1] = np.nan  
 
                         if self.met_missingness_rate():
@@ -250,13 +247,13 @@ class DatasetGenerator(object):
                         # Simulate missing samples
                         for i in range(self.X.shape[0]):  # randomly remove features
                             
-                            if self.y[i]==label and self.X[i,0] > 0 and self.X[i,1] > 0 and  np.random.random() < self.missingness_parameters['ratio_missing_per_class'][label]:
+                            if self.y[i]==label and self.X_raw[i,0] > 0 and self.X_raw[i,1] > 0:
 
-                                if self.missingness_parameters['missing_X1'] and np.random.random() < .5:  # remove samples from x or y with 
+                                if self.missingness_parameters['missing_X1'] and np.random.random()  < self.missingness_parameters['ratio_missing_per_class'][label]:
                                     # equal probability
                                     self.X[i,0] = np.nan
 
-                                if self.missingness_parameters['missing_X1'] and np.random.random() < .5:  # remove samples from x or y with 
+                                if self.missingness_parameters['missing_X2'] and np.random.random()  < self.missingness_parameters['ratio_missing_per_class'][label]:
                                     self.X[i,1] = np.nan     
 
                             if self.met_missingness_rate(label=label): 
@@ -271,13 +268,12 @@ class DatasetGenerator(object):
                             # Simulate missing samples
                             for i in range(self.X.shape[0]):  # randomly remove features
 
-                                if self.y[i]==label and np.random.random() < self.missingness_parameters['ratio_missing_per_class'][label]:
+                                if self.y[i]==label:
 
-                                    if self.missingness_parameters['missing_X1'] and np.random.random() < .5:  # remove samples from x or y with 
-                                        # equal probability
+                                    if self.missingness_parameters['missing_X1'] and np.random.random() < self.missingness_parameters['ratio_missing_per_class'][label]:
                                         self.X[i,0] = np.nan
 
-                                    if self.missingness_parameters['missing_X1'] and np.random.random() < .5:  # remove samples from x or y with 
+                                    if self.missingness_parameters['missing_X2'] and np.random.random() < self.missingness_parameters['ratio_missing_per_class'][label]:
                                         self.X[i,1] = np.nan 
 
                                 if self.met_missingness_rate(label=label): 
@@ -296,18 +292,27 @@ class DatasetGenerator(object):
 
     def met_missingness_rate(self, label=None, verbose=False):
 
-        if verbose:
+        if self.missingness_parameters['missing_X1'] and self.missingness_parameters['missing_X2']:
+            missing_dimension = 2
+        elif self.missingness_parameters['missing_X1'] and not self.missingness_parameters['missing_X2']:
+            missing_dimension = 1
+        elif self.missingness_parameters['missing_X1'] and not self.missingness_parameters['missing_X2']:
+            missing_dimension = 1
+        else:
+            print("/!\. No missing data.")
+            return True
+
+        if verbose or self.debug:
             if self.missingness_parameters['missingness_mechanism'] in ['MCAR', 'MAR']:
-                print("Ratio of number-wise missing data {:.2f} (thres. {})".format(np.isnan(self.X).sum()/self.num_samples, self.missingness_parameters['ratio_of_missing_values']))
+                print("Ratio of number-wise missing data {:.2f} (thres. {})".format(np.isnan(self.X).sum()/(self.num_samples*missing_dimension), self.missingness_parameters['ratio_of_missing_values']))
             else:
                 for label in np.unique(self.y).astype(int):
-                    print("Class {} - Ratio of number-wise missing data {:.5f} (thres. {})".format(label, (np.isnan(self.X[(self.y==label).squeeze()]).sum(axis=1) > 0).sum()/(self.y==label).sum(), self.missingness_parameters['ratio_missing_per_class'][label]))
+                    print("Class {} - Ratio of number-wise missing data {:.5f} (thres. {})".format(label, np.isnan(self.X[(self.y==label).squeeze()]).sum() /((self.y==label).sum()*missing_dimension), self.missingness_parameters['ratio_missing_per_class'][label]))
         #while (np.isnan(self.X[(self.y==label).squeeze()]).sum(axis=1) > 0).sum()/(self.y==label).sum() < self.ratio_missing_per_class[label]:
         if label is None:
-            return np.isnan(self.X).sum()/self.num_samples > self.missingness_parameters['ratio_of_missing_values'] 
+            return np.isnan(self.X).sum()/(self.num_samples*missing_dimension) >= self.missingness_parameters['ratio_of_missing_values'] 
         else:
-            return (np.isnan(self.X[(self.y==label).squeeze()]).sum(axis=1) > 0).sum()/(self.y==label).sum() > self.missingness_parameters['ratio_missing_per_class'][label] 
-
+            return np.isnan(self.X[(self.y==label).squeeze()]).sum() /((self.y==label).sum()*missing_dimension) >= self.missingness_parameters['ratio_missing_per_class'][label] 
 
     def save(self, experiment_path):
             
@@ -349,12 +354,12 @@ class DatasetGenerator(object):
         if missingness_pattern==1:
             self.missingness_parameters = {'missingness_mechanism' : 'MCAR', 
                                             'ratio_of_missing_values' : RATIO_OF_MISSING_VALUES,
-                                            'missing_X1' : None,
-                                            'missing_X2' : None,
+                                            'missing_X1' : True,
+                                            'missing_X2' : False,
                                             'missing_first_quarter' : None,
                                             'ratio_missing_per_class' : None,
                                             'allow_missing_both_coordinates' : None}
-            self.missingness_description = 'Pattern 1 - MCAR {}% missing'.format(RATIO_OF_MISSING_VALUES)
+            self.missingness_description = 'Pattern 1 - MCAR {} missing, only X1'.format(RATIO_OF_MISSING_VALUES)
 
         elif missingness_pattern==2:
             self.missingness_parameters = {'missingness_mechanism' : 'MAR', 
@@ -364,7 +369,7 @@ class DatasetGenerator(object):
                                             'missing_first_quarter' : True,
                                             'ratio_missing_per_class' : None}
 
-            self.missingness_description = 'Pattern 2 - MAR quarter missing ({}%) both X1,X2'.format(RATIO_OF_MISSING_VALUES)
+            self.missingness_description = 'Pattern 2 - MAR quarter missing ({}) both X1,X2'.format(RATIO_OF_MISSING_VALUES)
 
 
         elif missingness_pattern==3:
@@ -375,7 +380,7 @@ class DatasetGenerator(object):
                                             'missing_first_quarter' : True,
                                             'ratio_missing_per_class' : None}
 
-            self.missingness_description = 'Pattern 3 - MAR quarter missing ({}%) only X1'.format(RATIO_OF_MISSING_VALUES)
+            self.missingness_description = 'Pattern 3 - MAR quarter missing ({}) only X1'.format(RATIO_OF_MISSING_VALUES)
 
         elif missingness_pattern==4:
             self.missingness_parameters = {'missingness_mechanism' : 'MNAR', 
@@ -385,7 +390,7 @@ class DatasetGenerator(object):
                                             'missing_first_quarter' : False,
                                             'ratio_missing_per_class' : RATIO_MISSING_PER_CLASS}    
 
-            self.missingness_description = 'Pattern 4 - MNAR ({}% for pos. class {}% for neg.class)'.format(RATIO_MISSING_PER_CLASS[0], RATIO_MISSING_PER_CLASS[1])
+            self.missingness_description = 'Pattern 4 - MNAR ({} for pos. class {} for neg.class)'.format(RATIO_MISSING_PER_CLASS[0], RATIO_MISSING_PER_CLASS[1])
 
         elif missingness_pattern==5:
             self.missingness_parameters = {'missingness_mechanism' : 'MNAR', 
@@ -395,7 +400,7 @@ class DatasetGenerator(object):
                                             'missing_first_quarter' : True,
                                             'ratio_missing_per_class' : RATIO_MISSING_PER_CLASS}  
 
-            self.missingness_description = 'Pattern 4 - MNAR Quarter missing\n({}% for pos. class {}% for neg.class)'.format(RATIO_MISSING_PER_CLASS[0], RATIO_MISSING_PER_CLASS[1])
+            self.missingness_description = 'Pattern 5 - MNAR Quarter missing\n({} for pos. class {} for neg.class)'.format(RATIO_MISSING_PER_CLASS[0], RATIO_MISSING_PER_CLASS[1])
 
         elif missingness_pattern==6:
             self.missingness_parameters = {'missingness_mechanism' : 'MNAR', 
@@ -405,7 +410,7 @@ class DatasetGenerator(object):
                                             'missing_first_quarter' : True,
                                             'ratio_missing_per_class' : RATIO_MISSING_PER_CLASS}  
 
-            self.missingness_description = 'Pattern 4 - MNAR Quarter missing\n({}% for pos. class {}% for neg.class)\n Only X1'.format(RATIO_MISSING_PER_CLASS[0], RATIO_MISSING_PER_CLASS[1])
+            self.missingness_description = 'Pattern 4 - MNAR Quarter missing\n({} for pos. class {} for neg.class)\n Only X1'.format(RATIO_MISSING_PER_CLASS[0], RATIO_MISSING_PER_CLASS[1])
 
 
 

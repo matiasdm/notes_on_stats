@@ -18,6 +18,7 @@ matias.di.martino.uy@gmail.com,    Durham 2020.
 import numpy as np
 import matplotlib.pyplot as plt
 from numba import jit
+from const import EPSILON
 #from numba.typed import List TODO: work on fighting against the deprecation of list in Numba, cf: https://numba.pydata.org/numba-doc/latest/reference/deprecation.html#deprecation-of-reflection-for-list-and-set-types
 
 def kernel_based_empirical_risk(X, h):
@@ -824,51 +825,50 @@ def kernel_based_pdf_estimation_xz(X, h=.2, resolution=50, cmap='Blues', verbose
     hat_f, hat_f_0, hat_f_1, hat_f_2 = estimate_pdf(data=X, method='side_spaces', resolution=resolution, bandwidth=h) 
     
     # Normalization of the distributions
-    hat_f /= hat_f.sum();hat_f_1 /= hat_f_1.sum();hat_f_2 /= hat_f_2.sum()
-    
+    hat_f /= (hat_f.sum()+EPSILON);hat_f_1 /= (hat_f_1.sum()+EPSILON);hat_f_2 /= (hat_f_2.sum()+EPSILON)
+
     # Computation of the marginals
     hat_f_2_marginal = hat_f.sum(axis=1);hat_f_1_marginal = hat_f.sum(axis=0)
-    
+
     # Z_prior reflects P(Z_1=1, Z_2=1, ... Z_k=1)
     Z_prior = np.array([np.mean(~np.isnan(X[:,i])) for i in range(X.shape[1])])
 
-    # Estimation of f(Z_1=1|X_2)
-    #hat_f_z1_knowing_x2 = hat_f_2 * (1-Z_prior[0])/(hat_f_2*(1-Z_prior[0]) + hat_f_1_marginal*Z_prior[0])
-    #hat_f_z1_knowing_x2 /= hat_f_z1_knowing_x2.sum()
-    
     # Estimation of f(Z_1=0|X_2)
-    hat_f_z1 = hat_f_1 * (1-Z_prior[0])/(hat_f_1 * (1-Z_prior[0])  + hat_f_1_marginal*Z_prior[0])
-    hat_f_z1 /= hat_f_z1.sum()
-    
-    # Estimation of f(Z_2=1|X_1)
-    #hat_f_z2_knowing_x1 = hat_f_1 * (1-Z_prior[1])/(hat_f_1*(1-Z_prior[1]) + hat_f_2_marginal*Z_prior[1])
-    #hat_f_z2_knowing_x1 /= hat_f_z2_knowing_x1.sum()
-    
+    hat_f_z1 = hat_f_2_marginal * Z_prior[0]/(hat_f_2_marginal * Z_prior[0]  + hat_f_2*(1-Z_prior[0]))
+    hat_f_z1 /= (hat_f_z1.sum()+EPSILON)
+
+    # Estimation of f(Z_1=1|X_2)
+    hat_f_z1_bar = hat_f_2 * (1-Z_prior[0])/(hat_f_2_marginal * Z_prior[0]  + hat_f_2*(1-Z_prior[0]))
+    hat_f_z1_bar /= (hat_f_z1_bar.sum()+EPSILON)
+
     # Estimation of f(Z_2=0|X_1)
-    hat_f_z2 = hat_f_2 * (1-Z_prior[1])/(hat_f_2 * (1-Z_prior[1])  + hat_f_2_marginal*Z_prior[1])
+    hat_f_z2 = hat_f_1_marginal * Z_prior[1]/(hat_f_1_marginal * Z_prior[1]  + hat_f_1*(1-Z_prior[0]))
     hat_f_z2 /= hat_f_z2.sum()
 
+    # Estimation of f(Z_2=1|X_1)
+    hat_f_z2_bar = hat_f_1 * (1-Z_prior[1])/(hat_f_1_marginal * Z_prior[1]  + hat_f_1*(1-Z_prior[0]))
+    hat_f_z2_bar /= (hat_f_z2_bar.sum()+EPSILON)
 
     if verbose:
 
         fig, axes = plt.subplots(2, 5, figsize=(20, 8));axes = axes.flatten()
-        axes[0].imshow(hat_f_2[:,None].repeat(2, axis=1), cmap=cmap);axes[0].set_title("A)\nf(X_2|Z_1=0)")
-        axes[1].imshow(hat_f_2_marginal[:,None].repeat(2, axis=1), cmap=cmap);axes[1].set_title("B)\nf(X_2|Z_2=1)")
-        axes[2].imshow(hat_f, cmap=cmap);axes[2].set_title("C)\nf(X_1, X_2|Z_1=1, Z_2=1)")
-        axes[3].imshow(hat_f_1_marginal[None, :].repeat(2, axis=0), cmap=cmap);axes[3].set_title("D)\nf(X_1|Z_1=1)")
-        axes[4].imshow(hat_f_1[None, :].repeat(2, axis=0), cmap=cmap);axes[4].set_title("E)\nf(X_1|Z_2=0)")
-        
-        #axes[5].imshow(hat_f_z1_knowing_x2[:,None].repeat(2, axis=1));axes[5].set_title("f(Z_1=0|X_2)")
-        axes[6].imshow(hat_f_z1[:,None].repeat(2, axis=1), cmap=cmap);axes[6].set_title("F)\nf(Z_1=1|X_2)")
-        axes[8].imshow(hat_f_z2[None, :].repeat(2, axis=0), cmap=cmap);axes[8].set_title("G)\nf(Z_2=1|X_1)")
-        #axes[9].imshow(hat_f_z2_knowing_x1[None, :].repeat(2, axis=0));axes[9].set_title("f(Z_2=0|X_1)")
-        
+        axes[0].imshow(hat_f_2[:,None].repeat(2, axis=1), cmap=cmap, origin='lower');axes[0].set_title("A)\nf(X_2|Z_1=0)")
+        axes[1].imshow(hat_f_2_marginal[:,None].repeat(2, axis=1), cmap=cmap, origin='lower');axes[1].set_title("B)\nf(X_2|Z_2=1)")
+        axes[2].imshow(hat_f, cmap=cmap, origin='lower');axes[2].set_title("C)\nf(X_1, X_2|Z_1=1, Z_2=1)")
+        axes[3].imshow(hat_f_1_marginal[None, :].repeat(2, axis=0), cmap=cmap, origin='lower');axes[3].set_title("D)\nf(X_1|Z_1=1)")
+        axes[4].imshow(hat_f_1[None, :].repeat(2, axis=0), cmap=cmap, origin='lower');axes[4].set_title("E)\nf(X_1|Z_2=0)")
+
+        axes[5].imshow(hat_f_z1_bar[:,None].repeat(2, axis=1), cmap=cmap, origin='lower');axes[5].set_title("f(Z_1=0|X_2)")
+        axes[6].imshow(hat_f_z1[:,None].repeat(2, axis=1), cmap=cmap, origin='lower');axes[6].set_title("F)\nf(Z_1=1|X_2)")
+        axes[8].imshow(hat_f_z2[None, :].repeat(2, axis=0), cmap=cmap, origin='lower');axes[8].set_title("G)\nf(Z_2=1|X_1)")
+        axes[9].imshow(hat_f_z2_bar[None, :].repeat(2, axis=0), cmap=cmap, origin='lower');axes[9].set_title("f(Z_2=0|X_1)")
+            
         _ = [ax.axis('off') for ax in axes]; plt.tight_layout()
 
-        axes[5].text(0.5,0.5, "P(Z_1=0, Z_2=0)={:.3f}%".format(100*hat_f_0), size=18, ha="center", transform=axes[5].transAxes)
+        axes[7].text(0.5,0.5, "P(Z_1=0, Z_2=0)={:.3f}%".format(100*hat_f_0), size=18, ha="center", transform=axes[7].transAxes)
 
         
-    return hat_f, hat_f_0, hat_f_1, hat_f_2, hat_f_z1, hat_f_z2, hat_f_1_marginal, hat_f_2_marginal
+    return hat_f, hat_f_0, hat_f_1, hat_f_2, hat_f_1_marginal, hat_f_2_marginal, hat_f_z1, hat_f_z2, hat_f_z1_bar, hat_f_z2_bar
 
 
 

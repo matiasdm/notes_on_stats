@@ -159,7 +159,7 @@ def estimate_pdf(data=None, method='our', resolution=20, bandwidth=None):
                 x = xygrid[0][i,j]
                 y = xygrid[1][i,j]
                 # Computing contribution on coordinates i, j of hat_f, and coordinate i of hat_f_1 and coordinate j of hat_f_2
-                hat_f[i,j], hat_f_0[i,j], hat_f_1[i,j], hat_f_2[i,j] =  kernel_based_pdf_estimation_side_spaces(X=data, x=[x,y], h=h)
+                hat_f[i,j], hat_f_0[i,j], hat_f_1[i,j], hat_f_2[i,j] =  kernel_based_pdf_estimation_side_spaces(X=data, x=[x, y], h=h)
                 
         # Average the contribution of all i's and j's coordinate
         hat_f_0 = np.mean(hat_f_0)
