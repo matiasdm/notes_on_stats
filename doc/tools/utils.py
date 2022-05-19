@@ -265,8 +265,7 @@ def split_dataset(X, y, proportion_train):
     
     return X_train_pos, X_train_neg, X_test, y_test.squeeze()
 
-
-def my_classification_report(y_true, y_pred):
+def my_classification_report(y_true, y_pred, ax=None, verbose=False):
     """
     Print several performance metrics that are common in the context of screening and fraud detection.
     """    
@@ -276,43 +275,48 @@ def my_classification_report(y_true, y_pred):
     """
     from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
-    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-    
     """
     Compute metrics of interest  
     """    
-    print('Sample: {} positive and {} negative samples (#p/#n={:3.0f}%)'.format(tp+fn, tn+fp, 100*(tp+fn)/(tn+fp)))
-    acc = (tp + tn) / (tp + tn + fp +  fn)
-    print('Accuracy: {:3.1f}%'.format(100*acc))
-    f1 = 2*tp / (2*tp + fp + fn)
-    print('F1 score (2 PPVxTPR/(PPV+TPR)): {:3.1f}%'.format(100*f1))
-    mcc = (tp*tn - fp*fn) / np.sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))
-    print('Matthews correlation coefficient (MCC): {:3.1f}%'.format(100*mcc))
-    tpr =  tp / (tp+fn)
-    print('Sensitivity, recall, hit rate, or true positive rate (TPR): {:3.1f}%'.format(100*tpr))
-    tnr = tn / (tn+fp)
-    print('Specificity, selectivity or true negative rate (TNR): {:3.1f}%'.format(100*tnr))
-    ppv = tp / (tp+fp)
-    print('Precision or positive predictive value (PPV): {:3.1f}%'.format(100*ppv))
-    npv = tn / (tn+fn)
-    print('Negative predictive value (NPV): {:3.1f}%'.format(100*npv))
-    fnr = fn / (tp+fn)
-    print('Miss rate or false negative rate (FNR): {:3.1f}%'.format(100*fnr))
-    print('False discovery rate (FDR=1-PPV): {:3.1f}%'.format(100*(1-ppv)))
-    print('False omission rate (FOR=1-NPV): {:3.1f}%'.format(100*(1-npv)))
-    cm = confusion_matrix(y_true, y_pred)
-    disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-    disp.plot(cmap='Blues')
-    disp.im_.colorbar.remove()
-    plt.show()
-    return 
 
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
+
+    acc = (tp + tn) / (tp + tn + fp +  fn)
+    f1 = 2*tp / (2*tp + fp + fn)
+    mcc = (tp*tn - fp*fn) / np.sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))
+    tpr =  tp / (tp+fn)
+    tnr = tn / (tn+fp)
+    ppv = tp / (tp+fp)
+    npv = tn / (tn+fn)
+    fnr = fn / (tp+fn)
+
+
+    performances_metrics = {'Accuracy' : round(acc, 3),
+                       'F1 score (2 PPVxTPR/(PPV+TPR))': round(f1, 3),
+                       'Matthews correlation coefficient (MCC)': round(mcc, 3),
+                       'Sensitivity, recall, hit rate, or true positive rate (TPR)': round(tpr, 3),
+                       'Specificity, selectivity or true negative rate (TNR)': round(tnr, 3),
+                       'Precision or positive predictive value (PPV)': round(ppv, 3),
+                       'Negative predictive value (NPV)': round(npv, 3),
+                       'Miss rate or false negative rate (FNR)': round(fnr, 3),
+                       'False discovery rate (FDR=1-PPV)': round(1-ppv, 3),
+                       'False omission rate (FOR=1-NPV)': round(1-npv, 3)}
+
+    if verbose:
+        cm = confusion_matrix(y_true, y_pred)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+        disp.plot(cmap='Blues', ax=ax if ax is not None else None)
+        disp.im_.colorbar.remove()        
+        print('Sample: {} positive and {} negative samples (#p/#n={:3.0f}%)'.format(tp+fn, tn+fp, 100*(tp+fn)/(tn+fp)))
+        for item, value in performances_metrics.items():
+            print("  {0:70}\t {1}".format(item, value))
+        
+    return ax, pd.DataFrame(performances_metrics, index=['0'])
 
 def performance(X_test, y_true, y_pred, verbose=True):
     
     # Creation of a df for the results
-
-    df = pd.DataFrame({'X1':X_test[:,0], 
+    predictions_df = pd.DataFrame({'X1':X_test[:,0], 
                       'X2':X_test[:,1], 
                       'Z1':[1 if not np.isnan(x) else 0 for x in X_test[:,0]],
                       'Z2': [1 if not np.isnan(x) else 0 for x in X_test[:,1]],
@@ -324,8 +328,7 @@ def performance(X_test, y_true, y_pred, verbose=True):
                       'False Negative': [1 if y_true==1 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
                       })
     
-    if verbose:
-        from utils import my_classification_report
-        my_classification_report(y_true, y_pred)
+    from utils import my_classification_report
+    _, performances_df = my_classification_report(y_true, y_pred, verbose=verbose)
 
-    return df
+    return predictions_df, performances_df

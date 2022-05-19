@@ -794,28 +794,32 @@ def f_xi_side_spaces(X_i, x, bandwidth):
 
     # Since we are using a isomorph kernel, each axis can be handeled independently. 
     hat_fi = 1
-    hat_fi_missing = [1, 1]
-    hat_fi_0 = 0
 
-    coords_missing = np.isnan(X_i)  # unknown coordinates of X_i
+    hat_fi_0 = 0
+    hat_fi_1 = 0
+    hat_fi_2 = 0
 
     # Handle the case where both are missing
-
-    if coords_missing.sum() == k:
+    if np.isnan(X_i[0]) and np.isnan(X_i[1]):
         hat_fi_0 = 1 
-        
-    else:
+
+    # Handle the case where both known
+    elif not np.isnan(X_i[0]) and not np.isnan(X_i[1]):
         for j in range(k):
-            if not coords_missing[j]: # we know the j-th coordinate of X_i 
-                # We can compute the contribution of the jth coordinate using the standard term
-                hat_fi *= 1/bandwidth * K( (x[j]-X_i[j])/bandwidth )
-                hat_fi_missing[switch(j)] = 0
+            # We can compute the contribution of the jth coordinate using the standard term
+            hat_fi *= 1/bandwidth * K( (x[j]-X_i[j])/bandwidth )
 
-            else:  # we don't know the j-th coordinate, 
-                # We use prior on the missingness mechanism associated to this coordinates.
-                hat_fi_missing[switch(j)] *= 1/bandwidth * K( (x[switch(j)]-X_i[switch(j)])/bandwidth ) # To check
+    # Handle the case where X1 is missing
+    elif np.isnan(X_i[0]) and not np.isnan(X_i[1]):
 
-    return hat_fi, hat_fi_0, hat_fi_missing[0], hat_fi_missing[1]
+        hat_fi_2 = 1/bandwidth * K( (x[1]-X_i[1]) /bandwidth )
+
+
+    else:
+
+        hat_fi_1 = 1/bandwidth * K( (x[0]-X_i[0])/bandwidth )
+
+    return hat_fi, hat_fi_0, hat_fi_1, hat_fi_2
 
 def kernel_based_pdf_estimation_xz(X, h=.2, resolution=50, cmap='Blues', verbose=0):
     
@@ -873,38 +877,24 @@ def kernel_based_pdf_estimation_xz(X, h=.2, resolution=50, cmap='Blues', verbose
 
 
 
-def fit_predict(X, y, proportion_train, resolution, bandwidth, verbose=True):
-    
-    #################################################################
-    # (1) Separate between training and test set 
-    #################################################################
+def fit_predict(dist_pos, dist_neg, dataset_test):
 
-    from utils import split_dataset
-    X_train_pos, X_train_neg, X_test, y_true = split_dataset(X, y, proportion_train)
 
+    X_test = dataset_test.X
+    Y_test = dataset_test.y
 
     #################################################################
-    # (2) Estimation of the different distributions
+    #  Prediction using maximum likelihood estimation
     #################################################################
 
-    from stats import kernel_based_pdf_estimation_xz
-    hat_f_pos, hat_f_1_pos, hat_f_2_pos, hat_f_z1_knowing_x2_pos, hat_f_z2_knowing_x1_pos, hat_f_1_marginal_pos, hat_f_2_marginal_pos = kernel_based_pdf_estimation_xz(X=X_train_pos, h=bandwidth, resolution=resolution, cmap='Blues', verbose=0)
-    hat_f_neg, hat_f_1_neg, hat_f_2_neg, hat_f_z1_knowing_x2_neg, hat_f_z2_knowing_x1_neg, hat_f_1_marginal_neg, hat_f_2_marginal_neg = kernel_based_pdf_estimation_xz(X=X_train_neg, h=bandwidth, resolution=resolution, cmap='Greens',verbose=0)
-
-
-    #################################################################
-    # (3) Prediction using maximum likelihood estimation
-    #################################################################
-
-    _, step = np.linspace(-2.5,2.5,resolution, retstep=True)
+    _, step = np.linspace(-2.5,2.5,dist_pos.resolution, retstep=True)
 
     # Contains for each sample of the Test set, the corresponding x and y index coordinates, in the matrix of the 2D pdf... 
     coord_to_index = np.floor_divide(X_test+2.5, step)
 
 
     # Init. the array of prediction
-    y_pred = np.zeros(shape=y_true.shape[0]); arr = []
-
+    y_pred = np.zeros(shape=Y_test.shape[0]); arr = []
 
     #----------- Treat the case of when both coordinates are known
 
@@ -917,10 +907,11 @@ def fit_predict(X, y, proportion_train, resolution, bandwidth, verbose=True):
     inds_array = np.moveaxis(np.array(list(map(tuple, hat_f_coordinates))), -1, 0)
 
     # Compare likelihood to do the prediction
-    predictions_both_known = (hat_f_pos[tuple(inds_array)] > hat_f_neg[tuple(inds_array)]).astype(int)
+    y_pred_both_known = (dist_pos.f[tuple(inds_array)] > dist_neg.f[tuple(inds_array)]).astype(int)
 
     # Assign predictions 
-    y_pred[X_indexes_both_known] = predictions_both_known
+    y_pred[X_indexes_both_known] = y_pred_both_known
+
 
     #----------- Treat the case of when only the first coordinate is known
 
@@ -931,11 +922,10 @@ def fit_predict(X, y, proportion_train, resolution, bandwidth, verbose=True):
     hat_f_coordinates = coord_to_index[X_indexes_first_known][:,0].astype(int)
 
     # Compare likelihood to do the prediction
-    predictions_first_known = (hat_f_1_pos[hat_f_coordinates] > hat_f_1_neg[hat_f_coordinates]).astype(int)
+    y_pred_first_known = (dist_pos.f_1[hat_f_coordinates] > dist_neg.f_1[hat_f_coordinates]).astype(int)
 
     # Assign predictions 
-    y_pred[X_indexes_first_known] = predictions_first_known
-
+    y_pred[X_indexes_first_known] = y_pred_first_known
 
     #----------- Treat the case of when only the second coordinate is known
 
@@ -947,115 +937,20 @@ def fit_predict(X, y, proportion_train, resolution, bandwidth, verbose=True):
     hat_f_coordinates = coord_to_index[X_indexes_second_known][:,1].astype(int)
 
     # Compare likelihood to do the prediction
-    predictions_second_known = (hat_f_2_pos[hat_f_coordinates] > hat_f_2_neg[hat_f_coordinates]).astype(int)
+    y_pred_second_known = (dist_pos.f_2[hat_f_coordinates] > dist_neg.f_2[hat_f_coordinates]).astype(int)
 
     # Assign predictions 
-    y_pred[X_indexes_second_known] = predictions_second_known
+    y_pred[X_indexes_second_known] = y_pred_second_known
 
-    print("Sanity check: num prediction: {} == {}: Num samples\n".format(len(arr), y_true.shape[0]))
+    print("Sanity check: num prediction: {} == {}: Num samples\n".format(len(arr), Y_test.shape[0]))
 
+    y_true = dataset_test.y.squeeze()
 
+    # Creation of a df for the results
+    from utils import performance
+    predictions_df, performances_df = performance(X_test, y_true, y_pred, verbose=False)
 
-    if verbose:
-        from utils import performance
-        df = performance(X_test, y_true, y_pred, verbose=False)
-
-        fig, axes = plt.subplots(2, 5, figsize=(20, 8));axes = axes.flatten()
-
-        axes[0].imshow(hat_f_2_pos[:,None].repeat(2, axis=1), cmap='Blues', extent=[-.5, .5, -2.5, 2.5]);axes[0].set_title("A)\nf(X_2|Z_1=0)")
-        axes[1].imshow(hat_f_1_marginal_pos[:,None].repeat(2, axis=1), cmap='Blues', extent=[-.5, .5, -2.5, 2.5]);axes[1].set_title("B)\nf(X_2|Z_2=1)")
-        axes[2].imshow(hat_f_pos, cmap='Blues', extent=[-2.5, 2.5, -2.5, 2.5]);axes[2].set_title("C)\nf(X_1, X_2|Z_1=1, Z_2=1)")
-        axes[3].imshow(hat_f_2_marginal_pos[None, :].repeat(2, axis=0), cmap='Blues', extent=[-2.5, 2.5, -.5, .5]);axes[3].set_title("D)\nf(X_1|Z_1=1)")
-        axes[4].imshow(hat_f_1_pos[None, :].repeat(2, axis=0), cmap='Blues', extent=[-2.5, 2.5, -.5, .5]);axes[4].set_title("E)\nf(X_1|Z_2=0)")
-        #axes[5].imshow(hat_f_z1_knowing_x2[:,None].repeat(2, axis=1));axes[5].set_title("f(Z_1=0|X_2)")
-        axes[6].imshow(hat_f_z1_knowing_x2_pos[:,None].repeat(2, axis=1), cmap='Blues', extent=[ -.5, .5,-2.5, 2.5]);axes[6].set_title("F)\nf(Z_1=1|X_2)")
-        axes[8].imshow(hat_f_z2_knowing_x1_pos[None, :].repeat(2, axis=0), cmap='Blues', extent=[-2.5, 2.5, -.5, .5]);axes[8].set_title("G)\nf(Z_2=1|X_1)")
-        #axes[9].imshow(hat_f_z2_knowing_x1[None, :].repeat(2, axis=0));axes[9].set_title("f(Z_2=0|X_1)")
-
-        # plot on the A) plot the sample having only X2 
-        axes[0].scatter([0]*len(df.query(" `Z1`==0 and  `Z2`==1 and `True Positive`==1")), 
-                        df.query(" `Z1`==0 and  `Z2`==1 and `True Positive`==1")['X2'], 
-                        color='b', label="TP (n={})".format(len(df.query(" `Z1`==0 and  `Z2`==1 and `True Positive`==1"))))
-        axes[0].scatter([0]*len(df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1")), 
-                        df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1")['X2'], 
-                    color='g', label="FP (n={})".format(len(df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1"))))
-        axes[0].scatter([0]*len(df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1")),  
-                        df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1")['X2'], 
-                        color='r', label="FN (n={})".format(len(df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1"))))
-
-
-        axes[2].scatter(df.query(" `Z1`==1 and  `Z2`==1 and `True Positive`==1")['X1'], 
-                        df.query(" `Z1`==1 and  `Z2`==1 and `True Positive`==1")['X2'], 
-                        color='b', label="TP (n={})".format(len(df.query(" `Z1`==1 and  `Z2`==1 and `True Positive`==1"))))
-        axes[2].scatter(df.query(" `Z1`==1 and  `Z2`==1 and `False Positive`==1")['X1'], 
-                        df.query(" `Z1`==1 and  `Z2`==1 and `False Positive`==1")['X2'], 
-                    color='g', label="FP (n={})".format(len(df.query(" `Z1`==1 and  `Z2`==1 and `False Positive`==1"))))
-        axes[2].scatter(df.query(" `Z1`==1 and  `Z2`==1 and `False Negative`==1")['X1'],  
-                        df.query(" `Z1`==1 and  `Z2`==1 and `False Negative`==1")['X2'], 
-                        color='r', label="FN (n={})".format(len(df.query(" `Z1`==1 and  `Z2`==1 and `False Negative`==1"))))
-
-        axes[4].scatter(df.query(" `Z1`==1 and  `Z2`==0 and `True Positive`==1")['X1'],
-                        [0]*len(df.query(" `Z1`==1 and  `Z2`==0 and `True Positive`==1")),  
-                        color='b', label="TP (n={})".format(len(df.query(" `Z1`==1 and  `Z2`==0 and `True Positive`==1"))))
-        axes[4].scatter(df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")['X1'], 
-                        [0]*len(df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")),
-                        color='g', label="FP (n={})".format(len(df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1"))))
-        axes[4].scatter(df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1")['X1'], 
-                        [0]*len(df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1")),  
-                        color='r', label="FN (n={})".format(len(df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1"))))
-
-        _ = [ax.legend(prop={'size':10}, loc='lower right') for i,ax in enumerate(axes) if i in [0, 2, 4]]; [ax.axis('off') for ax in axes]; plt.tight_layout()
-
-
-        fig, axes = plt.subplots(2, 5, figsize=(20, 8));axes = axes.flatten()
-
-        axes[0].imshow(hat_f_2_neg[:,None].repeat(2, axis=1), cmap='Greens', extent=[-.5, .5, -2.5, 2.5]);axes[0].set_title("A)\nf(X_2|Z_1=0)")
-        axes[1].imshow(hat_f_1_marginal_neg[:,None].repeat(2, axis=1), cmap='Greens', extent=[-.5, .5, -2.5, 2.5]);axes[1].set_title("B)\nf(X_2|Z_2=1)")
-        axes[2].imshow(hat_f_neg, cmap='Greens', extent=[-2.5, 2.5, -2.5, 2.5]);axes[2].set_title("C)\nf(X_1, X_2|Z_1=1, Z_2=1)")
-        axes[3].imshow(hat_f_2_marginal_neg[None, :].repeat(2, axis=0), cmap='Greens', extent=[-2.5, 2.5, -.5, .5]);axes[3].set_title("D)\nf(X_1|Z_1=1)")
-        axes[4].imshow(hat_f_1_neg[None, :].repeat(2, axis=0), cmap='Greens', extent=[-2.5, 2.5, -.5, .5]);axes[4].set_title("E)\nf(X_1|Z_2=0)")
-        #axes[5].imshow(hat_f_z1_knowing_x2[:,None].repeat(2, axis=1));axes[5].set_title("f(Z_1=0|X_2)")
-        axes[6].imshow(hat_f_z1_knowing_x2_neg[:,None].repeat(2, axis=1), cmap='Greens', extent=[ -.5, .5,-2.5, 2.5]);axes[6].set_title("F)\nf(Z_1=1|X_2)")
-        axes[8].imshow(hat_f_z2_knowing_x1_neg[None, :].repeat(2, axis=0), cmap='Greens', extent=[-2.5, 2.5, -.5, .5]);axes[8].set_title("G)\nf(Z_2=1|X_1)")
-        #axes[9].imshow(hat_f_z2_knowing_x1[None, :].repeat(2, axis=0));axes[9].set_title("f(Z_2=0|X_1)")
-
-
-        # plot on the A) plot the sample having only X2 
-        axes[0].scatter([0]*len(df.query(" `Z1`==0 and  `Z2`==1 and `True Negative`==1")), 
-                        df.query(" `Z1`==0 and  `Z2`==1 and `True Negative`==1")['X2'], 
-                        color='g', label="TN (n={})".format(len(df.query(" `Z1`==0 and  `Z2`==1 and `True Negative`==1"))))
-        axes[0].scatter([0]*len(df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1")), 
-                        df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1")['X2'], 
-                    color='b', label="FN (n={})".format(len(df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1"))))
-        axes[0].scatter([0]*len(df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1")),  
-                        df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1")['X2'], 
-                        color='r', label="FP (n={})".format(len(df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1"))))
-
-
-        axes[2].scatter(df.query(" `Z1`==1 and  `Z2`==1 and `True Negative`==1")['X1'], 
-                        df.query(" `Z1`==1 and  `Z2`==1 and `True Negative`==1")['X2'], 
-                        color='g', label="TN (n={})".format(len(df.query(" `Z1`==1 and  `Z2`==1 and `True Negative`==1"))))
-        axes[2].scatter(df.query(" `Z1`==1 and  `Z2`==1 and `False Negative`==1")['X1'], 
-                        df.query(" `Z1`==1 and  `Z2`==1 and `False Negative`==1")['X2'], 
-                    color='b', label="FN (n={})".format(len(df.query(" `Z1`==1 and  `Z2`==1 and `False Negative`==1"))))
-        axes[2].scatter(df.query(" `Z1`==1 and  `Z2`==1 and `False Positive`==1")['X1'],  
-                        df.query(" `Z1`==1 and  `Z2`==1 and `False Positive`==1")['X2'], 
-                        color='r', label="FP (n={})".format(len(df.query(" `Z1`==1 and  `Z2`==1 and `False Positive`==1"))))
-
-        axes[4].scatter(df.query(" `Z1`==1 and  `Z2`==0 and `True Negative`==1")['X1'],
-                        [0]*len(df.query(" `Z1`==1 and  `Z2`==0 and `True Negative`==1")),  
-                        color='g', label="TN (n={})".format(len(df.query(" `Z1`==1 and  `Z2`==0 and `True Negative`==1"))))
-        axes[4].scatter(df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1")['X1'], 
-                        [0]*len(df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1")),
-                        color='b', label="FN (n={})".format(len(df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1"))))
-        axes[4].scatter(df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")['X1'], 
-                        [0]*len(df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")),  
-                        color='r', label="FP (n={})".format(len(df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1"))))
-
-        _ = [ax.legend(prop={'size':10}, loc='lower right') for i,ax in enumerate(axes) if i in [0, 2, 4]]; [ax.axis('off') for ax in axes]; plt.tight_layout()
-
-    
-    return X_test, y_true, y_pred
+    return y_pred, predictions_df, performances_df
 
 if __name__=='__main__':
     # Testing ...

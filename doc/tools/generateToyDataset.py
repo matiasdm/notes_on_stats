@@ -47,7 +47,7 @@ class DatasetGenerator(object):
     """
 
     
-    def __init__(self, dataset_name, num_samples=1000, ratio_of_missing_values=RATIO_OF_MISSING_VALUES, imbalance_ratio=IMBALANCE_RATIO, num_samples_gt=2000, fast=False, verbosity=1, debug=False, random_state=RANDOM_STATE):
+    def __init__(self, dataset_name, num_samples=1000, ratio_of_missing_values=RATIO_OF_MISSING_VALUES, imbalance_ratio=IMBALANCE_RATIO, class_used=None, fast=False, verbosity=1, debug=False, random_state=RANDOM_STATE):
         
         self.dataset_name = dataset_name
 
@@ -55,9 +55,9 @@ class DatasetGenerator(object):
             return 
 
         self.num_samples = num_samples
-        self.num_samples_gt = num_samples_gt
+        self.class_used = class_used
         
-        self.ratio_of_missing_values = ratio_of_missing_values
+        #self.ratio_of_missing_values = ratio_of_missing_values
         self.imbalance_ratio = imbalance_ratio
         
         self.missingness_pattern = None
@@ -68,16 +68,7 @@ class DatasetGenerator(object):
                                         'missing_first_quarter' : None,
                                         'ratio_missing_per_class' : None,
                                         'allow_missing_both_coordinates' : None}
-
-
-        self.mask_missing = None
         
-        self.X_gt = None
-        self.y_gt = None
-        
-        self.X_raw = None
-        self.X = None
-        self.y = None
         
         self.dataset_description = 'Number of samples: {}\n'.format(self.num_samples)
         self.missingness_description = ''
@@ -86,57 +77,41 @@ class DatasetGenerator(object):
         self.debug=debug
         self.random_state = random_state
         np.random.seed(random_state)
-        
-        
-        ################################
-        # Generate the positive examples
-        ################################
-        if dataset_name=='moons':
-            X_all, labels = datasets.make_moons(n_samples=int(2*imbalance_ratio*(num_samples+num_samples_gt)), noise=.05, random_state=random_state)
-        elif dataset_name=='circles':
-            X_all, labels = datasets.make_circles(n_samples=int(2*imbalance_ratio*(num_samples+num_samples_gt)), factor=.5, noise=.05, random_state=random_state)
-        else:
-            raise ValueError("Please use 'moons' or 'circles' datasets.") 
-        
-        # normalize dataset for easier parameter selection
-        X_all = StandardScaler().fit_transform(X_all)
 
-        # Select the positive examples
-        X_all = X_all[np.argwhere(labels==1).squeeze()]
+        # Generate a dataset with samples from both classes - stored for internal use and for keeping track of changes etc...
+        self._X_raw, self._y = self._init_data()
 
-        # Separate ground truth and training data
-        X_pos, Xgt_pos = X_all[:int(num_samples*imbalance_ratio),:], X_all[int(num_samples*imbalance_ratio):,:]
-        labels_pos, labelsgt_pos = 1*np.ones((X_pos.shape[0], 1)), 1*np.ones((Xgt_pos.shape[0], 1))
+        # Masked features - stored for internal use and for keeping track of changes etc...
+        self._X = deepcopy(self._X_raw)
+        # Actual features used 
+        self.X = None
+        self.y = None
 
-        ################################
-        # Generate the negative examples
-        ################################
-        if dataset_name=='moons':
-            X_all, labels = datasets.make_moons(n_samples=int(2*(1-imbalance_ratio)*(num_samples+num_samples_gt)), noise=.05, random_state=random_state)
-        elif dataset_name=='circles':
-            X_all, labels = datasets.make_circles(n_samples=int(2*(1-imbalance_ratio)*(num_samples+num_samples_gt)), factor=.5, noise=.05, random_state=random_state)
-        else:
-            raise ValueError("Please use 'moons' or 'circles' datasets.") 
+        self._mask_missing = None
+        self.mask_missing = None
 
+        self.predictions_df = None
+        self.performances_df = None
 
-        # normalize dataset for easier parameter selection
-        X_all = StandardScaler().fit_transform(X_all)
+    
+    def subset(self, class_used):
 
-        # Select the negative examples
-        X_all = X_all[np.argwhere(labels==0).squeeze()]
+        if class_used is not None:
 
-        # Separate ground truth and training data
-        X_neg = X_all[:int(num_samples*(1-imbalance_ratio)),:] 
-        Xgt_neg = X_all[int(num_samples*(1-imbalance_ratio)):,:]
-        labels_neg, labelsgt_neg = np.zeros((X_neg.shape[0], 1)), np.zeros((Xgt_neg.shape[0], 1))
+            self.class_used = class_used
 
-        # Combine the positive and negative samples
-        X, y = np.concatenate([X_neg, X_pos], axis=0), np.concatenate([labels_neg, labels_pos], axis=0)
-        X_gt, y_gt = np.concatenate([Xgt_neg, Xgt_pos], axis=0), np.concatenate([labelsgt_neg, labelsgt_pos], axis=0)
+            # Create X and y used for experiments
+            self.X = deepcopy(self._X[(self._y==class_used).squeeze()])
+            self.y = deepcopy(self._y[(self._y==class_used).squeeze()])
 
-        # Shuffle the data 
-        self.X_raw, self.y = shuffle(X, y, random_state=random_state)
-        self.X_gt, self.y_gt = shuffle(X_gt, y_gt, random_state=random_state)
+            # Create masks for the missingness
+            self.mask_missing = np.isnan(self.X[(self.y==class_used).squeeze()])
+
+    def reset(self):
+        self.X = deepcopy(self._X)
+        self.y = deepcopy(self._y)
+        self.mask_missing = np.isnan(self.X)
+        self.class_used = None
         
     def generate_missing_coordinates(self, missingness_mechanism='MCAR', ratio_of_missing_values=RATIO_OF_MISSING_VALUES, missing_first_quarter=False, missing_X1=False, missing_X2=False, ratio_missing_per_class=[.1, .5], missingness_pattern=None, verbosity=1):
 
@@ -172,7 +147,7 @@ class DatasetGenerator(object):
                                             'missing_X2' : missing_X2,
                                             'missing_first_quarter' : missing_first_quarter,
                                             'ratio_missing_per_class' : ratio_missing_per_class}              
-        self.X = deepcopy(self.X_raw)
+        self._X = deepcopy(self._X_raw)
 
         excedded_time = 0
                 
@@ -182,17 +157,17 @@ class DatasetGenerator(object):
             while not self.met_missingness_rate():
     
                 # Simulate missing samples
-                for i in range(self.X.shape[0]):  # randomly remove features
+                for i in range(self._X.shape[0]):  # randomly remove features
                     if self.missingness_parameters['missing_X1'] and np.random.random() < self.missingness_parameters['ratio_of_missing_values']:
-                        self.X[i,0] = np.nan
+                        self._X[i,0] = np.nan
 
                     if self.missingness_parameters['missing_X2'] and np.random.random() < self.missingness_parameters['ratio_of_missing_values']:
-                        self.X[i,1] = np.nan
+                        self._X[i,1] = np.nan
 
                     if self.met_missingness_rate():
                         break  
                     
-            self.mask_missing = np.isnan(self.X)
+            self.mask_missing = np.isnan(self._X)
 
         elif self.missingness_parameters['missingness_mechanism'] == 'MAR':
 
@@ -202,16 +177,16 @@ class DatasetGenerator(object):
                 while not self.met_missingness_rate() and excedded_time < MAX_TRY_MISSSINGNESS:
 
                     # Simulate missing samples
-                    for i in range(self.X.shape[0]):  # randomly remove features
+                    for i in range(self._X.shape[0]):  # randomly remove features
 
-                        if self.X_raw[i,0] > 0 and self.X_raw[i,1] > 0:
+                        if self._X_raw[i,0] > 0 and self._X_raw[i,1] > 0:
 
                             if self.missingness_parameters['missing_X1'] and np.random.random() < self.missingness_parameters['ratio_of_missing_values']:  
                                 # equal probability
-                                self.X[i,0] = np.nan
+                                self._X[i,0] = np.nan
 
                             if self.missingness_parameters['missing_X2'] and np.random.random() < self.missingness_parameters['ratio_of_missing_values']:  
-                                self.X[i,1] = np.nan
+                                self._X[i,1] = np.nan
 
                         if self.met_missingness_rate():
                             break  
@@ -227,10 +202,10 @@ class DatasetGenerator(object):
                         if np.random.random() < self.missingness_parameters['ratio_of_missing_values']:
 
                             if self.missingness_parameters['missing_X1'] and np.random.random() < self.missingness_parameters['ratio_of_missing_values']:  
-                                self.X[i,0] = np.nan
+                                self._X[i,0] = np.nan
 
                             if self.missingness_parameters['missing_X2'] and np.random.random() < self.missingness_parameters['ratio_of_missing_values']:  
-                                self.X[i,1] = np.nan  
+                                self._X[i,1] = np.nan  
 
                         if self.met_missingness_rate():
                             break  
@@ -245,16 +220,16 @@ class DatasetGenerator(object):
                     for label in [0, 1]:
                         
                         # Simulate missing samples
-                        for i in range(self.X.shape[0]):  # randomly remove features
+                        for i in range(self._X.shape[0]):  # randomly remove features
                             
-                            if self.y[i]==label and self.X_raw[i,0] > 0 and self.X_raw[i,1] > 0:
+                            if self._y[i]==label and self._X_raw[i,0] > 0 and self._X_raw[i,1] > 0:
 
                                 if self.missingness_parameters['missing_X1'] and np.random.random()  < self.missingness_parameters['ratio_missing_per_class'][label]:
                                     # equal probability
-                                    self.X[i,0] = np.nan
+                                    self._X[i,0] = np.nan
 
                                 if self.missingness_parameters['missing_X2'] and np.random.random()  < self.missingness_parameters['ratio_missing_per_class'][label]:
-                                    self.X[i,1] = np.nan     
+                                    self._X[i,1] = np.nan     
 
                             if self.met_missingness_rate(label=label): 
                                 break
@@ -266,15 +241,15 @@ class DatasetGenerator(object):
                     for label in [0, 1]:
                         
                             # Simulate missing samples
-                            for i in range(self.X.shape[0]):  # randomly remove features
+                            for i in range(self._X.shape[0]):  # randomly remove features
 
-                                if self.y[i]==label:
+                                if self._y[i]==label:
 
                                     if self.missingness_parameters['missing_X1'] and np.random.random() < self.missingness_parameters['ratio_missing_per_class'][label]:
-                                        self.X[i,0] = np.nan
+                                        self._X[i,0] = np.nan
 
                                     if self.missingness_parameters['missing_X2'] and np.random.random() < self.missingness_parameters['ratio_missing_per_class'][label]:
-                                        self.X[i,1] = np.nan 
+                                        self._X[i,1] = np.nan 
 
                                 if self.met_missingness_rate(label=label): 
                                     break  
@@ -283,8 +258,15 @@ class DatasetGenerator(object):
         if excedded_time == MAX_TRY_MISSSINGNESS:
             print("/!\. Missingness constraints were ambitious. Try lower them to reach the desired criteria.")
             self.met_missingness_rate(verbose=True)
-        
+
+        # Create X and y used for experiments
+        self.X = deepcopy(self._X)
+        self.y = deepcopy(self._y)
+
+        # Create masks for the missingness
+        self._mask_missing = np.isnan(self._X)
         self.mask_missing = np.isnan(self.X)
+
         if verbosity:
             self.plot(verbosity=verbosity)
                     
@@ -304,22 +286,22 @@ class DatasetGenerator(object):
 
         if verbose or self.debug:
             if self.missingness_parameters['missingness_mechanism'] in ['MCAR', 'MAR']:
-                print("Ratio of number-wise missing data {:.2f} (thres. {})".format(np.isnan(self.X).sum()/(self.num_samples*missing_dimension), self.missingness_parameters['ratio_of_missing_values']))
+                print("Ratio of number-wise missing data {:.2f} (thres. {})".format(np.isnan(self._X).sum()/(self.num_samples*missing_dimension), self.missingness_parameters['ratio_of_missing_values']))
             else:
-                for label in np.unique(self.y).astype(int):
-                    print("Class {} - Ratio of number-wise missing data {:.5f} (thres. {})".format(label, np.isnan(self.X[(self.y==label).squeeze()]).sum() /((self.y==label).sum()*missing_dimension), self.missingness_parameters['ratio_missing_per_class'][label]))
+                for label in np.unique(self._y).astype(int):
+                    print("Class {} - Ratio of number-wise missing data {:.5f} (thres. {})".format(label, np.isnan(self._X[(self._y==label).squeeze()]).sum() /((self._y==label).sum()*missing_dimension), self.missingness_parameters['ratio_missing_per_class'][label]))
         #while (np.isnan(self.X[(self.y==label).squeeze()]).sum(axis=1) > 0).sum()/(self.y==label).sum() < self.ratio_missing_per_class[label]:
         if label is None:
-            return np.isnan(self.X).sum()/(self.num_samples*missing_dimension) >= self.missingness_parameters['ratio_of_missing_values'] 
+            return np.isnan(self._X).sum()/(self.num_samples*missing_dimension) >= self.missingness_parameters['ratio_of_missing_values'] 
         else:
-            return np.isnan(self.X[(self.y==label).squeeze()]).sum() /((self.y==label).sum()*missing_dimension) >= self.missingness_parameters['ratio_missing_per_class'][label] 
+            return np.isnan(self._X[(self._y==label).squeeze()]).sum() /((self._y==label).sum()*missing_dimension) >= self.missingness_parameters['ratio_missing_per_class'][label] 
 
     def save(self, experiment_path):
             
         #-------- Save dataset ----------#
         with open(os.path.join(experiment_path, 'dataset_log.json'), 'w') as outfile:
-            json.dump(self, outfile, default=lambda o: o.astype(float) if type(o) == np.int64 else o.tolist() if type(o) == np.ndarray else o.__dict__)
-        
+            json.dump(dataset_test, outfile, default=lambda o: o.astype(float) if type(o) == np.int64 else o.tolist() if type(o) == np.ndarray else o.to_json(orient='records') if type(o) == pd.core.frame.DataFrame else o.__dict__)
+
     def load(self, dataset_data):
 
         for key, value in dataset_data.items():
@@ -329,23 +311,27 @@ class DatasetGenerator(object):
                 setattr(self, key, value)
     
     def get_data(self):
-        return self.X, self.X_gt, self.y, self.y_gt 
+        return self.X, self.y
         
-    def plot(self, verbosity=1):
-
-        colors, colors_gt = [self.cmap[0] if l==1 else self.cmap[1] for l in self.y], [self.cmap[0] if l==1 else self.cmap[1] for l in self.y_gt]
-
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 5))
-        ax1.scatter(self.X_gt[:,0], self.X_gt[:,1], c=colors_gt);ax1.axis('off');ax1.set_title("Ground Truth\n{}% imbalance ratio\n".format(int(self.imbalance_ratio*100)), weight='bold')
-        ax2.scatter(self.X[:,0], self.X[:,1], c=colors);ax2.axis('off')
-        ax2.set_title("{}{}".format(self.dataset_description, self.missingness_description), weight='bold')
+    def plot(self, verbosity=1, ax=None):
         
-        if verbosity > 0:
-            ax2.scatter(self.X_raw[(self.mask_missing[:,0]) & (~self.mask_missing[:,1]), 0], self.X_raw[(self.mask_missing[:,0]) & (~self.mask_missing[:,1]), 1], c='g' if self.verbosity==4 else 'r', alpha=.7, label='Missing X1 ({})'.format(((self.mask_missing[:,0]) & (~self.mask_missing[:,1])).sum()))
-            ax2.scatter(self.X_raw[(~self.mask_missing[:,0]) & (self.mask_missing[:,1]), 0], self.X_raw[(~self.mask_missing[:,0]) & (self.mask_missing[:,1]), 1], c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X2 ({})'.format(((~self.mask_missing[:,0]) & (self.mask_missing[:,1])).sum()))
-            ax2.scatter(self.X_raw[(self.mask_missing[:,0]) & (self.mask_missing[:,1]), 0], self.X_raw[(self.mask_missing[:,0]) & (self.mask_missing[:,1]), 1], c='r', alpha=.7, label='Missing both ({})'.format(((self.mask_missing[:,0]) & (self.mask_missing[:,1])).sum()))
-            ax2.legend(prop={'size':10}, loc='lower left')
-        plt.show()
+            colors = [self.cmap[0] if l==1 else self.cmap[1] for l in self.y]
+
+            if ax is None:
+                fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+            ax.scatter(self.X[:,0], self.X[:,1], c=colors);ax.axis('off')
+            ax.set_title("{}{}".format(self.dataset_description, self.missingness_description), weight='bold')
+
+
+            if verbosity > 0:
+                ax.scatter(self._X_raw[(self._mask_missing[:,0]) & (~self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(self._mask_missing[:,0]) & (~self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='g' if self.verbosity==4 else 'r', alpha=.7, label='Missing X1 ({})'.format(((self._mask_missing[:,0]) & (~self._mask_missing[:,1])).sum()))
+
+                ax.scatter(self._X_raw[(~self._mask_missing[:,0]) & (self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(~self._mask_missing[:,0]) & (self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X2 ({})'.format(((~self._mask_missing[:,0]) & (self._mask_missing[:,1])).sum()))
+
+                ax.scatter(self._X_raw[(self._mask_missing[:,0]) & (self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(self._mask_missing[:,0]) & (self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='r', alpha=.7, label='Missing both ({})'.format(((self._mask_missing[:,0]) & (self._mask_missing[:,1])).sum()))
+                ax.legend(prop={'size':10}, loc='lower left')
+            return ax
+
 
     def _retrieve_missingness_parameters(self, missingness_pattern, **kwargs):
 
@@ -425,6 +411,62 @@ class DatasetGenerator(object):
 
             self.missingness_description = 'Custom pattern - {}'.format(kwargs['allow_missing_both_coordinates'])
             
-    
+    def _init_data(self):
+
+        num_samples_gt = 2000
+
+        ################################
+        # Generate the positive examples
+        ################################
+        if self.dataset_name=='moons':
+            X_all, labels = datasets.make_moons(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), noise=.05, random_state=self.random_state)
+        elif self.dataset_name=='circles':
+            X_all, labels = datasets.make_circles(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), factor=.5, noise=.05, random_state=self.random_state)
+        else:
+            raise ValueError("Please use 'moons' or 'circles' datasets.") 
+        
+        # normalize dataset for easier parameter selection
+        X_all = StandardScaler().fit_transform(X_all)
+
+        # Select the positive examples
+        X_all = X_all[np.argwhere(labels==1).squeeze()]
+
+        # Separate ground truth and training data
+        X_pos = X_all[:int(self.num_samples*self.imbalance_ratio),:]
+        #Xgt_pos = X_all[int(num_samples*imbalance_ratio):,:]
+        labels_pos = 1*np.ones((X_pos.shape[0], 1))
+        
+        #labelsgt_pos  = 1*np.ones((Xgt_pos.shape[0], 1))
+
+        ################################
+        # Generate the negative examples
+        ################################
+        if self.dataset_name=='moons':
+            X_all, labels = datasets.make_moons(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), noise=.05, random_state=self.random_state)
+        elif self.dataset_name=='circles':
+            X_all, labels = datasets.make_circles(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), factor=.5, noise=.05, random_state=self.random_state)
+        else:
+            raise ValueError("Please use 'moons' or 'circles' datasets.") 
 
 
+        # normalize dataset for easier parameter selection
+        X_all = StandardScaler().fit_transform(X_all)
+
+        # Select the negative examples
+        X_all = X_all[np.argwhere(labels==0).squeeze()]
+
+        # Separate ground truth and training data
+        X_neg = X_all[:int(self.num_samples*(1-self.imbalance_ratio)),:] 
+        #Xgt_neg = X_all[int(num_samples*(1-imbalance_ratio)):,:]
+        labels_neg = np.zeros((X_neg.shape[0], 1))
+        #labelsgt_neg = np.zeros((Xgt_neg.shape[0], 1))
+
+        # Combine the positive and negative samples
+        X, y = np.concatenate([X_neg, X_pos], axis=0), np.concatenate([labels_neg, labels_pos], axis=0)
+        #X_gt, y_gt = np.concatenate([Xgt_neg, Xgt_pos], axis=0), np.concatenate([labelsgt_neg, labelsgt_pos], axis=0)
+
+        # Shuffle the data 
+        X_raw, y = shuffle(X, y, random_state=self.random_state)
+        #self.X_gt, self.y_gt = shuffle(X_gt, y_gt, random_state=random_state)
+
+        return X_raw, y
