@@ -1,8 +1,17 @@
 
+import os
+import sys
+import json
+from glob import glob
+
 import numpy as np 
 import matplotlib.pyplot as plt
 import pandas as pd
 
+# add tools path and import our own tools
+sys.path.insert(0, '../tools')
+
+from const import *
 
 def fi(x=12, y=12):
     return plt.figure(figsize=(x, y))
@@ -332,3 +341,96 @@ def performance(X_test, y_true, y_pred, verbose=True):
     _, performances_df = my_classification_report(y_true, y_pred, verbose=verbose)
 
     return predictions_df, performances_df
+
+def label_bar(rects,ax):
+    """
+    Attach a text label above each bar displaying its height
+    """
+    for rect in rects:
+        height = rect.get_height()
+        ax.text(rect.get_x() + rect.get_width()*(2/4), .5*height,
+                 "{:.2f}".format(height),
+                 fontsize = 11,
+                ha='center', va='bottom')
+
+def create_df():
+    
+    df = pd.DataFrame(columns = ['dataset_name','experiment_number', 'purpose', 'fitted', 'resolution', 'bandwidth', 
+                                 'num_samples', 'imbalance_ratio', 'missingness_pattern', 'missingness_mechanism', 
+                                 'ratio_of_missing_values', 'missing_X1', 'missing_X2', 'missing_first_quarter','ratio_missing_per_class', 
+                                'Accuracy', 'F1', 'MCC', 'Sensitivity', 'Specificity', 'Precision', 'PPV', 'NPV', 'FNR', 'FDR', 'FOR'])
+    
+    experiments_paths = glob(os.path.join(DATA_DIR, 'experiments', "*", '*'))
+
+    for experiment_path in experiments_paths:
+
+        exp_path = os.path.join(experiment_path, 'experiment_log.json')
+        dataset_path = os.path.join(experiment_path, 'dataset_test_log.json')
+
+        dist_None_path = os.path.join(experiment_path, 'dist_None_path.json')
+        dist_1_path = os.path.join(experiment_path, 'dist_1_path.json')
+        dist_0_path = os.path.join(experiment_path, 'dist_0_path.json')
+
+        if os.path.isfile(exp_path):
+
+            with open(exp_path) as experiment_json:
+
+                # Load experiment data
+                experiment_data = json.load(experiment_json)
+
+        if os.path.isfile(dataset_path):
+            with open(dataset_path) as data_json:
+
+                # Load experiment data
+                dataset_data = json.load(data_json)
+
+        if os.path.isfile(dist_None_path):
+
+            with open(dist_None_path) as dist_json:
+
+                # Load experiment data
+                dist_None_path = json.load(dist_json)
+
+        if os.path.isfile(dist_1_path):
+
+            with open(dist_1_path) as dist_json:
+
+                # Load experiment data
+                dist_1_data = json.load(dist_json)
+
+        if os.path.isfile(dist_0_path):
+
+            with open(dist_0_path) as dist_json:
+
+                # Load experiment data
+                dist_0_data = json.load(dist_json)
+
+        # append rows to an empty DataFrame
+        df = df.append({'dataset_name' : experiment_data['dataset_name'], 
+                        'experiment_number' : experiment_data['experiment_number'],  
+                        'purpose' : experiment_data['purpose'],  
+                        'fitted' : experiment_data['fitted'],  
+                        'num_samples' : dataset_data['num_samples'],  
+                        'imbalance_ratio' : dataset_data['imbalance_ratio'],  
+                        'missingness_pattern' : dataset_data['missingness_pattern'],  
+                        'missingness_mechanism' : dataset_data['missingness_parameters']['missingness_mechanism'],  
+                        'ratio_of_missing_values' : dataset_data['missingness_parameters']['ratio_of_missing_values'],  
+                        'missing_X1' : dataset_data['missingness_parameters']['missing_X1'],  
+                        'missing_X2' : dataset_data['missingness_parameters']['missing_X2'],  
+                        'missing_first_quarter' : dataset_data['missingness_parameters']['missing_first_quarter'],  
+                        'ratio_missing_per_class' : dataset_data['missingness_parameters']['ratio_missing_per_class'],
+                        'Accuracy' : experiment_data['performances_df']['Accuracy'][0],  
+                        'F1' : experiment_data['performances_df']['F1 score (2 PPVxTPR/(PPV+TPR))'][0],  
+                        'MCC' : experiment_data['performances_df']['Matthews correlation coefficient (MCC)'][0],  
+                        'Sensitivity' : experiment_data['performances_df']['Sensitivity, recall, hit rate, or true positive rate (TPR)'][0],  
+                        'Specificity' : experiment_data['performances_df']['Specificity, selectivity or true negative rate (TNR)'][0],  
+                        'Precision' : experiment_data['performances_df']['Precision or positive predictive value (PPV)'][0],  
+                        'PPV' : experiment_data['performances_df']['Precision or positive predictive value (PPV)'][0],  
+                        'NPV' : experiment_data['performances_df']['Negative predictive value (NPV)'][0],  
+                        'FNR' : experiment_data['performances_df']['Miss rate or false negative rate (FNR)'][0],  
+                        'FDR' : experiment_data['performances_df']['False discovery rate (FDR=1-PPV)'][0],  
+                        'FOR' : experiment_data['performances_df']['False omission rate (FOR=1-NPV)'][0],  
+                        }, 
+                        ignore_index = True)
+    
+    return df

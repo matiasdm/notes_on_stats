@@ -1,17 +1,22 @@
+import os
+import sys 
+import json
+from copy import deepcopy
+
 import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+import seaborn as sns
+
 from sklearn import datasets
 from sklearn.preprocessing import StandardScaler
 from sklearn.utils import shuffle 
-from copy import deepcopy
-import seaborn as sns
-import matplotlib.pyplot as plt
-import sys 
-import os
-import json
+
 # add tools path and import our own tools
 sys.path.insert(0, '../tools')
 
 from const import *
+
 
 class DatasetGenerator(object):
     """
@@ -47,15 +52,17 @@ class DatasetGenerator(object):
     """
 
     
-    def __init__(self, dataset_name, num_samples=1000, ratio_of_missing_values=RATIO_OF_MISSING_VALUES, imbalance_ratio=IMBALANCE_RATIO, class_used=None, fast=False, verbosity=1, debug=False, random_state=RANDOM_STATE):
+    def __init__(self, dataset_name, purpose='train', num_samples=1000, ratio_of_missing_values=RATIO_OF_MISSING_VALUES, imbalance_ratio=IMBALANCE_RATIO, class_used=None, fast=False, verbosity=1, debug=False, random_state=RANDOM_STATE):
         
         self.dataset_name = dataset_name
 
         if fast:
+            #TODOCHECK
             return 
 
         self.num_samples = num_samples
         self.class_used = class_used
+        self.purpose = purpose
         
         #self.ratio_of_missing_values = ratio_of_missing_values
         self.imbalance_ratio = imbalance_ratio
@@ -70,7 +77,7 @@ class DatasetGenerator(object):
                                         'allow_missing_both_coordinates' : None}
         
         
-        self.dataset_description = 'Number of samples: {}\n'.format(self.num_samples)
+        self.dataset_description = 'Number of samples: {}'.format(self.num_samples)
         self.missingness_description = ''
         self.cmap = sns.color_palette(plt.get_cmap('tab20')(np.arange(0,2)))
         self.verbosity = verbosity    
@@ -90,10 +97,6 @@ class DatasetGenerator(object):
         self._mask_missing = None
         self.mask_missing = None
 
-        self.predictions_df = None
-        self.performances_df = None
-
-    
     def subset(self, class_used):
 
         if class_used is not None:
@@ -299,8 +302,8 @@ class DatasetGenerator(object):
     def save(self, experiment_path):
             
         #-------- Save dataset ----------#
-        with open(os.path.join(experiment_path, 'dataset_log.json'), 'w') as outfile:
-            json.dump(dataset_test, outfile, default=lambda o: o.astype(float) if type(o) == np.int64 else o.tolist() if type(o) == np.ndarray else o.to_json(orient='records') if type(o) == pd.core.frame.DataFrame else o.__dict__)
+        with open(os.path.join(experiment_path, 'dataset_{}_log.json'.format(self.purpose)), 'w') as outfile:
+            json.dump(self, outfile, default=lambda o: o.astype(float) if type(o) == np.int64 else o.tolist() if type(o) == np.ndarray else o.to_json(orient='records') if type(o) == pd.core.frame.DataFrame else o.__dict__)
 
     def load(self, dataset_data):
 
@@ -319,9 +322,9 @@ class DatasetGenerator(object):
 
             if ax is None:
                 fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+                ax.set_title("{}\n{}".format(self.dataset_description, self.missingness_description), weight='bold')
+                
             ax.scatter(self.X[:,0], self.X[:,1], c=colors);ax.axis('off')
-            ax.set_title("{}{}".format(self.dataset_description, self.missingness_description), weight='bold')
-
 
             if verbosity > 0:
                 ax.scatter(self._X_raw[(self._mask_missing[:,0]) & (~self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(self._mask_missing[:,0]) & (~self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='g' if self.verbosity==4 else 'r', alpha=.7, label='Missing X1 ({})'.format(((self._mask_missing[:,0]) & (~self._mask_missing[:,1])).sum()))
@@ -331,7 +334,6 @@ class DatasetGenerator(object):
                 ax.scatter(self._X_raw[(self._mask_missing[:,0]) & (self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(self._mask_missing[:,0]) & (self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='r', alpha=.7, label='Missing both ({})'.format(((self._mask_missing[:,0]) & (self._mask_missing[:,1])).sum()))
                 ax.legend(prop={'size':10}, loc='lower left')
             return ax
-
 
     def _retrieve_missingness_parameters(self, missingness_pattern, **kwargs):
 
