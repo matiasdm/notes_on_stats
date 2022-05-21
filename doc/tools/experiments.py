@@ -30,6 +30,7 @@ class Experiments(object):
 
         # Set definitions attributes (also used for log purposes)
         self.dataset_name = dataset_name
+        self.debug=debug
 
         if previous_experiment is not None:
             self.load(previous_experiment)
@@ -41,7 +42,8 @@ class Experiments(object):
 
         # Distributions
         self.resolution = resolution
-        self.bandwidth = bandwidth = bandwidth
+        self.bandwidth = bandwidth
+        self.dist = None
         self.dist_pos = None
         self.dist_neg = None
         
@@ -112,8 +114,26 @@ class Experiments(object):
         # Init. the array of prediction
         y_pred = np.zeros(shape=self.dataset_test.y.shape[0]); arr = []
 
-        #----------- Treat the case of when both coordinates are known
 
+
+        #----------- Treat the case of when none coordinates are known
+
+        # Index of the samples in the test set where none of the coordinates are known 
+        X_indexes_none_known = np.argwhere(((~np.isnan(coord_to_index)).sum(axis=1)==0)).squeeze()
+
+        # Compare likelihood to do the prediction and assign the label in the prediction
+
+        # If equal prior, we assign labels randomly
+        if self.dist_pos.f_0  == self.dist_neg.f_0:
+            y_pred[X_indexes_none_known] = np.random.randint(0, 2, len(X_indexes_none_known))
+        # Otherwise  the label is based on the a posterior on the missingness ratio
+        else:
+            y_pred[X_indexes_none_known] = np.array( len(X_indexes_none_known) * [int(self.dist_pos.f_0  > self.dist_neg.f_0)])
+
+        arr.extend(X_indexes_none_known)
+
+
+        #----------- Treat the case of when both coordinates are known
 
         # Index of the samples in the test set where both first coordinates are known 
         X_indexes_both_known = np.argwhere((~np.isnan(coord_to_index)).sum(axis=1)==2).squeeze(); arr.extend(X_indexes_both_known)
@@ -158,7 +178,11 @@ class Experiments(object):
         # Assign predictions 
         y_pred[X_indexes_second_known] = y_pred_second_known
 
+        assert len(arr) == self.dataset_test.y.shape[0], "/!\. Not enough predictions made, check this out!"
+            
         print("Sanity check: number of predictions: {} == {}: Num samples\n".format(len(arr), self.dataset_test.y.shape[0])) if self.debug else None
+
+
 
         y_true = self.dataset_test.y.squeeze()
 
@@ -215,42 +239,28 @@ class Experiments(object):
             self.plot_estimation()
 
     def plot_estimation(self):
-        # TODOOOOOO
+
         # Create the pannel 
         fig, axes = plt.subplots(3, 5, figsize=(30, 12));axes = axes.flatten()
-        fig.suptitle("({}) Training dataset: {}\n{}".format(int(self.experiment_number), self.dataset_train.dataset_description, self.dataset_train.missingness_description), weight='bold', fontsize=20)
+        fig.suptitle("({}) dataset: {}\n{}".format(int(self.experiment_number), self.dataset_train.dataset_description, self.dataset_train.missingness_description), weight='bold', fontsize=20)
 
 
-        # Put the dataset 
-        axes[1 if df is not None else 2] = self.dataset_test.plot(ax=axes[1 if df is not None else 2])
+        # Plot the dataset 
+        axes[2] = self.dataset_train.plot(ax=axes[2])
+
+        # Plot the distributions
+        axes = self.dist.plot(axes=axes)
+
+        bar = axes[12].bar([0], self.dist.f_0, color = 'tab:orange', label="P(Z_1=0, Z_2=0)");label_bar(bar,axes[12])
+        axes[12].set_title("H)\nBoth coord. missing");axes[7].set_xlim([-2, 2])
+
+        # Plot the points on the distributions
+        _ = [ax.legend(prop={'size':10}, loc='lower right') for i,ax in enumerate(axes) if i in [12]]; [axes[i].axis('off') for i in range(len(axes))]
+        plt.tight_layout()
+
+        plt.show()
 
 
-        # Put the performances
-        if df is not None:
-
-                    cm = confusion_matrix(y_true, y_pred)
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-        disp.plot(cmap='Blues', ax=ax if ax is not None else None)
-        disp.im_.colorbar.remove()        
-        print('Sample: {} positive and {} negative samples (#p/#n={:3.0f}%)'.format(tp+fn, tn+fp, 100*(tp+fn)/(tn+fp)))
-        for item, value in performances_metrics.items():
-            print("  {0:70}\t {1}".format(item, value))
-
-
-            from utils import my_classification_report
-            axes[3], _ = my_classification_report(df['Y'].tolist(), df['Prediction'].tolist(), ax=axes[3])
-            
-            _ = [ax.legend(prop={'size':10}, loc='lower right') for i,ax in enumerate(axes) if i in [5, 7, 9, ]]; [axes[i].axis('off') for i in range(len(axes)) if i!=3 ]; plt.tight_layout()
-
-        if df is None:
-            _ = [axes[i].axis('off') for i in range(len(axes))]; plt.tight_layout()   
-
-
-        if self.dist_pos is not None:
-            self.dist_pos.plot(axes=axes)
-            self.dist_neg.plot(axes=axes)
-        else:
-            self.dist.plot(axes=axes)
         return      
 
     def plot_classification(self):
@@ -276,7 +286,7 @@ class Experiments(object):
         bar = axes[12].bar([0], self.dist_pos.f_0, color = 'tab:blue', label="Pos.");label_bar(bar,axes[12])
         bar = axes[12].bar([1], self.dist_neg.f_0, color = 'tab:green', label="Neg.");label_bar(bar,axes[12])
         axes[12].set_title("H)\nBoth coord. missing");axes[12].set_xlim([-4, 4])
-        _ = [ax.legend(prop={'size':10}, loc='lower right') for i,ax in enumerate(axes) if i in [5, 7, 9, 12]]; [axes[i].axis('off') for i in range(len(axes)) if i!=22 ]; plt.tight_layout()
+        _ = [ax.legend(prop={'size':10}, loc='lower right') for i,ax in enumerate(axes) if i in [5, 7, 9, 12, 15, 17, 19]]; [axes[i].axis('off') for i in range(len(axes)) if i!=22 ]; plt.tight_layout()
 
         plt.show()
 
@@ -329,6 +339,7 @@ class Experiments(object):
         self.dataset_test = None 
         self.dist_pos = None
         self.dist_neg = None
+        self.predictions_df = None
         self.performances_df = self.performances_df.to_dict(orient='list') if self.performances_df is not None else None
 
         with open(self.json_path, 'w') as outfile:
@@ -471,9 +482,7 @@ class Experiments(object):
         print("Experiment {} loaded successfully! :-)".format(previous_experiment))
         return  
 
-        
-
-    def _init_experiment_path(self):
+    def _init_experiment_path(self, suffix=None):
         """
             This method create the experiment path and folders associated with experiments. 
             It creates into the DATA_DIR location - usually "*/data/ - several objects (here is an exemple for the autism project):
@@ -500,6 +509,7 @@ class Experiments(object):
         """
         
         # Create experiment folder if not already created
+
         if not os.path.isdir(os.path.join(DATA_DIR, 'experiments')):
             os.mkdir(os.path.join(DATA_DIR, 'experiments'))
             

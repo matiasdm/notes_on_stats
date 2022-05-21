@@ -116,7 +116,6 @@ class Distributions(object):
 
         if predictions_df is not None and self.class_used == 1:
 
-
             # plot on the A) plot the sample having only X2 
             axes[5].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Positive`==1")), 
                             predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Positive`==1")['X2'], 
