@@ -100,6 +100,10 @@ class Distributions(object):
         elif self.class_used == 0:
             shift = 10
 
+        alpha=.3
+
+        # Plot the distributions
+
         axes[5+shift].imshow(self.f_2[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[5+shift].set_title("A)\nf(X_2|Z_1=0)")
         axes[6+shift].imshow(self.f_2_marginal[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[6+shift].set_title("B)\nf(X_2|Z_2=1)")
         axes[7+shift].imshow(self.f, cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -2.5, 2.5]);axes[7].set_title("C)\nf(X_1, X_2|Z_1=1, Z_2=1)")
@@ -109,10 +113,7 @@ class Distributions(object):
         axes[10+shift].imshow(self.f_z1_bar[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[10+shift].set_title("F)\nf(Z_1=0|X_2)")
         axes[11+shift].imshow(self.f_z1[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[11+shift].set_title("G)\nf(Z_1=1|X_2)")
         axes[13+shift].imshow(self.f_z2[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[13+shift].set_title("I)\nf(Z_2=1|X_1)")
-        axes[14+shift].imshow(self.f_z2_bar[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[14+shift].set_title("J)\nf(Z_2=0|X_1)")
-
-
-        alpha=.3
+        axes[14+shift].imshow(self.f_z2_bar[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[14+shift].set_title("J)\nf(Z_2=0|X_1)")        
 
         if predictions_df is not None and self.class_used == 1:
 
@@ -147,6 +148,9 @@ class Distributions(object):
                             [0]*len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1")),  
                             color='r', alpha=alpha, label="FN (n={})".format(len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1"))))
 
+            bar = axes[12].bar([0], self.f_0, color = 'tab:blue', label="Pos. {} TP {} FP".format(len(predictions_df.query(" `Z1`==0 and  `Z2`==0 and `True Positive`==1")), len(predictions_df.query(" `Z1`==0 and  `Z2`==0 and `False Positive`==1")) ));label_bar(bar,axes[12])
+
+
         elif predictions_df is not None and self.class_used == 0:
             # plot on the A) plot the sample having only X2 
             axes[5+shift].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Negative`==1")), 
@@ -179,6 +183,10 @@ class Distributions(object):
             axes[9+shift].scatter(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")['X1'], 
                             [0]*len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")),  
                             color='r', label="FP (n={})".format(len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")))) 
+
+            bar = axes[12].bar([1], self.f_0, color = 'tab:green', label="Neg. {} TN {} FN".format( len(predictions_df.query(" `Z1`==0 and  `Z2`==0 and `True Negative`==1")), len(predictions_df.query(" `Z1`==0 and  `Z2`==0 and `False Negative`==1")) ));label_bar(bar,axes[12])
+            
+            axes[12].set_title("H)\nBoth coord. missing");axes[12].set_xlim([-4, 4])
     
         return axes
 

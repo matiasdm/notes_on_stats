@@ -214,7 +214,7 @@ def estimate_pdf(data=None, method='our', resolution=20, bandwidth=None):
             for j in range(W):
                 x = xygrid[0][i,j]
                 y = xygrid[1][i,j]
-                hat_f[i,j] = kernel_based_pdf_estimation(imp_data,x=[x,y],h=h)
+                hat_f[i,j] = kernel_based_pdf_estimation(imp_data, x=[x,y],h=h)
 
     return hat_f
 

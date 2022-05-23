@@ -346,7 +346,7 @@ class DatasetGenerator(object):
 
             if ax is None:
                 fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-            if title:
+            if title or self.verbosity>1:
                 ax.set_title("{}\n{}".format(self.dataset_description, self.missingness_description), weight='bold')
                 
             ax.scatter(self.X[:,0], self.X[:,1], c=colors);ax.axis('off')

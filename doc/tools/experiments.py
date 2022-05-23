@@ -17,7 +17,7 @@ from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 sys.path.insert(0, '../tools')
 
 from const import *
-from utils import fi, label_bar
+from utils import fi
 
 from generateToyDataset import DatasetGenerator
 from distributions import Distributions
@@ -281,12 +281,8 @@ class Experiments(object):
         axes = self.dist_pos.plot(axes=axes, predictions_df=self.predictions_df)
         axes = self.dist_neg.plot(axes=axes, predictions_df=self.predictions_df)
 
-        # Plot the distributions of points
-
-        bar = axes[12].bar([0], self.dist_pos.f_0, color = 'tab:blue', label="Pos.");label_bar(bar,axes[12])
-        bar = axes[12].bar([1], self.dist_neg.f_0, color = 'tab:green', label="Neg.");label_bar(bar,axes[12])
-        axes[12].set_title("H)\nBoth coord. missing");axes[12].set_xlim([-4, 4])
-        _ = [ax.legend(prop={'size':10}, loc='lower right') for i,ax in enumerate(axes) if i in [5, 7, 9, 12, 15, 17, 19]]; [axes[i].axis('off') for i in range(len(axes)) if i!=22 ]; plt.tight_layout()
+        # Handle legend and set axis off
+        _ = [ax.legend(prop={'size':10}) for i,ax in enumerate(axes) if i in [5, 7, 9, 12, 15, 17, 19]]; [axes[i].axis('off') for i in range(len(axes)) if i!=22 ]; plt.tight_layout()
 
         plt.show()
 
