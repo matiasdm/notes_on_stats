@@ -20,7 +20,8 @@ from const import *
 from utils import fi, repr
 
 from generateToyDataset import DatasetGenerator
-from distributions import Distributions
+from model.bayesian.distributions import Distributions
+from model.neural_additive_models.nam import NAM
 
 
 class Experiments(object):

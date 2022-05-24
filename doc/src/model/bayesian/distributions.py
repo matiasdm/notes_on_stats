@@ -11,10 +11,11 @@ from scipy.stats import wasserstein_distance
 
 
 # add tools path and import our own tools
-sys.path.insert(0, '../src')
+sys.path.insert(0, '../../src')
 
 from const import *
 from utils import fi, label_bar, repr
+from .utils import estimate_pdf
 from generateToyDataset import DatasetGenerator
 
 class Distributions(object):
@@ -82,8 +83,6 @@ class Distributions(object):
                 print("Estimating distributions for both classes.")
 
         #---------------------- Estimation ----------------------#
-        from utils import estimate_pdf
-
         start_time = time()
 
         if self.method == 'no_imputations':
