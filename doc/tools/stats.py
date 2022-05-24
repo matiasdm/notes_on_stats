@@ -18,6 +18,7 @@ matias.di.martino.uy@gmail.com,    Durham 2020.
 import numpy as np
 import matplotlib.pyplot as plt
 from numba import jit
+from copy import deepcopy       
 from const import EPSILON
 #from numba.typed import List TODO: work on fighting against the deprecation of list in Numba, cf: https://numba.pydata.org/numba-doc/latest/reference/deprecation.html#deprecation-of-reflection-for-list-and-set-types
 
@@ -529,7 +530,7 @@ def F(X=None, X_prior=None, x=None, h=1, verbose=0):
     return hat_f
 
 @jit(nopython=True, parallel=True)
-def f_xi(X_prior,X_i,x,h):
+def f_xi(X_prior, X_i, x, h):
     """
     Contribution of the X_i sample to the estimation of the pdf of X at x. 
     X_prior contains the samples for which there is no missing values, which are used as prior when the contribution of sample with partially missing data is calculated.
@@ -586,7 +587,106 @@ def f_xi(X_prior,X_i,x,h):
     return hat_fi
 
 
-from numba import jit
+##############################################################################
+############## Weighted scheme data imputation                 ###############
+##############################################################################
+
+def impute_missing_data(X_train, X_test, method='custom_imputations', h=.2):
+    """
+    Imputation of the missing values of the different rows of X_test based on X_train. 
+    X_prior contains the samples for which there is no missing values, which are used as prior when coputing the missing coordinate of a sample.
+    """
+
+    k = X_test.shape[1]  # dimension of the space of samples. 
+    K = lambda u: 1/np.sqrt(2*np.pi) * np.exp(-u**2 / 2)  # Define the kernel
+    
+    if method == 'custom_imputations':
+        def W(X_1,X_2):
+            """
+            Weight between two samples X_1 and X_2 to measure the proximity of the hyperplane (in the case of missing values.)
+            W(X_1,X_2) = e^( -1/2 1/h**2 sum_k(x_1k-x_2k)**2 )  for k s.t. x_1k and x_2k isn't nan. 
+            """
+            def dist(X_1,X_2):
+                ks = [i for i in range(len(X_1)) if not np.isnan(X_1[i]) and not np.isnan(X_2[i])]
+                if not ks:  # if ks is empty the distance can't be computed
+                    return np.nan
+
+                d = 0
+                for k in ks:
+                    x_1 = X_1[k]
+                    x_2 = X_2[k]
+                    d += (x_1-x_2)**2
+                return np.sqrt(d)
+
+            d = dist(X_1, X_2)
+            if np.isnan(d):
+                # Is the vectors don't share at least one common coordinate 
+                return 0
+
+            W = K( d/h )
+            return W
+            
+        # Compute prior set.
+        m = [not np.isnan(np.sum(X_train[i,:])) for i in range(X_train.shape[0])]
+        X_prior = X_train[m,:]
+
+        # Init. the imputed test set.
+        imp_X_test = deepcopy(X_test)
+
+        # TODO: KEep track of the weights ? As a measure of confidence for the imputation ?
+
+        for i, X_i in enumerate(X_test):
+
+            # Perform imputation if needed
+            coords_missing = np.isnan(X_i)  # unknown coordinates of X_i
+            for j in range(k):        
+                if coords_missing[j]:  # we don't know the j-th coordinate, we need to impute it
+
+                    # We use the term associate to the j-th coordinate for the 
+                    # rest of the samples in the training set (for which the j-th component is know).
+                    # The contribution of each term is weighted with the distance to the sample hyperplane.
+                    hat_X_ij = 0
+                    Ws = 1e-10  # eps
+                    for X_p in X_prior:
+                        w_p = W(X_i, X_p)
+                        hat_X_ij += w_p * X_p[j]
+                        Ws += w_p
+                    hat_X_ij /= Ws
+
+                    imp_X_test[i, j] = hat_X_ij
+
+    elif method=='naive':
+            # Ignore missing values
+        from stats import kernel_based_pdf_estimation
+        imp_X_test = X_test[~np.isnan(X_test[:,0]),:]
+        imp_X_test = imp_X_test[~np.isnan(imp_X_test[:,1]),:]        
+                
+
+    elif method=='mean':
+        from sklearn.impute import SimpleImputer
+        imp = SimpleImputer(missing_values=np.nan, strategy='mean')
+        imp_X_test = imp.fit_transform(X_test)
+      
+    elif method=='median':
+        from sklearn.impute import SimpleImputer
+        imp = SimpleImputer(missing_values=np.nan, strategy='median')
+        imp_X_test = imp.fit_transform(X_test)
+      
+    elif method=='knn':
+        from sklearn.impute import KNNImputer
+        knn_imputer = KNNImputer()
+        imp_X_test = knn_imputer.fit_transform(X_test)
+        
+    elif method=='mice':
+        from sklearn.experimental import enable_iterative_imputer
+        from sklearn.impute import IterativeImputer
+        imp = IterativeImputer(n_nearest_features=None, imputation_order='ascending')
+        imp_X_test = imp.fit_transform(X_test)
+
+        
+    return imp_X_test
+
+
 
 ##############################################################################
 ############## Kernel_based_pdf_estimation_with_missing_priors ###############
@@ -749,7 +849,6 @@ def kernel_based_pdf_estimation_side_spaces(X, x=None, h=.2, verbose=0):
     hat_f, hat_f_0, hat_f_1, hat_f_2 = F_side_spaces(X=X, x=x, h=h)
     return hat_f, hat_f_0, hat_f_1, hat_f_2
 
-
 #@jit(nopython=True, parallel=True)
 def F_side_spaces(X=None, x=None, h=.2, verbose=0):
     """
@@ -820,60 +919,6 @@ def f_xi_side_spaces(X_i, x, bandwidth):
         hat_fi_1 = 1/bandwidth * K( (x[0]-X_i[0])/bandwidth )
 
     return hat_fi, hat_fi_0, hat_fi_1, hat_fi_2
-
-def kernel_based_pdf_estimation_xz(X, h=.2, resolution=50, cmap='Blues', verbose=0):
-    
-    from utils import estimate_pdf
-
-    # Estimation of f(X_1,X_2|Z_1=1, Z_2=1), f(X_2|Z_1=0,Z_2=1) and f(X_1|Z_1=1,Z_2=0)
-    hat_f, hat_f_0, hat_f_1, hat_f_2 = estimate_pdf(data=X, method='side_spaces', resolution=resolution, bandwidth=h) 
-    
-    # Normalization of the distributions
-    hat_f /= (hat_f.sum()+EPSILON);hat_f_1 /= (hat_f_1.sum()+EPSILON);hat_f_2 /= (hat_f_2.sum()+EPSILON)
-
-    # Computation of the marginals
-    hat_f_2_marginal = hat_f.sum(axis=1);hat_f_1_marginal = hat_f.sum(axis=0)
-
-    # Z_prior reflects P(Z_1=1, Z_2=1, ... Z_k=1)
-    Z_prior = np.array([np.mean(~np.isnan(X[:,i])) for i in range(X.shape[1])])
-
-    # Estimation of f(Z_1=0|X_2)
-    hat_f_z1 = hat_f_2_marginal * Z_prior[0]/(hat_f_2_marginal * Z_prior[0]  + hat_f_2*(1-Z_prior[0]))
-    hat_f_z1 /= (hat_f_z1.sum()+EPSILON)
-
-    # Estimation of f(Z_1=1|X_2)
-    hat_f_z1_bar = hat_f_2 * (1-Z_prior[0])/(hat_f_2_marginal * Z_prior[0]  + hat_f_2*(1-Z_prior[0]))
-    hat_f_z1_bar /= (hat_f_z1_bar.sum()+EPSILON)
-
-    # Estimation of f(Z_2=0|X_1)
-    hat_f_z2 = hat_f_1_marginal * Z_prior[1]/(hat_f_1_marginal * Z_prior[1]  + hat_f_1*(1-Z_prior[0]))
-    hat_f_z2 /= hat_f_z2.sum()
-
-    # Estimation of f(Z_2=1|X_1)
-    hat_f_z2_bar = hat_f_1 * (1-Z_prior[1])/(hat_f_1_marginal * Z_prior[1]  + hat_f_1*(1-Z_prior[0]))
-    hat_f_z2_bar /= (hat_f_z2_bar.sum()+EPSILON)
-
-    if verbose:
-
-        fig, axes = plt.subplots(2, 5, figsize=(20, 8));axes = axes.flatten()
-        axes[0].imshow(hat_f_2[:,None].repeat(2, axis=1), cmap=cmap, origin='lower');axes[0].set_title("A)\nf(X_2|Z_1=0)")
-        axes[1].imshow(hat_f_2_marginal[:,None].repeat(2, axis=1), cmap=cmap, origin='lower');axes[1].set_title("B)\nf(X_2|Z_2=1)")
-        axes[2].imshow(hat_f, cmap=cmap, origin='lower');axes[2].set_title("C)\nf(X_1, X_2|Z_1=1, Z_2=1)")
-        axes[3].imshow(hat_f_1_marginal[None, :].repeat(2, axis=0), cmap=cmap, origin='lower');axes[3].set_title("D)\nf(X_1|Z_1=1)")
-        axes[4].imshow(hat_f_1[None, :].repeat(2, axis=0), cmap=cmap, origin='lower');axes[4].set_title("E)\nf(X_1|Z_2=0)")
-
-        axes[5].imshow(hat_f_z1_bar[:,None].repeat(2, axis=1), cmap=cmap, origin='lower');axes[5].set_title("f(Z_1=0|X_2)")
-        axes[6].imshow(hat_f_z1[:,None].repeat(2, axis=1), cmap=cmap, origin='lower');axes[6].set_title("F)\nf(Z_1=1|X_2)")
-        axes[8].imshow(hat_f_z2[None, :].repeat(2, axis=0), cmap=cmap, origin='lower');axes[8].set_title("G)\nf(Z_2=1|X_1)")
-        axes[9].imshow(hat_f_z2_bar[None, :].repeat(2, axis=0), cmap=cmap, origin='lower');axes[9].set_title("f(Z_2=0|X_1)")
-            
-        _ = [ax.axis('off') for ax in axes]; plt.tight_layout()
-
-        axes[7].text(0.5,0.5, "P(Z_1=0, Z_2=0)={:.3f}%".format(100*hat_f_0), size=18, ha="center", transform=axes[7].transAxes)
-
-        
-    return hat_f, hat_f_0, hat_f_1, hat_f_2, hat_f_1_marginal, hat_f_2_marginal, hat_f_z1, hat_f_z2, hat_f_z1_bar, hat_f_z2_bar
-
 
 if __name__=='__main__':
     # Testing ...

@@ -111,39 +111,40 @@ def create_dataset(name, num_samples=10, ratio_of_missing_values=.5, imbalance_r
         return X, Xgt
 
 
-def estimate_pdf(data=None, method='our', resolution=20, bandwidth=None):
+def estimate_pdf(X=None, method='our', resolution=20, bandwidth=None):
+
     xygrid = np.meshgrid(np.linspace(-2.5,2.5,resolution),np.linspace(-2.5,2.5,resolution))
     H,W = xygrid[0].shape
     hat_f = np.zeros_like(xygrid[0])  # init. the pdf estimation
+    h = bandwidth
 
-    if method=='our':
+    if method=='our' or method=='custom_imputations':
         # See documentation
         from stats import kernel_based_pdf_estimation
-        h = bandwidth
+    
         for i in range(H):
             for j in range(W):
                 x = xygrid[0][i,j]
                 y = xygrid[1][i,j]
-                hat_f[i,j] = kernel_based_pdf_estimation(data,x=[x,y],h=h)
+                hat_f[i,j] = kernel_based_pdf_estimation(X=X, x=[x,y], h=h)
                 
     if method=='missing':
         # See documentation
         from stats import kernel_based_pdf_estimation_z_prior
-        h = bandwidth
+
         for i in range(H):
             for j in range(W):
                 x = xygrid[0][i,j]
                 y = xygrid[1][i,j]
-                hat_f[i,j] = kernel_based_pdf_estimation_z_prior(data,x=[x,y],h=h)  
+                hat_f[i,j] = kernel_based_pdf_estimation_z_prior(X=X, x=[x,y] ,h=h)  
 
     if method=='missing_limited_range':
         # See documentation
         from stats import kernel_based_pdf_estimation_z_prior_limited_range
-        h = bandwidth
 
         # Compute the space mask to be sure not to add contribution on expty space, based on the resolution of the space
-        m = [not np.isnan(np.sum(data[i,:])) for i in range(data.shape[0])]
-        X_prior = data[m,:]
+        m = [not np.isnan(np.sum(X[i,:])) for i in range(X.shape[0])]
+        X_prior = X[m,:]
         hist2d, _, _ = np.histogram2d(X_prior[:,0], X_prior[:,1], bins=[np.linspace(-2.5,2.5,resolution), np.linspace(-2.5,2.5,resolution)])
         hist2d_up = np.concatenate([np.concatenate([hist2d, np.zeros((1, W-1))], axis=0), np.zeros((H, 1))], axis=1)
         mask_space = hist2d_up>0
@@ -151,12 +152,16 @@ def estimate_pdf(data=None, method='our', resolution=20, bandwidth=None):
             for j in range(W):
                 x = xygrid[0][i,j]
                 y = xygrid[1][i,j]
-                hat_f[i,j] = kernel_based_pdf_estimation_z_prior_limited_range(data,x=[x,y], put_weight=mask_space[i,j], h=h)  
+                hat_f[i,j] = kernel_based_pdf_estimation_z_prior_limited_range(X=X, x=[x,y], put_weight=mask_space[i,j], h=h)  
 
-    if method=='side_spaces':
-        # See documentation
+    if method=='no_imputations':
+
+        #----------------------------------------------------------------------------------
+        #  Estimation of f(X_1,X_2|Z_1=1, Z_2=1), f(X_2|Z_1=0,Z_2=1) and f(X_1|Z_1=1,Z_2=0)
+        #----------------------------------------------------------------------------------
+
         from stats import kernel_based_pdf_estimation_side_spaces
-        h = bandwidth
+
         hat_f_0 = np.zeros_like(xygrid[0])  # init. the pdf estimation
         hat_f_1 = np.zeros_like(xygrid[0])  # init. the pdf estimation
         hat_f_2 = np.zeros_like(xygrid[0])  # init. the pdf estimation
@@ -166,7 +171,7 @@ def estimate_pdf(data=None, method='our', resolution=20, bandwidth=None):
                 x = xygrid[0][i,j]
                 y = xygrid[1][i,j]
                 # Computing contribution on coordinates i, j of hat_f, and coordinate i of hat_f_1 and coordinate j of hat_f_2
-                hat_f[i,j], hat_f_0[i,j], hat_f_1[i,j], hat_f_2[i,j] =  kernel_based_pdf_estimation_side_spaces(X=data, x=[x, y], h=h)
+                hat_f[i,j], hat_f_0[i,j], hat_f_1[i,j], hat_f_2[i,j] =  kernel_based_pdf_estimation_side_spaces(X=X, x=[x, y], h=h)
                 
         # Average the contribution of all i's and j's coordinate
         hat_f_0 = np.mean(hat_f_0)
@@ -175,48 +180,53 @@ def estimate_pdf(data=None, method='our', resolution=20, bandwidth=None):
         hat_f_1 = np.mean(hat_f_1, axis=0)
         
         # Average the contribution of all i's coordinate to form the vertical line
-        hat_f_2 = np.mean(hat_f_2, axis=1)   
+        hat_f_2 = np.mean(hat_f_2, axis=1) 
 
-        return hat_f, hat_f_0, hat_f_1, hat_f_2    
+        # Normalization of the distributions
+        hat_f /= (hat_f.sum()+EPSILON);hat_f_1 /= (hat_f_1.sum()+EPSILON);hat_f_2 /= (hat_f_2.sum()+EPSILON)
+
+        return hat_f, hat_f_0, hat_f_1, hat_f_2
                 
     if method=='naive':
         # Ignore missing values
         from stats import kernel_based_pdf_estimation
-        h = bandwidth
-        imp_data = data[~np.isnan(data[:,0]),:]
-        imp_data = imp_data[~np.isnan(imp_data[:,1]),:]        
+        imp_X = X[~np.isnan(X[:,0]),:]
+        imp_X = imp_X[~np.isnan(imp_X[:,1]),:]        
                 
     if method=='mean':
         from sklearn.impute import SimpleImputer
         imp = SimpleImputer(missing_values=np.nan, strategy='mean')
-        imp_data = imp.fit_transform(data)
+        imp_X = imp.fit_transform(X)
       
     if method=='median':
         from sklearn.impute import SimpleImputer
         imp = SimpleImputer(missing_values=np.nan, strategy='median')
-        imp_data = imp.fit_transform(data)
+        imp_X = imp.fit_transform(X)
       
     if method=='knn':
         from sklearn.impute import KNNImputer
         knn_imputer = KNNImputer()
-        imp_data = knn_imputer.fit_transform(data)
+        imp_X = knn_imputer.fit_transform(X)
         
     if method=='mice':
         from sklearn.experimental import enable_iterative_imputer
         from sklearn.impute import IterativeImputer
         imp = IterativeImputer(n_nearest_features=None, imputation_order='ascending')
-        imp_data = imp.fit_transform(data)
+        imp_X = imp.fit_transform(X)
        
     if method in ['mice', 'knn', 'median', 'mean', 'naive']:
         from stats import kernel_based_pdf_estimation
-        h = bandwidth
         for i in range(H):
             for j in range(W):
                 x = xygrid[0][i,j]
                 y = xygrid[1][i,j]
-                hat_f[i,j] = kernel_based_pdf_estimation(imp_data, x=[x,y],h=h)
+                hat_f[i,j] = kernel_based_pdf_estimation(imp_X, x=[x,y],h=h)
+
+    # Except for the `no_imputations` method, return only hat_f
 
     return hat_f
+
+
 
 
 def compare_imputation_methods(dataset='None', kernel_bandwidth=.2, num_samples=100, ratio_of_missing_values=.7, imbalance_ratio=.5, resolution=20, methods=None):
@@ -254,7 +264,7 @@ def compare_imputation_methods(dataset='None', kernel_bandwidth=.2, num_samples=
     if methods is None:
         methods = ['naive', 'mean', 'median', 'knn', 'mice', 'our', 'missing']
     for i,method in enumerate(methods):
-        hat_f = estimate_pdf(data=X, method=method, resolution=resolution, bandwidth=h)  
+        hat_f = estimate_pdf(X=X, method=method, resolution=resolution, bandwidth=h)  
         hat_f /= hat_f.sum()
         plt.subplot(3,3,i+3); plt.imshow(hat_f); plt.axis('off');
         l2diff = np.mean( (hat_fgt-hat_f)**2 ); 
@@ -319,6 +329,7 @@ def my_classification_report(y_true, y_pred, ax=None, verbose=False):
             print("  {0:70}\t {1}".format(item, value))
         
     return ax, pd.DataFrame(performances_metrics, index=['0'])
+
 
 def performance(X_test, y_true, y_pred, verbose=True):
     

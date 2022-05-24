@@ -20,12 +20,13 @@ from generateToyDataset import DatasetGenerator
 class Distributions(object):
 
 
-    def __init__(self, dataset, class_used=None, cmap='Blues', verbosity=1, debug=False, random_state=RANDOM_STATE):
+    def __init__(self, dataset, class_used=None, method='no_imputations', cmap='Blues', verbosity=1, debug=False, random_state=RANDOM_STATE):
 
         # Dataset 
         self.dataset_name = dataset.dataset_name
         self.dataset = dataset
         self.class_used = class_used
+        self.method = method
 
         # Kernel Density estimation parameters
         bandwidth = None 
@@ -68,24 +69,65 @@ class Distributions(object):
         self.bandwidth = bandwidth
         self.resolution = resolution
 
-        if self.class_used is not None:
-            print("Estimating distribution for class {}.".format(int(self.class_used))) if self.debug else None
-        else:
-            print("Estimating distributions for both classes.") if self.debug else None
+        #---------------------- Verbose ----------------------#
 
-        from stats import kernel_based_pdf_estimation_xz
+        if self.debug or self.verbosity > 1:
 
+            if self.class_used is not None:
+                print("Estimating distribution for class {}.".format(int(self.class_used)))
+            else:
+                print("Estimating distributions for both classes.")
+
+        #---------------------- Estimation ----------------------#
+        from utils import estimate_pdf
 
         start_time = time()
 
-        # Estimation all the distributions
-        self.f, self.f_0, self.f_1, self.f_2, self.f_1_marginal, self.f_2_marginal, self.f_z1, self.f_z2, self.f_z1_bar, self.f_z2_bar = kernel_based_pdf_estimation_xz(X=self.dataset.X, h=bandwidth, resolution=resolution, verbose=0)
+        if self.method == 'no_imputations':
+            # Estimation all the distributions
+            self.f, self.f_0, self.f_1, self.f_2  = estimate_pdf(X=self.dataset.X, method=self.method, bandwidth=self.bandwidth, resolution=self.resolution)
+
+        elif self.method in ['custom_imputations', 'mice', 'knn', 'median', 'mean', 'naive']:
+            self.f = estimate_pdf(X=self.dataset.X, method=self.method, bandwidth=self.bandwidth, resolution=self.resolution)
+
+            # Computation of the prior when no data at all are available.
+            self.f_0 = np.sum(np.isnan(self.dataset.X).sum(axis=1) == self.dataset.X.shape[1]) / self.dataset.X.shape[0]
+
+        else:
+            raise ValueError("Please use 'no_imputations', 'custom_imputations', 'mice', 'knn', 'median', 'mean', or 'naive' methods.")
+
+
+        #----------------------------------------------------------------------------------
+        # Computation of the other distributions
+        #----------------------------------------------------------------------------------
+
+        # Computation of the marginals
+        self.f_1_marginal = self.f.sum(axis=0)
+        self.f_2_marginal = self.f.sum(axis=1)
+
+        if self.method == 'no_imputations':
+            # Z_prior reflects P(Z_1=1, Z_2=1, ... Z_k=1)
+            Z_prior = np.array([np.mean(~np.isnan(X[:,i])) for i in range(X.shape[1])])
+
+            # Estimation of f(Z_1=0|X_2)
+            self.f_z1 = self.f_2_marginal * Z_prior[0]/(self.f_2_marginal * Z_prior[0]  + self.f_2*(1-Z_prior[0]))
+            self.f_z1 /= (self.f_z1.sum()+EPSILON)
+
+            # Estimation of f(Z_1=1|X_2)
+            self.f_z1_bar = self.f_2 * (1-Z_prior[0])/(self.f_2_marginal * Z_prior[0]  + self.f_2*(1-Z_prior[0]))
+            self.f_z1_bar /= (self.f_z1_bar.sum()+EPSILON)
+
+            # Estimation of f(Z_2=0|X_1)
+            self.f_z2 = self.f_1_marginal * Z_prior[1]/(self.f_1_marginal * Z_prior[1]  + self.f_1*(1-Z_prior[0]))
+            self.f_z2 /= self.f_z2.sum()
+
+            # Estimation of f(Z_2=1|X_1)
+            self.f_z2_bar = self.f_1 * (1-Z_prior[1])/(self.f_1_marginal * Z_prior[1]  + self.f_1*(1-Z_prior[0]))
+            self.f_z2_bar /= (self.f_z2_bar.sum()+EPSILON)
 
         end_time = time()
         self.estimation_time = end_time - start_time
-        self._print_time() if self.debug else None
-
-        self._compute_distance()
+        self._print_time() if (self.debug or self.verbosity > 1)  else None
 
         self.computed = True
 
@@ -102,29 +144,32 @@ class Distributions(object):
 
         alpha=.3
 
-        # Plot the distributions
-
-        axes[5+shift].imshow(self.f_2[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[5+shift].set_title("A)\nf(X_2|Z_1=0)")
-        axes[6+shift].imshow(self.f_2_marginal[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[6+shift].set_title("B)\nf(X_2|Z_2=1)")
+        # Plot the distributions common to every distributions-based approaches
+        axes[6+shift].imshow(self.f_2_marginal[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[6+shift].set_title("B)\nf(X_2|Z_1=1)")
         axes[7+shift].imshow(self.f, cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -2.5, 2.5]);axes[7].set_title("C)\nf(X_1, X_2|Z_1=1, Z_2=1)")
-        axes[8+shift].imshow(self.f_1_marginal[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[8+shift].set_title("D)\nf(X_1|Z_1=1)")
-        axes[9+shift].imshow(self.f_1[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[9+shift].set_title("E)\nf(X_1|Z_2=0)")
-        
-        axes[10+shift].imshow(self.f_z1_bar[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[10+shift].set_title("F)\nf(Z_1=0|X_2)")
-        axes[11+shift].imshow(self.f_z1[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[11+shift].set_title("G)\nf(Z_1=1|X_2)")
-        axes[13+shift].imshow(self.f_z2[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[13+shift].set_title("I)\nf(Z_2=1|X_1)")
-        axes[14+shift].imshow(self.f_z2_bar[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[14+shift].set_title("J)\nf(Z_2=0|X_1)")        
+        axes[8+shift].imshow(self.f_1_marginal[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[8+shift].set_title("D)\nf(X_1|Z_2=1)")
+
+        if self.method == 'no_imputations':
+
+            axes[5+shift].imshow(self.f_2[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[5+shift].set_title("A)\nf(X_2|Z_1=0)")
+
+            axes[9+shift].imshow(self.f_1[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[9+shift].set_title("E)\nf(X_1|Z_2=0)")
+            
+            axes[10+shift].imshow(self.f_z1_bar[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[10+shift].set_title("F)\nf(Z_1=0|X_2)")
+            axes[11+shift].imshow(self.f_z1[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[11+shift].set_title("G)\nf(Z_1=1|X_2)")
+            axes[13+shift].imshow(self.f_z2[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[13+shift].set_title("I)\nf(Z_2=1|X_1)")
+            axes[14+shift].imshow(self.f_z2_bar[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[14+shift].set_title("J)\nf(Z_2=0|X_1)")        
 
         if predictions_df is not None and self.class_used == 1:
 
             # plot on the A) plot the sample having only X2 
-            axes[5].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Positive`==1")), 
+            axes[5 if self.method == 'no_imputations' else 6].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Positive`==1")), 
                             predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Positive`==1")['X2'], 
                             color='b', alpha=alpha, label="TP (n={})".format(len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Positive`==1"))))
-            axes[5].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1")), 
+            axes[5 if self.method == 'no_imputations' else 6].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1")), 
                             predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1")['X2'], 
                         color='g', alpha=alpha, label="FP (n={})".format(len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1"))))
-            axes[5].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1")),  
+            axes[5 if self.method == 'no_imputations' else 6].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1")),  
                             predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1")['X2'], 
                             color='r', alpha=alpha, label="FN (n={})".format(len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1"))))
 
@@ -138,13 +183,13 @@ class Distributions(object):
                             predictions_df.query(" `Z1`==1 and  `Z2`==1 and `False Negative`==1")['X2'], 
                             color='r', alpha=alpha, label="FN (n={})".format(len(predictions_df.query(" `Z1`==1 and  `Z2`==1 and `False Negative`==1"))))
 
-            axes[9].scatter(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `True Positive`==1")['X1'],
+            axes[9 if self.method == 'no_imputations' else 8].scatter(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `True Positive`==1")['X1'],
                             [0]*len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `True Positive`==1")),  
                             color='b', alpha=alpha, label="TP (n={})".format(len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `True Positive`==1"))))
-            axes[9].scatter(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")['X1'], 
+            axes[9 if self.method == 'no_imputations' else 8].scatter(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")['X1'], 
                             [0]*len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")),
                             color='g', alpha=alpha, label="FP (n={})".format(len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1"))))
-            axes[9].scatter(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1")['X1'], 
+            axes[9 if self.method == 'no_imputations' else 8].scatter(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1")['X1'], 
                             [0]*len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1")),  
                             color='r', alpha=alpha, label="FN (n={})".format(len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1"))))
 
@@ -153,13 +198,13 @@ class Distributions(object):
 
         elif predictions_df is not None and self.class_used == 0:
             # plot on the A) plot the sample having only X2 
-            axes[5+shift].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Negative`==1")), 
+            axes[5+shift if self.method == 'no_imputations' else 6+shift].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Negative`==1")), 
                             predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Negative`==1")['X2'], 
                             color='g', label="TN (n={})".format(len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Negative`==1"))))
-            axes[5+shift].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1")), 
+            axes[5+shift if self.method == 'no_imputations' else 6+shift].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1")), 
                             predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1")['X2'], 
                         color='b', label="FN (n={})".format(len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Negative`==1"))))
-            axes[5+shift].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1")),  
+            axes[5+shift if self.method == 'no_imputations' else 6+shift].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1")),  
                             predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1")['X2'], 
                             color='r', label="FP (n={})".format(len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `False Positive`==1"))))
 
@@ -174,13 +219,13 @@ class Distributions(object):
                             predictions_df.query(" `Z1`==1 and  `Z2`==1 and `False Positive`==1")['X2'], 
                             color='r', label="FP (n={})".format(len(predictions_df.query(" `Z1`==1 and  `Z2`==1 and `False Positive`==1"))))
 
-            axes[9+shift].scatter(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `True Negative`==1")['X1'],
+            axes[9+shift if self.method == 'no_imputations' else 8+shift].scatter(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `True Negative`==1")['X1'],
                             [0]*len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `True Negative`==1")),  
                             color='g', label="TN (n={})".format(len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `True Negative`==1"))))
-            axes[9+shift].scatter(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1")['X1'], 
+            axes[9+shift if self.method == 'no_imputations' else 8+shift].scatter(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1")['X1'], 
                             [0]*len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1")),
                             color='b', label="FN (n={})".format(len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Negative`==1"))))
-            axes[9+shift].scatter(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")['X1'], 
+            axes[9+shift if self.method == 'no_imputations' else 8+shift].scatter(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")['X1'], 
                             [0]*len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")),  
                             color='r', label="FP (n={})".format(len(predictions_df.query(" `Z1`==1 and  `Z2`==0 and `False Positive`==1")))) 
 
@@ -206,13 +251,6 @@ class Distributions(object):
                 else: 
                     setattr(self, key, value)
     
-    @switchdataset
-    def _compute_distance(self):
-        self.f_1_jensenshannon = distance.jensenshannon(self.f_1, self.f_1_marginal, 2.0)
-        self.f_1_wasserstein = wasserstein_distance(self.f_1, self.f_1_marginal)
-        self.f_2_jensenshannon = distance.jensenshannon(self.f_2, self.f_2_marginal, 2.0)
-        self.f_2_wasserstein = wasserstein_distance(self.f_2, self.f_2_marginal)
-
     def _print_time(self):
 
         hours, rest = divmod( self.estimation_time, 3600)

@@ -88,27 +88,38 @@ class DatasetGenerator(object):
         # Generate a dataset with samples from both classes - stored for internal use and for keeping track of changes etc...
         self._X_raw, self._y = self._init_data()
 
-        # Masked features - stored for internal use and for keeping track of changes etc...
+        # Masked data - stored for internal use and for keeping track of changes etc...
         self._X = deepcopy(self._X_raw)
-        # Actual features used 
+
+        # Actual data used by the other classes. 
         self.X = None
         self.y = None
+
+        # Imputed data (depend on the experiences/settings)
+        self.imp_X = None
+
 
         self._mask_missing = None
         self.mask_missing = None
 
-    def subset(self, class_used):
+    def subset(self, class_used, imputation_mode=False):
 
+        if imputation_mode:
+            assert self.imp_X is not None, "/!\. You must call an imputation method first, using `self.impute_missing_data(self, X_train, method='custom_imputations')`."
+
+            # Create X and y used for experiments
+            self.X = deepcopy(self.imp_X)
+            self.y = deepcopy(self._y)
+            # Create masks for the missingness
+            self.mask_missing = np.isnan(self.X)
+            
         if class_used is not None:
-
             self.class_used = class_used
 
             # Create X and y used for experiments
             self.X = deepcopy(self._X[(self._y==class_used).squeeze()])
             self.y = deepcopy(self._y[(self._y==class_used).squeeze()])
 
-            # Create masks for the missingness
-            self.mask_missing = np.isnan(self.X[(self.y==class_used).squeeze()])
 
     def reset(self):
         self.X = deepcopy(self._X)
@@ -276,6 +287,17 @@ class DatasetGenerator(object):
             self.plot(verbosity=verbosity)
                     
         return None
+
+    def impute_missing_data(self, X_train, method='custom_imputations', bandwidth=BANDWIDTH):
+
+        from stats import impute_missing_data
+        self.imp_X = impute_missing_data(X_train=X_train, X_test=self.X, method=method, h=bandwidth)
+
+        # TODO: print number of imputed data depending on verbosity
+
+        return 
+
+
 
     def met_missingness_rate(self, label=None, verbose=False, return_values=False):
 

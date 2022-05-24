@@ -26,7 +26,7 @@ from distributions import Distributions
 class Experiments(object):
 
 
-    def __init__(self, dataset_name, dataset_train=None, dataset_test=None, purpose='classification', previous_experiment=None, save_experiment=True, verbosity=1, debug=False, proportion_train=PROPORTION_TRAIN, resolution=RESOLUTION, bandwidth=BANDWIDTH, random_state=RANDOM_STATE):
+    def __init__(self, dataset_name, dataset_train=None, dataset_test=None, purpose='classification', method='no_imputations', inference_imputation=False, previous_experiment=None, save_experiment=True, verbosity=1, debug=False, proportion_train=PROPORTION_TRAIN, resolution=RESOLUTION, bandwidth=BANDWIDTH, random_state=RANDOM_STATE):
 
         # Set definitions attributes (also used for log purposes)
         self.dataset_name = dataset_name
@@ -48,6 +48,8 @@ class Experiments(object):
         self.dist_neg = None
         
         self.purpose = purpose
+        self.method = method
+        self.inference_imputation = inference_imputation
         self.save_experiment = save_experiment
 
         # Create experiment folder
@@ -69,15 +71,17 @@ class Experiments(object):
     def fit(self):
 
         if self.purpose == 'classification':
-            #Estimation of the distributions for the positive and negative class
+                #Estimation of the distributions for the positive and negative class
             self.dist_pos = Distributions(dataset=self.dataset_train, 
                                         class_used=1, 
+                                        method=self.method,
                                         cmap='Blues',
                                         debug=self.debug, 
                                         verbosity=1)
 
             self.dist_neg = Distributions(dataset=self.dataset_train, 
                                         class_used=0, 
+                                        method=self.method,
                                         cmap='Greens',
                                         debug=self.debug, 
                                         verbosity=1)
@@ -101,90 +105,32 @@ class Experiments(object):
 
         assert self.purpose == 'classification', "/!\. Purpose mode is set to `estimation`, you should set it to `classification`. :-)"
 
-        #################################################################
-        #  Prediction using maximum likelihood estimation
-        #################################################################
+        if self.inference_imputation:
+            print("Imputing missing data in the test set... ({} missing values)".format(len(np.isnan(self.dataset_test.X)))) if (self.debug or self.verbosity > 1) else None
 
-        _, step = np.linspace(-2.5,2.5, self.dist_pos.resolution, retstep=True)
+            self.dataset_test.impute_missing_data(self.dataset_train.X, method=self.method, bandwidth=self.bandwidth) 
+            #TODO: do we want to enable training with one imputation scheme and infer with another one ? I think no. Too complex for nothing.
 
-        # Contains for each sample of the Test set, the corresponding x and y index coordinates, in the matrix of the 2D pdf... 
-        coord_to_index = np.floor_divide(self.dataset_test.X+2.5, step)
+        # TODO: if we don't enlarge the scope of those classes (only use fit and predict with distributions), then no need to distinguish here...
+        if self.method in ['no_imputations', 'custom_imputations', 'mice', 'knn', 'median', 'mean', 'naive']:
 
-
-        # Init. the array of prediction
-        y_pred = np.zeros(shape=self.dataset_test.y.shape[0]); arr = []
-
-
-
-        #----------- Treat the case of when none coordinates are known
-
-        # Index of the samples in the test set where none of the coordinates are known 
-        X_indexes_none_known = np.argwhere(((~np.isnan(coord_to_index)).sum(axis=1)==0)).squeeze()
-
-        # Compare likelihood to do the prediction and assign the label in the prediction
-
-        # If equal prior, we assign labels randomly
-        if self.dist_pos.f_0  == self.dist_neg.f_0:
-            y_pred[X_indexes_none_known] = np.random.randint(0, 2, len(X_indexes_none_known))
-        # Otherwise  the label is based on the a posterior on the missingness ratio
+            #TODO: see if this couln't be a decorator with parameter.....
+            if self.inference_imputation:
+                self.dataset_test.subset(class_used=None, imputation_mode=True)
+                self._predict()
+                self.dataset_test.reset()   
+            else:
+                self._predict()
         else:
-            y_pred[X_indexes_none_known] = np.array( len(X_indexes_none_known) * [int(self.dist_pos.f_0  > self.dist_neg.f_0)])
-
-        arr.extend(X_indexes_none_known)
-
-
-        #----------- Treat the case of when both coordinates are known
-
-        # Index of the samples in the test set where both first coordinates are known 
-        X_indexes_both_known = np.argwhere((~np.isnan(coord_to_index)).sum(axis=1)==2).squeeze(); arr.extend(X_indexes_both_known)
-
-        # Coordinates of indexes in the feature space of the samples in the test set where both first coordinates are known 
-        hat_f_coordinates = coord_to_index[X_indexes_both_known].astype(int)
-        inds_array = np.moveaxis(np.array(list(map(tuple, hat_f_coordinates))), -1, 0)
-
-        # Compare likelihood to do the prediction
-        y_pred_both_known = (self.dist_pos.f[tuple(inds_array)] > self.dist_neg.f[tuple(inds_array)]).astype(int)
-
-        # Assign predictions 
-        y_pred[X_indexes_both_known] = y_pred_both_known
+            raise ValueError("Please use 'no_imputations', 'custom_imputations', 'mice', 'knn', 'median', 'mean', or 'naive' methods.")
+        
+        return
 
 
-        #----------- Treat the case of when only the first coordinate is known
-
-        # Index of the samples in the test set where only the first coordinate is known 
-        X_indexes_first_known = np.argwhere(~np.isnan(coord_to_index[:,0]) & np.isnan(coord_to_index[:,1])).squeeze(); arr.extend(X_indexes_first_known)
-
-        # Coordinates of index in the feature space of the samples in the test set where only the first coordinate is known 
-        hat_f_coordinates = coord_to_index[X_indexes_first_known][:,0].astype(int)
-
-        # Compare likelihood to do the prediction
-        y_pred_first_known = (self.dist_pos.f_1[hat_f_coordinates] > self.dist_neg.f_1[hat_f_coordinates]).astype(int)
-
-        # Assign predictions 
-        y_pred[X_indexes_first_known] = y_pred_first_known
-
-        #----------- Treat the case of when only the second coordinate is known
-
-
-        # Index of the samples in the test set where only the first coordinate is known 
-        X_indexes_second_known = np.argwhere(np.isnan(coord_to_index[:,0]) & ~np.isnan(coord_to_index[:,1])).squeeze(); arr.extend(X_indexes_second_known)
-
-        # Coordinates of index in the feature space of the samples in the test set where only the first coordinate is known 
-        hat_f_coordinates = coord_to_index[X_indexes_second_known][:,1].astype(int)
-
-        # Compare likelihood to do the prediction
-        y_pred_second_known = (self.dist_pos.f_2[hat_f_coordinates] > self.dist_neg.f_2[hat_f_coordinates]).astype(int)
-
-        # Assign predictions 
-        y_pred[X_indexes_second_known] = y_pred_second_known
-
-        assert len(arr) == self.dataset_test.y.shape[0], "/!\. Not enough predictions made, check this out!"
-            
-        print("Sanity check: number of predictions: {} == {}: Num samples\n".format(len(arr), self.dataset_test.y.shape[0])) if self.debug else None
-
-
+    def performances(self):
 
         y_true = self.dataset_test.y.squeeze()
+        y_pred = self.dataset_test.y_pred
 
         # Creation of a df for the prediction
         predictions_df = pd.DataFrame({'X1':self.dataset_test.X[:,0], 
@@ -234,11 +180,11 @@ class Experiments(object):
     def plot(self):
 
         if self.purpose == 'classification':
-            self.plot_classification()
+            self._plot_classification()
         elif self.purpose == 'estimation':
-            self.plot_estimation()
+            self._plot_estimation()
 
-    def plot_estimation(self):
+    def _plot_estimation(self):
 
         # Create the pannel 
         fig, axes = plt.subplots(3, 5, figsize=(30, 12));axes = axes.flatten()
@@ -263,7 +209,7 @@ class Experiments(object):
 
         return      
 
-    def plot_classification(self):
+    def _plot_classification(self):
     
         # Create the pannel 
         fig, axes = plt.subplots(5, 5, figsize=(20, 14)); axes = axes.flatten()
@@ -282,9 +228,10 @@ class Experiments(object):
         axes = self.dist_neg.plot(axes=axes, predictions_df=self.predictions_df)
 
         # Handle legend and set axis off
-        _ = [ax.legend(prop={'size':10}) for i,ax in enumerate(axes) if i in [5, 7, 9, 12, 15, 17, 19]]; [axes[i].axis('off') for i in range(len(axes)) if i!=22 ]; plt.tight_layout()
-
-        plt.show()
+        axes_with_legend = [5, 7, 9, 12, 15, 17, 19] if self.method == 'no_imputations' else [6, 7, 8, 12, 16, 17, 18]
+        _ = [ax.legend(prop={'size':10}) for i,ax in enumerate(axes) if i in axes_with_legend]; [axes[i].axis('off') for i in range(len(axes)) if i!=22 ]
+        
+        plt.tight_layout();plt.show()
 
         #Compute metrics of interest  
         tn, fp, fn, tp = confusion_matrix(self.predictions_df['y_true'].tolist(), self.predictions_df['y_pred'].tolist()).ravel()
@@ -303,10 +250,6 @@ class Experiments(object):
 
         #for item, value in performances_metrics.items(): TODOREMMOVE
         #    print("  {0:70}\t {1}".format(item, value))
-
-
-
-
 
         return            
     
@@ -377,9 +320,9 @@ class Experiments(object):
                 
                 # Load experiment attributes
                 self._load(experiment_data)
-            print("Loaded experiment at '{}'".format(experiment_path)) if self.debug else None
+            print("Loaded experiment at '{}'".format(experiment_path)) if (self.debug or self.verbosity > 1)  else None
         else:
-            print("/!\ No previous experiment found at '{}'".format(experiment_path)) if self.debug else None
+            print("/!\ No previous experiment found at '{}'".format(experiment_path)) if (self.debug or self.verbosity > 1)  else None
 
 
         #---------------- Loading Test Dataset   ----------------#
@@ -396,9 +339,9 @@ class Experiments(object):
                 
                 # Load experiment attributes
                 self.dataset_test.load(dataset_test_data)
-            print("Loaded test dataset at '{}'".format(dataset_test_path)) if self.debug else None
+            print("Loaded test dataset at '{}'".format(dataset_test_path)) if (self.debug or self.verbosity > 1)  else None
         else:
-            print("/!\ No previous dataset found at '{}'".format(dataset_test_path)) if self.debug else None
+            print("/!\ No previous dataset found at '{}'".format(dataset_test_path)) if (self.debug or self.verbosity > 1)  else None
 
         #---------------- Loading Train Dataset  ----------------#
 
@@ -413,9 +356,9 @@ class Experiments(object):
                 
                 # Load experiment attributes
                 self.dataset_train.load(dataset_train_data)
-            print("Loaded train dataset at '{}'".format(dataset_train_path)) if self.debug else None
+            print("Loaded train dataset at '{}'".format(dataset_train_path)) if (self.debug or self.verbosity > 1)  else None
         else:
-            print("/!\ No previous dataset found at '{}'".format(dataset_train_path)) if self.debug else None
+            print("/!\ No previous dataset found at '{}'".format(dataset_train_path)) if (self.debug or self.verbosity > 1)  else None
 
 
         #---------------- Loading none dist   ----------------#
@@ -433,9 +376,9 @@ class Experiments(object):
                 # Load experiment attributes
                 self.dist.load(dist_data)
 
-            print("Loaded associated distribution with '{}'".format(dist_None_path)) if self.debug else None
+            print("Loaded associated distribution with '{}'".format(dist_None_path)) if (self.debug or self.verbosity > 1)  else None
         else:
-            print("/!\ No previous computed distribution found at '{}'".format(dist_None_path)) if self.debug else None
+            print("/!\ No previous computed distribution found at '{}'".format(dist_None_path)) if (self.debug or self.verbosity > 1)  else None
 
         #---------------- Loading Pos dist   ----------------#
 
@@ -451,9 +394,9 @@ class Experiments(object):
                 # Load experiment attributes
                 self.dist_pos.load(dist_data)
 
-            print("Loaded associated distribution with '{}'".format(dist_pos_path)) if self.debug else None
+            print("Loaded associated distribution with '{}'".format(dist_pos_path)) if (self.debug or self.verbosity > 1)  else None
         else:
-            print("/!\ No previous computed distribution found at '{}'".format(dist_pos_path)) if self.debug else None
+            print("/!\ No previous computed distribution found at '{}'".format(dist_pos_path)) if (self.debug or self.verbosity > 1)  else None
 
         #---------------- Loading Neg dist   ----------------#
 
@@ -469,9 +412,9 @@ class Experiments(object):
                 # Load experiment attributes
                 self.dist_neg.load(dist_data)
 
-            print("Loaded associated distribution with '{}'".format(dist_neg_path)) if self.debug else None
+            print("Loaded associated distribution with '{}'".format(dist_neg_path)) if (self.debug or self.verbosity > 1)  else None
         else:
-            print("/!\ No previous computed distribution found at '{}'".format(dist_neg_path)) if self.debug else None
+            print("/!\ No previous computed distribution found at '{}'".format(dist_neg_path)) if (self.debug or self.verbosity > 1)  else None
 
         self.predict()      
         
@@ -540,3 +483,100 @@ class Experiments(object):
                 setattr(self, key, np.array(value))
             else: 
                 setattr(self, key, value)
+
+    def _predict(self):
+    
+        #################################################################
+        #  Prediction using maximum likelihood estimation
+        #################################################################
+
+        _, step = np.linspace(-2.5,2.5, self.dist_pos.resolution, retstep=True)
+
+        # Contains for each sample of the Test set, the corresponding x and y index coordinates, in the matrix of the 2D pdf... 
+        coord_to_index = np.floor_divide(self.dataset_test.X+2.5, step)
+
+
+        # Init. the array of prediction
+        y_pred = np.zeros(shape=self.dataset_test.y.shape[0]); arr = []
+
+
+
+        #----------- Treat the case of when none coordinates are known
+
+        # Index of the samples in the test set where none of the coordinates are known 
+        X_indexes_none_known = np.argwhere(((~np.isnan(coord_to_index)).sum(axis=1)==0)).squeeze()
+
+        # Compare likelihood to do the prediction and assign the label in the prediction
+
+        # If equal prior, we assign labels randomly
+        if self.dist_pos.f_0  == self.dist_neg.f_0:
+            y_pred[X_indexes_none_known] = np.random.randint(0, 2, len(X_indexes_none_known))
+        # Otherwise  the label is based on the a posterior on the missingness ratio
+        else:
+            y_pred[X_indexes_none_known] = np.array( len(X_indexes_none_known) * [int(self.dist_pos.f_0  > self.dist_neg.f_0)])
+
+        arr.extend(X_indexes_none_known)
+
+
+        #----------- Treat the case of when both coordinates are known
+
+        # Index of the samples in the test set where both first coordinates are known 
+        X_indexes_both_known = np.argwhere((~np.isnan(coord_to_index)).sum(axis=1)==2).squeeze(); arr.extend(X_indexes_both_known)
+
+        # Coordinates of indexes in the feature space of the samples in the test set where both first coordinates are known 
+        hat_f_coordinates = coord_to_index[X_indexes_both_known].astype(int)
+        inds_array = np.moveaxis(np.array(list(map(tuple, hat_f_coordinates))), -1, 0)
+
+        # Compare likelihood to do the prediction
+        y_pred_both_known = (self.dist_pos.f[tuple(inds_array)] > self.dist_neg.f[tuple(inds_array)]).astype(int)
+
+        # Assign predictions 
+        y_pred[X_indexes_both_known] = y_pred_both_known
+
+
+        #----------- Treat the case of when only the first coordinate is known
+
+        # Index of the samples in the test set where only the first coordinate is known 
+        X_indexes_first_known = np.argwhere(~np.isnan(coord_to_index[:,0]) & np.isnan(coord_to_index[:,1])).squeeze(); arr.extend(X_indexes_first_known)
+
+        # Coordinates of index in the feature space of the samples in the test set where only the first coordinate is known 
+        hat_f_coordinates = coord_to_index[X_indexes_first_known][:,0].astype(int)
+
+        # Compare likelihood to do the prediction
+        if self.method == 'no_imputations':
+            y_pred_first_known = (self.dist_pos.f_1[hat_f_coordinates] > self.dist_neg.f_1[hat_f_coordinates]).astype(int)
+        else:
+            y_pred_first_known = (self.dist_pos.f_1_marginal[hat_f_coordinates] > self.dist_neg.f_1_marginal[hat_f_coordinates]).astype(int)
+
+        # Assign predictions 
+        y_pred[X_indexes_first_known] = y_pred_first_known
+
+        #----------- Treat the case of when only the second coordinate is known
+
+
+        # Index of the samples in the test set where only the first coordinate is known 
+        X_indexes_second_known = np.argwhere(np.isnan(coord_to_index[:,0]) & ~np.isnan(coord_to_index[:,1])).squeeze(); arr.extend(X_indexes_second_known)
+
+        # Coordinates of index in the feature space of the samples in the test set where only the first coordinate is known 
+        hat_f_coordinates = coord_to_index[X_indexes_second_known][:,1].astype(int)
+
+        # Compare likelihood to do the prediction
+        if self.method == 'no_imputations':
+            y_pred_second_known = (self.dist_pos.f_2[hat_f_coordinates] > self.dist_neg.f_2[hat_f_coordinates]).astype(int)
+        else:
+            y_pred_second_known = (self.dist_pos.f_2_marginal[hat_f_coordinates] > self.dist_neg.f_2_marginal[hat_f_coordinates]).astype(int)
+
+        # Assign predictions 
+        y_pred[X_indexes_second_known] = y_pred_second_known
+
+        assert len(arr) == self.dataset_test.y.shape[0], "/!\. Not enough predictions made, check this out!"
+            
+        print("Sanity check: number of predictions: {} == {}: Num samples\n".format(len(arr), self.dataset_test.y.shape[0])) if (self.debug or self.verbosity > 1)  else None
+
+        self.dataset_test.y_pred = y_pred
+
+        # Compute performances
+        self.performances()
+
+        return
+
