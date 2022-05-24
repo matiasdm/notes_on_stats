@@ -22,6 +22,7 @@ BANDWIDTH = .2
 
 # Classification default parameters
 PROPORTION_TRAIN = .8
+DEFAULT_MISSING_VALUE = -5
 
 # Machine parameters
 EPSILON = np.finfo(float).eps

@@ -11,10 +11,10 @@ from scipy.stats import wasserstein_distance
 
 
 # add tools path and import our own tools
-sys.path.insert(0, '../tools')
+sys.path.insert(0, '../src')
 
 from const import *
-from utils import fi, label_bar
+from utils import fi, label_bar, repr
 from generateToyDataset import DatasetGenerator
 
 class Distributions(object):
@@ -48,6 +48,9 @@ class Distributions(object):
         self.verbosity = verbosity 
         self.debug=debug
         self.random_state = random_state
+
+    def __call__(self):
+        return repr(self)
 
     # Decorator function that switch the data of the dataset from class 0 or 1, and reset it properly at the end.
     def switchdataset(func):
@@ -107,7 +110,7 @@ class Distributions(object):
 
         if self.method == 'no_imputations':
             # Z_prior reflects P(Z_1=1, Z_2=1, ... Z_k=1)
-            Z_prior = np.array([np.mean(~np.isnan(X[:,i])) for i in range(X.shape[1])])
+            Z_prior = np.array([np.mean(~np.isnan(self.dataset.X[:,i])) for i in range(self.dataset.X.shape[1])])
 
             # Estimation of f(Z_1=0|X_2)
             self.f_z1 = self.f_2_marginal * Z_prior[0]/(self.f_2_marginal * Z_prior[0]  + self.f_2*(1-Z_prior[0]))

@@ -14,10 +14,10 @@ import seaborn as sns
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 
 # add tools path and import our own tools
-sys.path.insert(0, '../tools')
+sys.path.insert(0, '../src')
 
 from const import *
-from utils import fi
+from utils import fi, repr
 
 from generateToyDataset import DatasetGenerator
 from distributions import Distributions
@@ -31,6 +31,7 @@ class Experiments(object):
         # Set definitions attributes (also used for log purposes)
         self.dataset_name = dataset_name
         self.debug=debug
+        self.verbosity=verbosity
 
         if previous_experiment is not None:
             self.load(previous_experiment)
@@ -58,7 +59,7 @@ class Experiments(object):
         else:
             self.experiment_number, self.experiment_path, self.json_path = -1, None, None
 
-        self.description = '({} Dataset name: {} ({})'.format(self.experiment_number, self.dataset_name, self.purpose)
+        self.description = '({}) Dataset name: {} ({})'.format(self.experiment_number, self.dataset_name, self.purpose)
         self.predictions_df = None
         self.performances_df = None
         self.fitted = False
@@ -123,9 +124,12 @@ class Experiments(object):
                 self._predict()
         else:
             raise ValueError("Please use 'no_imputations', 'custom_imputations', 'mice', 'knn', 'median', 'mean', or 'naive' methods.")
+
+
+        # Compute performances
+        self.performances()
         
         return
-
 
     def performances(self):
 
@@ -213,10 +217,10 @@ class Experiments(object):
     
         # Create the pannel 
         fig, axes = plt.subplots(5, 5, figsize=(20, 14)); axes = axes.flatten()
-        fig.suptitle("({}) Training dataset: {}\n{}".format(int(self.experiment_number), self.dataset_train.dataset_description, self.dataset_train.missingness_description), weight='bold', fontsize=12)
+        fig.suptitle("({}) Training dataset: {}\n{}".format(int(self.experiment_number), self.dataset_train.dataset_description, self.dataset_train.missingness_description), y=1.05, weight='bold', fontsize=12)
 
         # Plot the dataset 
-        axes[2] = self.dataset_test.plot(ax=axes[2])
+        axes[2] = self.dataset_test.plot(ax=axes[2], title=False)
 
         # Plot the performances 
         cm = confusion_matrix(self.predictions_df['y_true'].tolist(), self.predictions_df['y_pred'].tolist())
@@ -251,7 +255,10 @@ class Experiments(object):
         #for item, value in performances_metrics.items(): TODOREMMOVE
         #    print("  {0:70}\t {1}".format(item, value))
 
-        return            
+        return     
+
+    def __call__(self):
+        return repr(self)       
     
     def save(self):
         
@@ -574,9 +581,6 @@ class Experiments(object):
         print("Sanity check: number of predictions: {} == {}: Num samples\n".format(len(arr), self.dataset_test.y.shape[0])) if (self.debug or self.verbosity > 1)  else None
 
         self.dataset_test.y_pred = y_pred
-
-        # Compute performances
-        self.performances()
 
         return
 

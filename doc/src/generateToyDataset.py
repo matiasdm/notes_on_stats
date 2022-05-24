@@ -10,12 +10,13 @@ import seaborn as sns
 
 from sklearn import datasets
 from sklearn.preprocessing import StandardScaler
-from sklearn.utils import shuffle 
+from sklearn.utils import shuffle
 
 # add tools path and import our own tools
 sys.path.insert(0, '../tools')
 
 from const import *
+from utils import repr
 
 
 class DatasetGenerator(object):
@@ -25,18 +26,24 @@ class DatasetGenerator(object):
     It is understand in this work as the percentage of single number information that is missing in the dataset.
     E.g. if X is of shape 1000 x 3 (1000 subjects and 3 possible featurs per subjects), then a ratio of missing data of 20% mean there is .2x1000x3 = 600 numbers that are missing.
     This view of missing data is number-wise, although it could be subject-wise, group-wise, class-wise, or a mix! 
-    
-    Available missingness mechanisms include:
+
+    Note on the feature management processing:
+        self._X_raw contains the features originally created from sklearn, WITHOUT missing values. 
+        self._X contains the features originally created from sklear, WITH missing values. Call `generate_missing_coordinates` to create.  
+        self.X contains the features that are used externally. There are the one used to estimate distributions, or train models. 
+        self.imp_X contains _X (so with missing values), but with the missing data imputed. Call `impute_missing_data` to create.  
+
+        The methods: 
+            - subset(class_used, imputation_mode) allows to change the face of X, (for training, selecting the correct class, or for prediction to allow using imputation, or to encode the NaNs with the DEFAULT_MISSING_VALUE.)
+
+            - reset() reset the self.X features to the _X ones. 
     
     1) Missing Completely at Random (MCAR). 
     
     kwargs:
     ----------
-        missing_both_coordinates: bool, default=False
-            Whether the missingness happen on each dimension separately, or jointly. 
-            If True, it is possible that both coordinates are missing at the same time, leading to an understanding of 
-            the ratio of missing data as a percentage of missing varibale from all numerical value (e.g. a ratio of 20% 
-            with this argument raised will inflate the total number of samples having missing data).
+        TODO: bool, default=False
+            TODO
         
     ...
 
@@ -49,6 +56,8 @@ class DatasetGenerator(object):
     -------
     says(sound=None)
         Prints the animals name and what sound it makes
+
+    TODO: think of removing self._Z as useless it seems
     """
 
     
@@ -99,20 +108,40 @@ class DatasetGenerator(object):
         self.imp_X = None
 
 
-        self._mask_missing = None
-        self.mask_missing = None
+        self._Z = None
+        self.Z = None
 
-    def subset(self, class_used, imputation_mode=False):
+    def __call__(self):
+        return repr(self)
 
-        if imputation_mode:
+    def subset(self, class_used=None, missing_treatment=None):
+
+        # At inference, we may want to either impute or encode the missinf values.
+        if missing_treatment == 'imputation':
+
             assert self.imp_X is not None, "/!\. You must call an imputation method first, using `self.impute_missing_data(self, X_train, method='custom_imputations')`."
 
             # Create X and y used for experiments
             self.X = deepcopy(self.imp_X)
             self.y = deepcopy(self._y)
-            # Create masks for the missingness
-            self.mask_missing = np.isnan(self.X)
-            
+
+            # Create masks for the missingness (still take the missing features array)
+            self.Z = (~np.isnan(self._X)).astype(int)
+
+            print("Imputing {} missing values.".format(len(np.isnan(self._X)))) if (self.debug or self.verbosity > 0)  else None
+
+        elif missing_treatment == 'encoding':
+
+            self.X = deepcopy(self._X)
+            self.X[np.isnan(self.X)] = DEFAULT_MISSING_VALUE
+            self.y = deepcopy(self._y)
+
+            # Create masks for the missingness (still take the missing features array)
+            self.Z = (~np.isnan(self._X)).astype(int)
+
+            print("Encoding {} missing values with {}.".format(len(np.isnan(self._X)), DEFAULT_MISSING_VALUE)) if (self.debug or self.verbosity > 0)  else None
+
+        # For training/estimation, we may want self.X and self.y to be the ones of a certain class. 
         if class_used is not None:
             self.class_used = class_used
 
@@ -120,11 +149,14 @@ class DatasetGenerator(object):
             self.X = deepcopy(self._X[(self._y==class_used).squeeze()])
             self.y = deepcopy(self._y[(self._y==class_used).squeeze()])
 
+            self.Z = (~np.isnan(self.X)).astype(int)
+
+        return 
 
     def reset(self):
         self.X = deepcopy(self._X)
         self.y = deepcopy(self._y)
-        self.mask_missing = np.isnan(self.X)
+        self.Z =  (~np.isnan(self.X)).astype(int)
         self.class_used = None
         
     def generate_missing_coordinates(self, missingness_mechanism='MCAR', ratio_of_missing_values=RATIO_OF_MISSING_VALUES, missing_first_quarter=False, missing_X1=False, missing_X2=False, ratio_missing_per_class=[.1, .5], missingness_pattern=None, verbosity=1):
@@ -181,8 +213,6 @@ class DatasetGenerator(object):
                     if self.met_missingness_rate():
                         break  
                     
-            self.mask_missing = np.isnan(self._X)
-
         elif self.missingness_parameters['missingness_mechanism'] == 'MAR':
 
             if  self.missingness_parameters['missing_first_quarter']: 
@@ -280,8 +310,8 @@ class DatasetGenerator(object):
         self.y = deepcopy(self._y)
 
         # Create masks for the missingness
-        self._mask_missing = np.isnan(self._X)
-        self.mask_missing = np.isnan(self.X)
+        self._Z =  (~np.isnan(self._X)).astype(int)
+        self.Z =  (~np.isnan(self.X)).astype(int)
 
         if verbosity:
             self.plot(verbosity=verbosity)
@@ -296,6 +326,8 @@ class DatasetGenerator(object):
         # TODO: print number of imputed data depending on verbosity
 
         return 
+    
+
 
 
 
@@ -332,21 +364,17 @@ class DatasetGenerator(object):
 
     def save(self, experiment_path):
 
-        # Store here the objects that cannot be saved as json objects (saved and stored separately)
-        mask_missing = self.mask_missing
-        _mask_missing = self._mask_missing
-
-        self.mask_missing = None 
-        self._mask_missing = None 
-
+        # Unneccesary to save.
+        self.Z = None 
+        self._Z = None 
 
         #-------- Save dataset ----------#
         with open(os.path.join(experiment_path, 'dataset_{}_log.json'.format(self.purpose)), 'w') as outfile:
             json.dump(self, outfile, default=lambda o: o.astype(float) if type(o) == np.int64 else o.tolist() if type(o) == np.ndarray else o.to_json(orient='records') if type(o) == pd.core.frame.DataFrame else o.__dict__)
             
         # Reload the object that were unsaved 
-        self._mask_missing = _mask_missing
-        self.mask_missing = mask_missing
+        self._Z =  (~np.isnan(self._X)).astype(int)
+        self.Z =  (~np.isnan(self.X)).astype(int)
 
     def load(self, dataset_data):
 
@@ -356,11 +384,9 @@ class DatasetGenerator(object):
             else: 
                 setattr(self, key, value)
 
-        self._mask_missing = np.isnan(self._X)
-        self.mask_missing = np.isnan(self.X)
     
     def get_data(self):
-        return self.X, self.y
+        return self.X, self.Z, self.y
         
     def plot(self, verbosity=1, ax=None, title=False):
         
@@ -368,17 +394,17 @@ class DatasetGenerator(object):
 
             if ax is None:
                 fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-            if title or self.verbosity>1:
+            if title:
                 ax.set_title("{}\n{}".format(self.dataset_description, self.missingness_description), weight='bold')
                 
             ax.scatter(self.X[:,0], self.X[:,1], c=colors);ax.axis('off')
 
             if verbosity > 0:
-                ax.scatter(self._X_raw[(self._mask_missing[:,0]) & (~self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(self._mask_missing[:,0]) & (~self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='g' if self.verbosity==4 else 'r', alpha=.7, label='Missing X1 ({})'.format(((self._mask_missing[:,0]) & (~self._mask_missing[:,1])).sum()))
+                ax.scatter(self._X_raw[(self._Z[:,0]) & (~self._Z[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(self._Z[:,0]) & (~self._Z[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='g' if self.verbosity==4 else 'r', alpha=.7, label='Missing X1 ({})'.format(((self._Z[:,0]) & (~self._Z[:,1])).sum()))
 
-                ax.scatter(self._X_raw[(~self._mask_missing[:,0]) & (self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(~self._mask_missing[:,0]) & (self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X2 ({})'.format(((~self._mask_missing[:,0]) & (self._mask_missing[:,1])).sum()))
+                ax.scatter(self._X_raw[(~self._Z[:,0]) & (self._Z[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(~self._Z[:,0]) & (self._Z[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X2 ({})'.format(((~self._Z[:,0]) & (self._Z[:,1])).sum()))
 
-                ax.scatter(self._X_raw[(self._mask_missing[:,0]) & (self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(self._mask_missing[:,0]) & (self._mask_missing[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='r', alpha=.7, label='Missing both ({})'.format(((self._mask_missing[:,0]) & (self._mask_missing[:,1])).sum()))
+                ax.scatter(self._X_raw[(self._Z[:,0]) & (self._Z[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(self._Z[:,0]) & (self._Z[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='r', alpha=.7, label='Missing both ({})'.format(((self._Z[:,0]) & (self._Z[:,1])).sum()))
                 ax.legend(prop={'size':10}, loc='lower left')
             return ax
 

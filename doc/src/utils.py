@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 # add tools path and import our own tools
-sys.path.insert(0, '../tools')
+sys.path.insert(0, '../src')
 
 from const import *
 
@@ -459,3 +459,108 @@ def create_df():
     df = df.astype({"missingness_pattern": int, "experiment_number": int})
     
     return df
+
+
+def repr(object_, indent=0):
+
+    import seaborn as sns 
+    import numpy as np
+    
+    if indent==0:
+        
+        print("{0:10}{1:30}\t {2:40}\t {3:150}".format("","Attribute Name", "type", "Value or first element"))
+        print("{0:10}-----------------------------------------------------------------------------------------------------------------------------------------------------------------\n".format(""))
+    
+    for _ in range(indent):
+        print("\t")
+    
+    if not isinstance(object_, dict):
+    
+        dict_ = object_.__dict__
+    else:
+        dict_ = object_
+    
+    for k, o in dict_.items():
+        if type(o) == dict:
+            print("{0:10}{1:30}\t {2:40}".format(indent*"\t" if indent > 0 else "", k, _print_correct_type(o)))
+            repr(o, indent=indent+1)
+        else:
+            print("{0:10}{1:30}\t {2:40}\t {3:150}".format(indent*"\t" if indent > 0 else "", k, _print_correct_type(o), _print_correct_sample(o, indent=indent)))
+    
+    print("\n")
+    return 
+
+def _print_correct_sample(o, indent=0):
+    """
+        This helper function is associated with the show method, used to print properly classes object.
+        This one output a string of the element o, taking the type into account.
+
+    """
+
+
+    
+    if o is None:
+        return "None"    
+    
+    elif isinstance(o, (int, float, np.float32, np.float64)):
+        return str(o)
+    
+    elif isinstance(o, str):
+        return o.replace('\n', '-') if len(o) < 80 else o.replace('\n', '-')[:80]+'...'
+    
+    elif isinstance(o, (list, tuple)) :#and not type(o) == sns.palettes._ColorPalette:
+        return "{} len: {}".format(str(o[0]), len(o))
+    
+    elif isinstance(o, np.ndarray) :#and not type(o) == sns.palettes._ColorPalette:
+        return "{} shape: {}".format(str(o[0]), str(o.shape))
+    
+    elif type(o) == dict : 
+        return repr(o, indent=indent+1)
+
+    elif type(o) == pd.core.frame.DataFrame:
+        return 'dataframe'
+    
+    else:
+        
+        return str(o)
+    
+def _print_correct_type(o):
+    """
+        This helper function is associated with the show method, used to print properly classes object.
+        This one output a string of the type of the element o.
+
+    """
+    if o is None:
+        return "None"    
+    
+    elif isinstance(o, int):
+        return "int"
+    
+    elif isinstance(o, float):
+        return "float"
+    
+    elif isinstance(o, np.float32):
+        return "np.float32"
+    
+    elif isinstance(o, np.float64):
+        return "np.float64"    
+    
+    elif isinstance(o, list):
+        return "list"
+    
+    elif isinstance(o, str):
+        return "str"
+    
+    elif isinstance(o, tuple):
+        return "tuple"
+    
+    elif isinstance(o, np.ndarray):
+        return "np.ndarray"
+    
+    elif type(o) == dict : 
+        return "dict"
+    
+    else:
+        
+        return str(type(o))
+        
