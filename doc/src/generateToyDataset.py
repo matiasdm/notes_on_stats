@@ -10,10 +10,12 @@ import seaborn as sns
 
 from sklearn import datasets
 from sklearn.preprocessing import StandardScaler
+from sklearn.model_selection import train_test_split
+
 from sklearn.utils import shuffle
 
 # add tools path and import our own tools
-sys.path.insert(0, '../tools')
+sys.path.insert(0, '../src')
 
 from const import *
 from utils import repr
@@ -28,10 +30,13 @@ class DatasetGenerator(object):
     This view of missing data is number-wise, although it could be subject-wise, group-wise, class-wise, or a mix! 
 
     Note on the feature management processing:
-        self._X_raw contains the features originally created from sklearn, WITHOUT missing values. 
-        self._X contains the features originally created from sklear, WITH missing values. Call `generate_missing_coordinates` to create.  
-        self.X contains the features that are used externally. There are the one used to estimate distributions, or train models. 
-        self.imp_X contains _X (so with missing values), but with the missing data imputed. Call `impute_missing_data` to create.  
+        - self._X_raw contains the features originally created from sklearn, WITHOUT missing values. 
+        - self._X contains the features originally created from sklear, WITH missing values. Call `generate_missing_coordinates` to create.  
+        - self._X_train contains the training set, and self._X_test the testing set.
+        - self.X_train contains the training set with the missing data potentially encoded or imputed. 
+
+        The data without _ before their name are visible from the outside of this class (ditributions estimation or model training). The other are necessary for internal use. 
+        TODOREMOVE self.imp_X contains _X (so with missing values), but with the missing data imputed. Call `impute_missing_data` to create.  
 
         The methods: 
             - subset(class_used, imputation_mode) allows to change the face of X, (for training, selecting the correct class, or for prediction to allow using imputation, or to encode the NaNs with the DEFAULT_MISSING_VALUE.)
@@ -61,20 +66,33 @@ class DatasetGenerator(object):
     """
 
     
-    def __init__(self, dataset_name, purpose='train', num_samples=1000, imbalance_ratio=IMBALANCE_RATIO, class_used=None, fast=False, verbosity=1, debug=False, random_state=RANDOM_STATE):
+    def __init__(self, 
+                dataset_name, 
+                num_samples=NUM_SAMPLES,
+                imbalance_ratio=IMBALANCE_RATIO, 
+                class_used=None, 
+                proportion_train=PROPORTION_TRAIN, 
+                missing_data_handling=MISSING_DATA_HANDLING,
+                imputation_method=DEFAULT_IMPUTATION_METHOD, 
+                loading=False, 
+                verbosity=1,
+                debug=False, 
+                random_state=RANDOM_STATE):
         
         self.dataset_name = dataset_name
 
-        if fast:
+        if loading:
             #TODOCHECK
             return 
 
         self.num_samples = num_samples
         self.class_used = class_used
-        self.purpose = purpose
         
         #self.ratio_of_missing_values = ratio_of_missing_values
         self.imbalance_ratio = imbalance_ratio
+        self.proportion_train = proportion_train
+        self.missing_data_handling = missing_data_handling
+        self.imputation_method = imputation_method
         
         self.missingness_pattern = None
         self.missingness_parameters = {'missingness_mechanism' : None, 
@@ -100,69 +118,119 @@ class DatasetGenerator(object):
         # Masked data - stored for internal use and for keeping track of changes etc...
         self._X = deepcopy(self._X_raw)
 
-        # Actual data used by the other classes. 
-        self.X = None
-        self.y = None
+        # Imputed data (depend on the experiences/settings). If state is training, it contains imputation of 
+        # the train set, otherwise the test set.
+        self._imp_X_train, self._imp_X_test = None, None 
 
-        # Imputed data (depend on the experiences/settings)
-        self.imp_X = None
+        # Data used by the other classes splitted.
+        self.train_index, self.test_index = None, None 
+        self.X_train = None
+        self.X_test = None
+        self.y_train = None
+        self.y_test = None
 
-
-        self._Z = None
-        self.Z = None
 
     def __call__(self):
         return repr(self)
 
-    def subset(self, class_used=None, missing_treatment=None):
+    def split_test_train(self):
+        """
+        Split the dataset given some proportions, taking as input the see-able dataset with potentially missing data, having them either encoded of imputed.
+        """
+        self.train_index, self.test_index = train_test_split(np.arange(self.num_samples), test_size = (1-PROPORTION_TRAIN))
 
-        # At inference, we may want to either impute or encode the missinf values.
-        if missing_treatment == 'imputation':
 
-            assert self.imp_X is not None, "/!\. You must call an imputation method first, using `self.impute_missing_data(self, X_train, method='custom_imputations')`."
+        self._X_train = deepcopy(self._X[self.train_index])
+        self._X_test = deepcopy(self._X[self.test_index])
+
+        self._y_train = deepcopy(self._y[self.train_index])
+        self._y_test = deepcopy(self._y[self.test_index])
+
+
+        # VBy default once the split is done, no matter the state of the dataset, data are pusshed to the forefront.
+        self.X_train = deepcopy(self._X_train)
+        self.X_test = deepcopy(self._X_test)
+        self.y_train = deepcopy(self._y_train)
+        self.y_test = deepcopy(self._y_test)
+
+        print("Splitting dataset into test and train set.") if (self.debug or self.verbosity > 1) else None
+
+        # We need to re-empute or encode data after this step, for model where several replicates of experiements are done and 
+        # Who re-shuffle the data for each replicates. 
+        self.impute_data()
+        
+        return
+
+
+    def impute_data(self):
+        """
+            Must be called after the `split_test_train` method.
+            Change the visible variable self.X_, depending on the class, and handling of missing data.
+
+            If the approach are `bayesian` (omputing distributions), at training time (state=='training'), self.X_train will contain 
+            the the data from the training set, with potential missing value, for a certain class. 
+            At inference time it will contain the test set, with potential missing data, for all classes of course. 
+        """
+
+    
+        if self.missing_data_handling == 'imputation':
+
+            if self._imp_X_train is None and self._imp_X_test is None:
+                self._imp_X_train, self._imp_X_test  = self._impute_missing_data()
 
             # Create X and y used for experiments
-            self.X = deepcopy(self.imp_X)
-            self.y = deepcopy(self._y)
+            self.X_train = deepcopy(self._imp_X_train)
+            self.y_train = deepcopy(self._y_train)
 
-            # Create masks for the missingness (still take the missing features array)
-            self.Z = (~np.isnan(self._X)).astype(int)
+            self.X_test = deepcopy(self._imp_X_test)
+            self.y_test = deepcopy(self._y_test)
+            
+            print("Imputed {} values (train) and {} (test) using method {}.".format(len(np.isnan(self.X_train)), len(np.isnan(self.X_test)), self.imputation_method)) if (self.debug or self.verbosity > 0)  else None                
 
-            print("Imputing {} missing values.".format(len(np.isnan(self._X)))) if (self.debug or self.verbosity > 0)  else None
+        elif self.missing_data_handling == 'encoding':
 
-        elif missing_treatment == 'encoding':
+            self.X_train = deepcopy(self._X_train)
+            self.X_train[np.isnan(self.X_train)] = DEFAULT_MISSING_VALUE
+            self.y_train = deepcopy(self._y_train)
 
-            self.X = deepcopy(self._X)
-            self.X[np.isnan(self.X)] = DEFAULT_MISSING_VALUE
-            self.y = deepcopy(self._y)
+            self.X_test = deepcopy(self._X_test)
+            self.X_test[np.isnan(self.X_test)] = DEFAULT_MISSING_VALUE
+            self.y_test = deepcopy(self._y_test)
 
-            # Create masks for the missingness (still take the missing features array)
-            self.Z = (~np.isnan(self._X)).astype(int)
+            print("Encoding {} (train) and {} (test) missing values with {}.".format(len(np.isnan(self._X_train)), len(np.isnan(self._X_test)), DEFAULT_MISSING_VALUE)) if (self.debug or self.verbosity > 0)  else None
 
-            print("Encoding {} missing values with {}.".format(len(np.isnan(self._X)), DEFAULT_MISSING_VALUE)) if (self.debug or self.verbosity > 0)  else None
+        elif self.missing_data_handling == 'without':
 
-        # For training/estimation, we may want self.X and self.y to be the ones of a certain class. 
-        if class_used is not None:
-            self.class_used = class_used
+            self.X_train = deepcopy(self._X_train)
+            self.y_train = deepcopy(self._y_train)
+            self.X_test = deepcopy(self._X_test)
+            self.y_test = deepcopy(self._y_test)
 
-            # Create X and y used for experiments
-            self.X = deepcopy(self._X[(self._y==class_used).squeeze()])
-            self.y = deepcopy(self._y[(self._y==class_used).squeeze()])
+        else:
+            raise ValueError("Please use one of the following missing variables handling: imputing, encoding, or without")
 
-            self.Z = (~np.isnan(self.X)).astype(int)
+        return 
+        
+    def change_imputation_approach(self, missing_data_handling, imputation_method):
+
+        previous_imputation_method = self.imputation_method
+        previous_missing_data_handling = self.missing_data_handling
+        self.missing_data_handling = missing_data_handling
+        self.imputation_method = imputation_method
+        self.impute_data()
+
+        print("MD handling: {} ({}) --> {} ({}), with changes of the data.".format(previous_missing_data_handling, previous_imputation_method, missing_data_handling, imputation_method)) if (self.debug or self.verbosity > 1)  else None
 
         return 
 
-    def reset(self):
-        self.X = deepcopy(self._X)
-        self.y = deepcopy(self._y)
-        self.Z =  (~np.isnan(self.X)).astype(int)
-        self.class_used = None
-        
-    def generate_missing_coordinates(self, missingness_mechanism='MCAR', ratio_of_missing_values=RATIO_OF_MISSING_VALUES, missing_first_quarter=False, missing_X1=False, missing_X2=False, ratio_missing_per_class=[.1, .5], missingness_pattern=None, verbosity=1):
+    def generate_missing_coordinates(self, missingness_pattern=None, **kwargs):
 
         """
         Example of the currently implemented Missingness mechanisms and settings.
+
+
+        TODO: kwargs include: 
+        missingness_mechanism='MCAR', ratio_of_missing_values=RATIO_OF_MISSING_VALUES, missing_first_quarter=False, missing_X1=False, missing_X2=False, ratio_missing_per_class=[.1, .5], missingness_pattern=None, verbosity=1)
 
         # No missing data at all. Here for compatibility reasons. 
         self.generate_missing_coordinates(missingness_mechanism='None')
@@ -184,15 +252,15 @@ class DatasetGenerator(object):
 
         """
         if missingness_pattern is not None:
-            self._retrieve_missingness_parameters(missingness_pattern)
+            self._retrieve_missingness_parameters(missingness_pattern, **kwargs)
 
         else:
-            self.missingness_parameters =   {'missingness_mechanism' : missingness_mechanism, 
-                                            'ratio_of_missing_values' : ratio_of_missing_values,
-                                            'missing_X1' : missing_X1,
-                                            'missing_X2' : missing_X2,
-                                            'missing_first_quarter' : missing_first_quarter,
-                                            'ratio_missing_per_class' : ratio_missing_per_class}              
+            self.missingness_parameters =   {'missingness_mechanism' : kwargs['missingness_mechanism'], 
+                                            'ratio_of_missing_values' : kwargs['ratio_of_missing_values'], 
+                                            'missing_X1' : kwargs['missing_X1'], 
+                                            'missing_X2' : kwargs['missing_X2'], 
+                                            'missing_first_quarter' : kwargs['missing_first_quarter'], 
+                                            'ratio_missing_per_class' : kwargs['ratio_missing_per_class']}              
         self._X = deepcopy(self._X_raw)
 
         excedded_time = 0
@@ -304,33 +372,21 @@ class DatasetGenerator(object):
             new_ratio, new_ratio_class_0, new_ratio_class_1 = self.met_missingness_rate(verbose=True if self.verbosity > 1 else False, return_values=True)
             self.missingness_parameters['ratio_of_missing_values'] = new_ratio
             self.missingness_parameters['ratio_missing_per_class'] = [new_ratio_class_0, new_ratio_class_1]
-
-        # Create X and y used for experiments
-        self.X = deepcopy(self._X)
-        self.y = deepcopy(self._y)
-
-        # Create masks for the missingness
-        self._Z =  (~np.isnan(self._X)).astype(int)
-        self.Z =  (~np.isnan(self.X)).astype(int)
-
-        if verbosity:
-            self.plot(verbosity=verbosity)
-                    
         return None
 
-    def impute_missing_data(self, X_train, method='custom_imputations', bandwidth=BANDWIDTH):
-
+    def _impute_missing_data(self, bandwidth=BANDWIDTH):
+        """
+            If state is training, we impute the missing data of the training set with itself.
+            If state is inference, we impute the missing data of the test set with the training set.
+            TODO: veriify that we are doing this once... (the imputation computation), because it's better to store than to recompute everytime.
+        """
         from stats import impute_missing_data
-        self.imp_X = impute_missing_data(X_train=X_train, X_test=self.X, method=method, h=bandwidth)
 
-        # TODO: print number of imputed data depending on verbosity
+        _imp_X_train = impute_missing_data(X_train=self.X_train, X_test=self.X_train, method=self.imputation_method, h=bandwidth)
+        _imp_X_test = impute_missing_data(X_train=self.X_train, X_test=self.X_test, method=self.imputation_method, h=bandwidth)
 
-        return 
+        return _imp_X_train, _imp_X_test
     
-
-
-
-
     def met_missingness_rate(self, label=None, verbose=False, return_values=False):
 
         if self.missingness_parameters['missing_X1'] and self.missingness_parameters['missing_X2']:
@@ -365,17 +421,15 @@ class DatasetGenerator(object):
     def save(self, experiment_path):
 
         # Unneccesary to save.
-        self.Z = None 
-        self._Z = None 
 
         #-------- Save dataset ----------#
-        with open(os.path.join(experiment_path, 'dataset_{}_log.json'.format(self.purpose)), 'w') as outfile:
+        with open(os.path.join(experiment_path, 'dataset_log.json'), 'w') as outfile:
             json.dump(self, outfile, default=lambda o: o.astype(float) if type(o) == np.int64 else o.tolist() if type(o) == np.ndarray else o.to_json(orient='records') if type(o) == pd.core.frame.DataFrame else o.__dict__)
             
         # Reload the object that were unsaved 
-        self._Z =  (~np.isnan(self._X)).astype(int)
-        self.Z =  (~np.isnan(self.X)).astype(int)
 
+        return
+    
     def load(self, dataset_data):
 
         for key, value in dataset_data.items():
@@ -384,64 +438,83 @@ class DatasetGenerator(object):
             else: 
                 setattr(self, key, value)
 
-    
     def get_data(self):
         return self.X, self.Z, self.y
         
-    def plot(self, verbosity=1, ax=None, title=False):
-        
-            colors = [self.cmap[0] if l==1 else self.cmap[1] for l in self.y]
+    def plot(self, verbosity=1, ax1=None, ax2=None, title=True):
 
-            if ax is None:
-                fig, ax = plt.subplots(1, 1, figsize=(10, 5))
-            if title:
-                ax.set_title("{}\n{}".format(self.dataset_description, self.missingness_description), weight='bold')
-                
-            ax.scatter(self.X[:,0], self.X[:,1], c=colors);ax.axis('off')
+        colors = [self.cmap[0] if l==1 else self.cmap[1] for l in self.y_train]
 
-            if verbosity > 0:
-                ax.scatter(self._X_raw[(self._Z[:,0]) & (~self._Z[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(self._Z[:,0]) & (~self._Z[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='g' if self.verbosity==4 else 'r', alpha=.7, label='Missing X1 ({})'.format(((self._Z[:,0]) & (~self._Z[:,1])).sum()))
+        if ax1 is None:
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
 
-                ax.scatter(self._X_raw[(~self._Z[:,0]) & (self._Z[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(~self._Z[:,0]) & (self._Z[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X2 ({})'.format(((~self._Z[:,0]) & (self._Z[:,1])).sum()))
+        if title:
+            fig.suptitle("{}\n{}".format(self.dataset_description, self.missingness_description), weight='bold')
 
-                ax.scatter(self._X_raw[(self._Z[:,0]) & (self._Z[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 0], self._X_raw[(self._Z[:,0]) & (self._Z[:,1]) & ((self.class_used is None) | ((self.class_used is not None) & (self._y==self.class_used))).squeeze(), 1], c='r', alpha=.7, label='Missing both ({})'.format(((self._Z[:,0]) & (self._Z[:,1])).sum()))
-                ax.legend(prop={'size':10}, loc='lower left')
-            return ax
+        Z_train = np.isnan(self.X_train[:,0])
 
-    def _retrieve_missingness_parameters(self, missingness_pattern, **kwargs):
+        train_df = pd.DataFrame({'X_1': self._X_raw[self.train_index][:,0], 
+                                'X_2': self._X_raw[self.train_index][:,1],
+                                'Z_1': (~np.isnan(self._X[self.train_index][:,0])).astype(int),
+                                'Z_2': (~np.isnan(self._X[self.train_index][:,1])).astype(int)
+                                })
+
+        test_df = pd.DataFrame({'X_1':  self._X_raw[self.test_index][:,0], 
+                                'X_2': self._X_raw[self.test_index][:,1],
+                                'Z_1': (~np.isnan(self._X[self.test_index][:,0])).astype(int),
+                                'Z_2': (~np.isnan(self._X[self.test_index][:,1])).astype(int)
+                                })
+
+        # Plot the training ans test sets
+        ax1.scatter(self._X_train[:,0], self._X_train[:,1], c=colors);ax1.axis('off')
+        ax2.scatter(self._X_test[:,0], self._X_test[:,1], c=self.cmap[0]);ax2.axis('off')
+
+        ax1.scatter(train_df.query(" `Z_1`==0 & `Z_2`==1 ")['X_1'].to_list(), train_df.query(" `Z_1`==0 & `Z_2`==1 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X1 ({})'.format(len(train_df.query(" `Z_1`==0 & `Z_2`==1 "))))
+        ax1.scatter(train_df.query(" `Z_1`==1 & `Z_2`==0 ")['X_1'].to_list(), train_df.query(" `Z_1`==1 & `Z_2`==0 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X2 ({})'.format(len(train_df.query(" `Z_1`==1 & `Z_2`==0 "))))
+        ax1.scatter(train_df.query(" `Z_1`==0 & `Z_2`==0 ")['X_1'].to_list(), train_df.query(" `Z_1`==0 & `Z_2`==0 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing both ({})'.format(len(train_df.query(" `Z_1`==0 & `Z_2`==0 "))))
+        ax1.legend(prop={'size':10}, loc='lower left')
+
+        ax2.scatter(test_df.query(" `Z_1`==0 & `Z_2`==1 ")['X_1'].to_list(), test_df.query(" `Z_1`==0 & `Z_2`==1 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X1 ({})'.format(len(test_df.query(" `Z_1`==0 & `Z_2`==1 "))))
+        ax2.scatter(test_df.query(" `Z_1`==1 & `Z_2`==0 ")['X_1'].to_list(), test_df.query(" `Z_1`==1 & `Z_2`==0 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X2 ({})'.format(len(test_df.query(" `Z_1`==1 & `Z_2`==0 "))))
+        ax2.scatter(test_df.query(" `Z_1`==0 & `Z_2`==0 ")['X_1'].to_list(), test_df.query(" `Z_1`==0 & `Z_2`==0 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing both ({})'.format(len(test_df.query(" `Z_1`==0 & `Z_2`==0 "))))
+        ax2.legend(prop={'size':10}, loc='lower left')
+
+        return ax1, ax2
+
+    def _retrieve_missingness_parameters(self, missingness_pattern, ratio_of_missing_values=RATIO_OF_MISSING_VALUES, ratio_missing_per_class=RATIO_MISSING_PER_CLASS):
 
         self.missingness_pattern = missingness_pattern
 
         if missingness_pattern==1:
             self.missingness_parameters = {'missingness_mechanism' : 'MCAR', 
-                                            'ratio_of_missing_values' : RATIO_OF_MISSING_VALUES,
+                                            'ratio_of_missing_values' : ratio_of_missing_values,
                                             'missing_X1' : True,
                                             'missing_X2' : False,
                                             'missing_first_quarter' : None,
                                             'ratio_missing_per_class' : None,
                                             'allow_missing_both_coordinates' : None}
-            self.missingness_description = 'Pattern 1 - MCAR {} missing, only X1'.format(RATIO_OF_MISSING_VALUES)
+            self.missingness_description = 'Pattern 1 - MCAR {} missing, only X1'.format(ratio_of_missing_values)
 
         elif missingness_pattern==2:
             self.missingness_parameters = {'missingness_mechanism' : 'MAR', 
-                                            'ratio_of_missing_values' : RATIO_OF_MISSING_VALUES,
+                                            'ratio_of_missing_values' : ratio_of_missing_values,
                                             'missing_X1' : True,
                                             'missing_X2' : True,
                                             'missing_first_quarter' : True,
                                             'ratio_missing_per_class' : None}
 
-            self.missingness_description = 'Pattern 2 - MAR quarter missing ({}%) both X1,X2'.format(int(100*RATIO_OF_MISSING_VALUES))
+            self.missingness_description = 'Pattern 2 - MAR quarter missing ({}%) both X1,X2'.format(int(100*ratio_of_missing_values))
 
 
         elif missingness_pattern==3:
             self.missingness_parameters = {'missingness_mechanism' : 'MAR', 
-                                            'ratio_of_missing_values' : RATIO_OF_MISSING_VALUES,
+                                            'ratio_of_missing_values' : ratio_of_missing_values,
                                             'missing_X1' : True,
                                             'missing_X2' : False,
                                             'missing_first_quarter' : True,
                                             'ratio_missing_per_class' : None}
 
-            self.missingness_description = 'Pattern 3 - MAR quarter missing ({}%) only X1'.format(int(100*RATIO_OF_MISSING_VALUES))
+            self.missingness_description = 'Pattern 3 - MAR quarter missing ({}%) only X1'.format(int(100*ratio_of_missing_values))
 
         elif missingness_pattern==4:
             self.missingness_parameters = {'missingness_mechanism' : 'MNAR', 
@@ -449,9 +522,9 @@ class DatasetGenerator(object):
                                             'missing_X1' : True,
                                             'missing_X2' : True,
                                             'missing_first_quarter' : False,
-                                            'ratio_missing_per_class' : RATIO_MISSING_PER_CLASS}    
+                                            'ratio_missing_per_class' : ratio_missing_per_class}    
 
-            self.missingness_description = 'Pattern 4 - MNAR ({}% for pos. class {}% for neg.class)'.format(int(100*RATIO_MISSING_PER_CLASS[0]), int(100*RATIO_MISSING_PER_CLASS[1]))
+            self.missingness_description = 'Pattern 4 - MNAR ({}% for neg. class {}% for pos. class)'.format(int(100*ratio_missing_per_class[0]), int(100*ratio_missing_per_class[1]))
 
         elif missingness_pattern==5:
             self.missingness_parameters = {'missingness_mechanism' : 'MNAR', 
@@ -459,9 +532,9 @@ class DatasetGenerator(object):
                                             'missing_X1' : True,
                                             'missing_X2' : True,
                                             'missing_first_quarter' : True,
-                                            'ratio_missing_per_class' : RATIO_MISSING_PER_CLASS}  
+                                            'ratio_missing_per_class' : ratio_missing_per_class}  
 
-            self.missingness_description = 'Pattern 5 - MNAR Quarter missing\n({}% for pos. class {}% for neg.class)'.format(int(100*RATIO_MISSING_PER_CLASS[0]), int(100*RATIO_MISSING_PER_CLASS[1]))
+            self.missingness_description = 'Pattern 5 - MNAR Quarter missing\n({}% for neg. class {}% for pos. class)'.format(int(100*ratio_missing_per_class[0]), int(100*ratio_missing_per_class[1]))
 
         elif missingness_pattern==6:
             self.missingness_parameters = {'missingness_mechanism' : 'MNAR', 
@@ -469,9 +542,9 @@ class DatasetGenerator(object):
                                             'missing_X1' : True,
                                             'missing_X2' : False,
                                             'missing_first_quarter' : True,
-                                            'ratio_missing_per_class' : RATIO_MISSING_PER_CLASS}  
+                                            'ratio_missing_per_class' : ratio_missing_per_class}  
 
-            self.missingness_description = 'Pattern 4 - MNAR Quarter missing\n({}% for pos. class {}% for neg.class)\n Only X1'.format(int(100*RATIO_MISSING_PER_CLASS[0]), int(100*RATIO_MISSING_PER_CLASS[1]))
+            self.missingness_description = 'Pattern 4 - MNAR Quarter missing\n({}% for neg. class {}% for pos. class)\n Only X1'.format(int(100*ratio_missing_per_class[0]), int(100*ratio_missing_per_class[1]))
 
 
 

@@ -64,18 +64,18 @@ class FeatureNet(nn.Module):
 
 
 class NAM(nn.Module):
-    def __init__(self, no_features, hidden_sizes, dropout_rate = .2, feature_dropout = 0.0, use_exu = False):
+    def __init__(self, num_features, hidden_sizes, dropout_rate = .2, feature_dropout = 0.0, use_exu = False):
         super(NAM, self).__init__()
         
-        self.no_features = no_features
-        feature_nets = [FeatureNet(hidden_sizes, dropout_rate, use_exu) for _ in range(no_features)]
+        self.num_features = num_features
+        feature_nets = [FeatureNet(hidden_sizes, dropout_rate, use_exu) for _ in range(num_features)]
         self.feature_nets = nn.ModuleList(feature_nets)
         self.feature_drop = nn.Dropout(feature_dropout)
         self.bias = torch.nn.Parameter(torch.zeros(1,), requires_grad=True)
             
     def forward(self, x):
         y = []
-        for i in range(self.no_features):
+        for i in range(self.num_features):
             o = self.feature_nets[i](x[:,i].unsqueeze(1))
             y.append(o)
         y = torch.cat(y, 1)

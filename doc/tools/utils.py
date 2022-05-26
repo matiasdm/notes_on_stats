@@ -118,7 +118,7 @@ def estimate_pdf(X=None, method='our', resolution=20, bandwidth=None):
     hat_f = np.zeros_like(xygrid[0])  # init. the pdf estimation
     h = bandwidth
 
-    if method=='our' or method=='custom_imputations':
+    if method=='multi_dimensional_weighting':
         # See documentation
         from stats import kernel_based_pdf_estimation
     
@@ -154,7 +154,7 @@ def estimate_pdf(X=None, method='our', resolution=20, bandwidth=None):
                 y = xygrid[1][i,j]
                 hat_f[i,j] = kernel_based_pdf_estimation_z_prior_limited_range(X=X, x=[x,y], put_weight=mask_space[i,j], h=h)  
 
-    if method=='no_imputations':
+    if method=='multi_distributions':
 
         #----------------------------------------------------------------------------------
         #  Estimation of f(X_1,X_2|Z_1=1, Z_2=1), f(X_2|Z_1=0,Z_2=1) and f(X_1|Z_1=1,Z_2=0)
@@ -222,7 +222,7 @@ def estimate_pdf(X=None, method='our', resolution=20, bandwidth=None):
                 y = xygrid[1][i,j]
                 hat_f[i,j] = kernel_based_pdf_estimation(imp_X, x=[x,y],h=h)
 
-    # Except for the `no_imputations` method, return only hat_f
+    # Except for the `multi_distributions` method, return only hat_f
 
     return hat_f
 

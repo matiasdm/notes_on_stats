@@ -5,37 +5,32 @@ import pandas as pd
 from sklearn.metrics import roc_curve, auc
 
 
-def plot_roc_curves(results, pred_col, resp_col, size = (7, 5), fname = None):
-    plt.clf()
-    plt.style.use('classic')
-    plt.figure(figsize=size)
+def plot_roc_curves(results, ax = None):
+
+    if ax is None:
+        fig, ax =  plt.subplots(1, 1, figsize=(5, 5))
     
     for _, res in results.groupby('replicate'):
-        fpr, tpr, _ = roc_curve(res[resp_col], res[pred_col])      
+        fpr, tpr, _ = roc_curve(res['y_true'], res['y_pred'])      
         roc_auc = auc(fpr, tpr)    
-        plt.plot(fpr, tpr, '-', color='orange', lw=0.5)
+        ax.plot(fpr, tpr, '-', color='orange', lw=0.5)
 
-    fpr, tpr, _ = roc_curve(results[resp_col], results[pred_col])
+    fpr, tpr, _ = roc_curve(results['y_true'], results['y_pred'])
     roc_auc = auc(fpr, tpr)
-    plt.plot(fpr, tpr, '-', color='darkorange', lw=1.5, label='ROC curve (area = %0.2f)' % roc_auc,)
-    plt.plot([0, 1], [0, 1], color='navy', lw=1.5, linestyle='--')
-    plt.xlim([0.0, 1.0])
-    plt.ylim([0.0, 1.05])
-    plt.grid()
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('True Positive Rate')
-    plt.legend(loc="lower right")
-    if fname is not None:
-        plt.savefig(fname)
-    else:
-        plt.show()    
+    ax.plot(fpr, tpr, '-', color='darkorange', lw=1.5, label='ROC curve (area = %0.2f)' % roc_auc,)
+    ax.plot([0, 1], [0, 1], color='navy', lw=1.5, linestyle='--')
+    ax.set_xlim([0.0, 1.0])
+    ax.set_ylim([0.0, 1.05])
+    ax.grid()
+    ax.set_xlabel('False Positive Rate')
+    ax.set_ylabel('True Positive Rate')
+    return ax
+   
 
 
-def plot_prediction_plot(results, pred_col, resp_col, size = (7, 5), fname = None):
-    plt.clf()
-    plt.style.use('classic')
+def plot_prediction_plot(results, pred_col, resp_col, axes=None, size = (7, 5), fname = None):
+
     plt.figure(figsize=size)
-
     x = results[pred_col]
     y = results[resp_col]
     plt.scatter(x, y, color='darkorange', lw=1.0)
@@ -51,15 +46,19 @@ def plot_prediction_plot(results, pred_col, resp_col, size = (7, 5), fname = Non
 
         
 
-def plot_shape_functions(results, features, ncols = 4, size = (25, 8), fname = None):
+def plot_shape_functions(results, features,  axes=None, ncols=4, start_axes_plotting=None):
 
     n = len(features)
     nrows = n // ncols
 
-    fig, axes = plt.subplots(nrows = nrows, ncols = ncols, figsize = figsize); axes = axes.flatten()
+    if axes is None:
+        fig, axes = plt.subplots(nrows = nrows, ncols = ncols, figsize = figsize); axes = axes.flatten()
+
+
     for i, feature in enumerate(features):
-        r = i // ncols
-        c = i % ncols
+
+        if start_axes_plotting is not None:
+            i+=start_axes_plotting
 
         results.sort_values(feature, inplace = True)
         for _, res in results.groupby('replicate'):
@@ -109,12 +108,7 @@ def plot_shape_functions(results, features, ncols = 4, size = (25, 8), fname = N
         axes[i].xaxis.label.set_visible(False)
         axes[i].set_title(feature.replace('_', ' '))
         axes[i].get_legend().remove()
-
-    plt.tight_layout()
-    if fname is not None:
-        plt.savefig(fname)
-    else:
-        plt.show()
-    return
+    
+    return axes
 
 

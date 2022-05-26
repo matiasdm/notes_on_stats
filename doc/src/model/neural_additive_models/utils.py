@@ -1,6 +1,7 @@
 import time
 import torch
 import torch.nn as nn
+from torch.utils.data import DataLoader
 
 def train_model(model, data, regression = False, max_epochs = 10, batch_size = 32, learning_rate = 1e-3, weight_decay = 5e-4, output_penalty = 0., verbosity = 20):
     # Data loader
@@ -36,11 +37,11 @@ def train_model(model, data, regression = False, max_epochs = 10, batch_size = 3
             err.backward()
             optimizer.step()
             
-            if verbosity is not None:
+            if verbosity >0 :
                 if i % verbosity == 0:
                     print('Epoch: {0}/{1};\t Batch: {2}/{3};\t Err: {4:1.3f}'.format(epoch + 1, max_epochs, i + 1, no_batches, err.item()))
 
-        print('\n\t Epoch finished in {:1.2f} seconds!\n'.format(time.time() - start))
+        print('\n\t Epoch finished in {:1.2f} seconds!\n'.format(time.time() - start)) if verbosity > 0 else None 
 
 
 def eval_model(model, data):

@@ -72,19 +72,20 @@ def label_bar(rects,ax):
 
 def create_df():
     
-    df = pd.DataFrame(columns = ['dataset_name','experiment_number', 'purpose', 'fitted',
-                                 'num_samples', 'imbalance_ratio', 'missingness_pattern', 'missingness_mechanism', 
-                                 'ratio_of_missing_values', 'missing_X1', 'missing_X2', 'missing_first_quarter','ratio_missing_per_class_0', 'ratio_missing_per_class_1',
+    df = pd.DataFrame(columns = ['dataset_name','experiment_number', 'approach', 'missing_data_handling','imputation_method',
+                                'num_samples', 'imbalance_ratio', 'missingness_pattern', 'missingness_mechanism', 
+                                'ratio_of_missing_values', 'missing_X1', 'missing_X2', 'missing_first_quarter','ratio_missing_per_class_0', 'ratio_missing_per_class_1','auc',
                                 'Accuracy', 'F1', 'MCC', 'Sensitivity', 'Specificity', 'Precision', 'PPV', 'NPV', 'FNR', 'FDR', 'FOR', 
                                 'resolution', 'bandwidth', 'estimation_time_0', 'estimation_time_1'])
-    
+
+
     experiments_paths = glob(os.path.join(DATA_DIR, 'experiments', "*", '*'))
-    
+
 
     for experiment_path in experiments_paths:
 
         exp_path = os.path.join(experiment_path, 'experiment_log.json')
-        dataset_path = os.path.join(experiment_path, 'dataset_test_log.json')
+        dataset_path = os.path.join(experiment_path, 'dataset_log.json')
 
         dist_None_path = os.path.join(experiment_path, 'distributions_None_log.json')
         dist_1_path = os.path.join(experiment_path, 'distributions_1_log.json')
@@ -129,12 +130,13 @@ def create_df():
 
                 # Load experiment data
                 dist_0_data = json.load(dist_json)
-
+                
         # append rows to an empty DataFrame
         df = df.append({'dataset_name' : experiment_data['dataset_name'], 
                         'experiment_number' : experiment_data['experiment_number'],  
-                        'purpose' : experiment_data['purpose'],  
-                        'fitted' : experiment_data['fitted'],  
+                        'approach' : experiment_data['approach'],  
+                        'missing_data_handling' : experiment_data['missing_data_handling'],  
+                        'imputation_method' : experiment_data['imputation_method'],  
                         'num_samples' : dataset_data['num_samples'],  
                         'imbalance_ratio' : dataset_data['imbalance_ratio'],  
                         'missingness_pattern' : int(dataset_data['missingness_pattern']),  
@@ -147,8 +149,7 @@ def create_df():
                         'ratio_missing_per_class_1' : dataset_data['missingness_parameters']['ratio_missing_per_class'][1] if dataset_data['missingness_parameters']['ratio_missing_per_class'] is not None else np.nan,
                         'resolution' : experiment_data['resolution'],
                         'bandwidth' : experiment_data['bandwidth'],
-                        'estimation_time_0' : dist_0_data['estimation_time'] if dist_0_data is not None else np.nan,
-                        'estimation_time_1' : dist_1_data['estimation_time'] if dist_1_data is not None else np.nan,
+                        'auc' : experiment_data['performances_df']['Area Under the Curve (AUC)'][0] if 'Area Under the Curve (AUC)' in experiment_data['performances_df'].keys() else np.nan,
                         'Accuracy' : experiment_data['performances_df']['Accuracy'][0],  
                         'F1' : experiment_data['performances_df']['F1 score (2 PPVxTPR/(PPV+TPR))'][0],  
                         'MCC' : experiment_data['performances_df']['Matthews correlation coefficient (MCC)'][0],  
