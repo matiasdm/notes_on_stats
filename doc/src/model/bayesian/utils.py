@@ -79,7 +79,7 @@ def estimate_pdf(X=None, approach='multi_distributions', imputation_method='mult
                     y = xygrid[1][i,j]
                     hat_f[i,j] = kernel_based_pdf_estimation_z_prior(X=X, x=[x,y] ,h=h)  
 
-        # TODO: should be remoded
+
         if imputation_method=='missing_limited_range':
             # See documentation
             from .stats import kernel_based_pdf_estimation_z_prior_limited_range

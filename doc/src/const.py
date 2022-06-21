@@ -59,4 +59,37 @@ COLUMNS_DF = ['dataset_name', 'experiment_number','num_samples', 'imbalance_rati
 
 
 
+DEFAULT_CONFIG = {'num_samples': NUM_SAMPLES,
+                  'imbalance_ratio': IMBALANCE_RATIO,
+                  'missingness_pattern': MISSINGNESS_PATTERN,
+                  'ratio_of_missing'}
+
+
+    DATASET_NAME = 'circles'
+    NUM_SAMPLES = 10000
+    IMBALANCE_RATIO = .5
+
+    # Missingness default parameters
+    MISSINGNESS_PATTERN = 3
+    MAX_TRY_MISSSINGNESS = 10
+    RATIO_OF_MISSING_VALUES = .2
+    RATIO_MISSING_PER_CLASS = [.1, .3]
+
+    # Handling of issing data in the case of non-robust algorithms, or for experimental purposes.
+    MISSING_DATA_HANDLING = 'without'
+    DEFAULT_IMPUTATION_METHOD = 'mice'
+    DEFAULT_MISSING_VALUE = -5
+
+    # pdf estimation default parameters
+    RESOLUTION = 10
+    BANDWIDTH = .2
+
+    # Classification default parameters
+    PROPORTION_TRAIN = .8
+
+    # Verbosity
+    VERBOSITY=4
+
+
+
 

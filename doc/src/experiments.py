@@ -26,6 +26,7 @@ from model.neural_additive_models.nam import NAM
 from model.neural_additive_models.visualization import plot_roc_curves, plot_shape_functions
 from model.neural_additive_models.utils import train_model, eval_model
 from model.neural_additive_models.dataset import TabularData
+import torch
 
 
 class Experiments(object):
@@ -70,6 +71,7 @@ class Experiments(object):
         self.fitted = False
 
         # NAMs related attributs
+        self.model = None
         self.use_missing_indicator_variables = None
 
         # Interesting byproducts
@@ -128,6 +130,9 @@ class Experiments(object):
 
         elif self.approach == 'nam':
 
+            # Be careful this one is containing all the replicates, if you want to access results on a test set 
+            # with the best model, you should call `self.predict` and y_pred and proper coordinates will be accessible
+            # Through self.dataset.y_pred. Note also this is called when plotting! 
             self.predictions_df = self._train_nam(**kwargs)
 
 
@@ -138,13 +143,19 @@ class Experiments(object):
         assert self.purpose == 'classification', "/!\. Purpose mode is set to `estimation`, you should set it to `classification`. :-)"
         # TODO: if we don't enlarge the scope of those classes (only use fit and predict with distributions), then no need to distinguish here...
         if self.approach in ['multi_distributions', 'single_distribution']:
+
+            # Do the prediction for the test set.
             self._predict_map()
 
             # Compute performances
             self._performances_bayesian()
 
         elif self.approach == 'nam':
-            # Inference is performed while training. 
+            
+            # Do the prediction with the best model
+            self._predict_nam()
+
+            # Compute perf.
             self._performances_nam()
 
         else:
@@ -173,7 +184,8 @@ class Experiments(object):
                       'False Negative': [1 if y_true==1 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
                       })
 
-        
+        self.predictions_df = predictions_df
+
         #Compute metrics of interest  
         tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
 
@@ -197,8 +209,8 @@ class Experiments(object):
                             'False discovery rate (FDR=1-PPV)': round(1-ppv, 3),
                             'False omission rate (FOR=1-NPV)': round(1-npv, 3)}
 
-        self.predictions_df = predictions_df
-        self.performances_df = pd.DataFrame(performances_dict, index=['0'])       
+        self.performances_df = pd.DataFrame(performances_dict, index=['0'])  
+
         return 
 
     def _performances_nam(self):
@@ -342,7 +354,7 @@ class Experiments(object):
         best_predictions_df = self.predictions_df.query(" `replicate` == @best_replicate")
 
         # Create the pannel 
-        fig, axes = plt.subplots(2, 4, figsize=(20, 8)); axes = axes.flatten()
+        fig, axes = plt.subplots(2, 5, figsize=(25, 8)); axes = axes.flatten()
         fig.suptitle("({}) {}\n{}".format(int(self.experiment_number), self.description, self.dataset.missingness_description), y=1.1, weight='bold', fontsize=12)
 
         # Plot the dataset 
@@ -360,10 +372,75 @@ class Experiments(object):
 
         # Plot the roc curves
         axes[3] = plot_roc_curves(self.predictions_df, ax=axes[3]) 
-        axes = plot_shape_functions(self.predictions_df, features, axes=axes, ncols=4, start_axes_plotting=4) 
+        axes = plot_shape_functions(self.predictions_df, features, axes=axes, ncols=5, start_axes_plotting=5) 
+
+        # Plot the dataset with the errors
+
+        y_true = self.dataset.y_test.squeeze()
+        y_pred = (self.dataset.y_pred > CLASSIFICATION_THRESHOLD).astype(int)
+
+        # Creation of a df for the prediction
+        predictions_df = pd.DataFrame({'X1':self.dataset._X_raw[self.dataset.test_index][:,0], 
+                                    'X2':self.dataset._X_raw[self.dataset.test_index][:,1], 
+                                    'Z1':[1 if not np.isnan(x) else 0 for x in self.dataset._X_test[:,0]],
+                                    'Z2': [1 if not np.isnan(x) else 0 for x in self.dataset._X_test[:,1]],
+                                    'Have missing' : [(np.isnan(x).sum()>0).astype(int)  for x in self.dataset._X_test],
+                                    'y_true': y_true, 
+                                    'y_pred': y_pred, 
+                                    'True Positive': [1 if y_true==1 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    'True Negative': [1 if y_true==0 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    'False Positive': [1 if y_true==0 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    'False Negative': [1 if y_true==1 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    })
+
+        alpha=1
+        axes[4].set_title("Classification result (th={})".format(CLASSIFICATION_THRESHOLD));axes[4].axis('off')
+
+        # Plot the sample points without missing data
+        axes[4].scatter(predictions_df.query(" `Have missing`==0 and `True Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `True Positive`==1")['X2'],
+                    color='tab:blue', alpha=alpha, label="TP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Positive`==1"))))
+        axes[4].scatter(predictions_df.query(" `Have missing`==0 and `True Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `True Negative`==1")['X2'],
+                    color='tab:blue', alpha=alpha, label="TN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Negative`==1"))))
+        axes[4].scatter(predictions_df.query(" `Have missing`==0 and `False Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `False Positive`==1")['X2'],
+                    color='tab:orange', s=100, alpha=alpha, label="FP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Positive`==1"))))
+        axes[4].scatter(predictions_df.query(" `Have missing`==0 and `False Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `False Negative`==1")['X2'],
+                    color='tab:red', s=100, alpha=alpha, label="FN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Negative`==1"))))
+
+
+        # Plot the sample points without missing data
+        axes[4].scatter(predictions_df.query(" `Have missing`==1 and `True Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `True Positive`==1")['X2'],
+                    color='tab:blue', facecolors='none', alpha=alpha, label="TP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Positive`==1"))))
+        axes[4].scatter(predictions_df.query(" `Have missing`==1 and `True Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `True Negative`==1")['X2'],
+                    color='tab:blue', facecolors='none', alpha=alpha, label="TN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Negative`==1"))))
+        axes[4].scatter(predictions_df.query(" `Have missing`==1 and `False Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `False Positive`==1")['X2'],
+                    color='tab:orange', s=100, facecolors='none', alpha=alpha, label="FP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Positive`==1"))))
+        axes[4].scatter(predictions_df.query(" `Have missing`==1 and `False Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `False Negative`==1")['X2'],
+                    color='tab:red', s=100, facecolors='none', alpha=alpha, label="FN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Negative`==1"))))
+
+        # Plot the sample points without missing data
+        axes[9].scatter([-5], [-5],color='tab:blue', alpha=alpha, label="TP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Positive`==1"))))
+        axes[9].scatter([-5], [-5],color='tab:blue', alpha=alpha, label="TN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Negative`==1"))))
+        axes[9].scatter([-5], [-5],color='tab:orange', s=100, alpha=alpha, label="FP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Positive`==1"))))
+        axes[9].scatter([-5], [-5],color='tab:red', s=100, alpha=alpha, label="FN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Negative`==1"))))
+        axes[9].scatter([-5], [-5],color='tab:blue', facecolors='none', alpha=alpha, label="TP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Positive`==1"))))
+        axes[9].scatter([-5], [-5],color='tab:blue', facecolors='none', alpha=alpha, label="TN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Negative`==1"))))
+        axes[9].scatter([-5], [-5],color='tab:orange', s=100, facecolors='none', alpha=alpha, label="FP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Positive`==1"))))
+        axes[9].scatter([-5], [-5], color='tab:red', s=100, facecolors='none', alpha=alpha, label="FN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Negative`==1"))))
+        axes[9].set_xlim([0,1]);axes[9].set_ylim([0,1]);axes[9].axis('off');axes[9].legend(loc='center', prop={'size':15})
 
         if not self.use_missing_indicator_variables:
-            [axes[i].axis('off') for i in [6, 7]]
+            [axes[i].axis('off') for i in [7, 8, 9]]
+        else:
+            [axes[i].axis('off') for i in [9]]
+
 
         plt.tight_layout();plt.show()
 
@@ -385,18 +462,16 @@ class Experiments(object):
 
         # Store here the objects that cannot be saved as json objects (saved and stored separately)
         dataset = self.dataset
-
-        if self.approach in ['single_distribution', 'multi_distributions']:
-
-            dist_pos = self.dist_pos
-            dist_neg = self.dist_neg
-
+        dist_pos = self.dist_pos
+        dist_neg = self.dist_neg
+        model = self.model if hasattr(self, 'model') else None #TODO MAJOR
         performances_df = self.performances_df
         predictions_df = self.predictions_df
 
         self.dataset = None 
         self.dist_pos = None
         self.dist_neg = None
+        self.model = None
 
         if self.approach in ['single_distribution', 'multi_distributions']:
             self.predictions_df = None
@@ -409,11 +484,9 @@ class Experiments(object):
 
         # Reload the object that were unsaved 
         self.dataset = dataset
-        if self.approach in ['single_distribution', 'multi_distributions']:
-            
-            self.dist_pos = dist_pos
-            self.dist_neg = dist_neg
-
+        self.dist_pos = dist_pos
+        self.dist_neg = dist_neg
+        self.model = model
         self.performances_df = performances_df
         self.predictions_df = predictions_df
 
@@ -432,6 +505,8 @@ class Experiments(object):
         dist_None_path = os.path.join(DATA_DIR,  'experiments', self.dataset_name, str(previous_experiment), 'distributions_None_log.json')
         dist_pos_path = os.path.join(DATA_DIR,  'experiments', self.dataset_name, str(previous_experiment), 'distributions_1_log.json')
         dist_neg_path = os.path.join(DATA_DIR,  'experiments', self.dataset_name, str(previous_experiment), 'distributions_0_log.json')
+        model_path = os.path.join(DATA_DIR,  'experiments', self.dataset_name, str(previous_experiment), 'best_model.pt')
+
 
         #---------------- Loading Experiment  ----------------#
 
@@ -531,6 +606,21 @@ class Experiments(object):
             self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
             self.performance_df = pd.DataFrame(self.performances_df, index=[0])
 
+            if os.path.isfile(model_path):
+                
+                if self.use_missing_indicator_variables :
+                    NAM_DEFAULT_PARAMETERS['model']['num_features'] = 4
+                else:
+                    NAM_DEFAULT_PARAMETERS['model']['num_features'] = 2
+                self.model = NAM(**NAM_DEFAULT_PARAMETERS['model'])
+                self.model = self.model.double()
+                self.model.load_state_dict(torch.load(model_path))
+                self.model.eval()
+            else:
+                raise ValueError("No model stored for this experiment.")
+        
+            print("This experiemnt did not have the best model saved at that time, sorry! Re-do experiment.")
+
         print("Experiment {} loaded successfully! :-)".format(previous_experiment))
         return  
 
@@ -564,7 +654,10 @@ class Experiments(object):
 
         if not os.path.isdir(os.path.join(DATA_DIR, 'experiments')):
             os.mkdir(os.path.join(DATA_DIR, 'experiments'))
-            
+
+        if not os.path.isdir(os.path.join(DATA_DIR, 'tmp')):
+            os.mkdir(os.path.join(DATA_DIR, 'tmp'))  
+
         # Create dataset experiment folder  if not already created
         if not os.path.isdir(os.path.join(DATA_DIR, 'experiments', self.dataset_name)):
             os.mkdir(os.path.join(DATA_DIR, 'experiments', self.dataset_name))
@@ -608,6 +701,7 @@ class Experiments(object):
 
 
         replicates_results = []
+        best_roc_auc = 0
         for i in range(NAM_DEFAULT_PARAMETERS['num_replicates']):      
             print('\t===== Replicate no. {} =====\n'.format(i + 1)) if (self.debug or self.verbosity > 1)  else None
 
@@ -648,8 +742,31 @@ class Experiments(object):
 
             replicates_results.append(res)
 
+            # Save best model by computing auroc
+            y_true = res['y_true'].to_numpy(); y_pred = res['y_pred'].to_numpy()
+            fpr_auc, tpr_auc, _ = roc_curve(y_true, y_pred)      
+            roc_auc = auc(fpr_auc, tpr_auc)  
+            if roc_auc > best_roc_auc:
+                best_roc_auc = roc_auc
+
+                if self.save_experiment:
+                    torch.save(model.state_dict(), os.path.join(self.experiment_path, 'best_model.pt'))
+                else:
+                    torch.save(model.state_dict(), os.path.join(DATA_DIR, 'tmp', 'best_model.pt'))
 
 
+        # Finally load the best model
+        
+
+        self.model = NAM(**NAM_DEFAULT_PARAMETERS['model'])
+        self.model = self.model.double()
+        if self.save_experiment:
+            self.model.load_state_dict(torch.load(os.path.join(self.experiment_path, 'best_model.pt')))
+        else:
+            self.model.load_state_dict(torch.load(os.path.join(DATA_DIR, 'tmp', 'best_model.pt')))
+
+        self.model.eval() 
+        
         return  pd.concat(replicates_results)
 
     def _predict_map(self):
@@ -742,5 +859,23 @@ class Experiments(object):
         print("Sanity check: number of predictions: {} == {}: Num samples\n".format(len(arr), self.dataset.y_test.shape[0])) if (self.debug or self.verbosity > 1)  else None
 
         self.dataset.y_pred = y_pred
+
+        return
+
+    def _predict_nam(self):
+    
+        if self.use_missing_indicator_variables:
+            features = ['X_1', 'X_2', 'Z_1', 'Z_2']
+            X_test = np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
+        else:
+            features = ['X_1', 'X_2']
+            X_test = self.dataset.X_test
+
+        y_test = self.dataset.y_test.squeeze()
+
+        # Create the PyTorch Datasets
+        data_test = TabularData(X=X_test, y=y_test) 
+
+        self.dataset.y_pred, _ = eval_model(self.model, data_test)
 
         return

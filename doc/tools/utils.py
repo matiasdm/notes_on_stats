@@ -50,11 +50,13 @@ def create_dataset(name, num_samples=10, ratio_of_missing_values=.5, imbalance_r
     # Generate the negative examples
     ################################
     if name=='moons':
-        data = datasets.make_moons(n_samples=int(2*(1-imbalance_ratio)*n), noise=.05)
+        data = datasets.make_moons(n_samples=int(2*imbalance_ratio*n), noise=.05)
     elif name=='circles':
-        data = datasets.make_circles(n_samples=int(2*(1-imbalance_ratio)*n), factor=.5, noise=.05)
+        data = datasets.make_circles(n_samples=int(2*imbalance_ratio*n), factor=.5, noise=.05)
+    elif name=='blobs':
+        data = datasets.make_blobs(n_samples=n, random_state=8)
     else:
-        raise ValueError("Please use 'moons' or 'circles' datasets.") 
+        raise ValueError("Please use 'moons', 'circles', or 'blobs' datasets.") 
     
     X_all, labels = data  # keep the 2D samples 
 

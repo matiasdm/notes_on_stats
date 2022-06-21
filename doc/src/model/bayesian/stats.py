@@ -44,7 +44,6 @@ def feature_values_positive_to_negative_ratio(Xp=None, Xn=None, x_range=None, y_
     elif Xp.shape[1]==2:
         return feature_values_positive_to_negative_ratio_2D(Xp=Xp, Xn=Xn, verbose=verbose, x_range=x_range, y_range=y_range, num_bins=num_bins)
 
-
 def feature_values_positive_to_negative_ratio_1D(Xp=None, Xn=None, x_range=None, num_bins=50, verbose=1):
     """
     This functions computes the ratio 
@@ -95,8 +94,6 @@ def feature_values_positive_to_negative_ratio_1D(Xp=None, Xn=None, x_range=None,
         plt.xlabel('X'); plt.ylabel('Q'); plt.title('$Q = log_{10}( P(X|y=1)/P(X|y=-1) )$'); 
         
     return Q
-
-
 
 def feature_values_positive_to_negative_ratio_2D(Xp=None, Xn=None, x_range=None, y_range=None, num_bins=50, verbose=1):
     """
@@ -172,7 +169,6 @@ def feature_values_positive_to_negative_ratio_2D(Xp=None, Xn=None, x_range=None,
         plt.show()
     return Q
 
-
 def define_colormap(min_value=-1., max_value=1., zero=0., num_tones=10):
     """
     This is a shortcut to color quantities in tones of blue and orange. In this "ASD" screening examples, we associated orange tones with risk of ASD and blue tones with indications of TD. This function is just to simply this color mapping across different experiments. Zero is the "neutral value", and is mapped to the color white. Max value is the larges value an ASD risk factor can take, this value (and any value above this value) is mapped to the darkest orange. Min value is the lower value the risk indicator can take, and any value lower or equal is mapped to the darkest blue tone. This function returns a mapping function that you can use to compute the color of each new feature values. For example:
@@ -206,7 +202,6 @@ def define_colormap(min_value=-1., max_value=1., zero=0., num_tones=10):
 
 ############## Kernel_based_pdf_estimation imputing the missing values 
 
-
 def kernel_based_pdf_estimation(X,x=None,h=1,verbose=0):
     """
     Estimate the pdf distribution of "X" at "x" using the set of observations X[i,:]. x has lenght k (the dimension of the problem), X has shape nxk (n observations of dimension k). X can have missing values which should be filled with np.nan. A Kernel approximation is computed when the coordinates of the observations are know. If a coordinate is unknown, the contribution of this term is replaced by a weighed average prior computed from the subset of observation for which we have complete data. . 
@@ -228,7 +223,6 @@ def kernel_based_pdf_estimation(X,x=None,h=1,verbose=0):
     X_prior = X[m,:]
     hat_f = F(X=X, X_prior=X_prior, x=x, h=h)
     return hat_f
-
 
 @jit(nopython=True, parallel=True)
 def F(X=None, X_prior=None, x=None, h=1, verbose=0):
@@ -299,8 +293,6 @@ def f_xi(X_prior, X_i, x, h):
             
             hat_fi *= hat_fip    
     return hat_fi
-
-
 
 ############## Weighted scheme data imputation            
 

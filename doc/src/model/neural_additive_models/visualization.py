@@ -99,6 +99,7 @@ def plot_shape_functions(results, features,  axes=None, ncols=4, start_axes_plot
 
         else:
             x.plot.hist(alpha = .15, 
+                        bins=20,
                         ax = twin)
         twin.set_ylabel('frequnecy')
 

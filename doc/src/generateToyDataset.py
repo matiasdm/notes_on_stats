@@ -129,6 +129,9 @@ class DatasetGenerator(object):
         self.y_train = None
         self.y_test = None
 
+        # Prediciton on the test set
+        self.y_pred = None
+
 
     def __call__(self):
         return repr(self)
@@ -160,7 +163,6 @@ class DatasetGenerator(object):
         self.impute_data()
         
         return
-
 
     def impute_data(self):
         """
@@ -283,7 +285,7 @@ class DatasetGenerator(object):
                     
         elif self.missingness_parameters['missingness_mechanism'] == 'MAR':
 
-            if  self.missingness_parameters['missing_first_quarter']: 
+            if self.missingness_parameters['missing_first_quarter']: 
 
                 # Making sure that the total amount of missing coordinate does not exceed the threshold
                 while not self.met_missingness_rate() and excedded_time < MAX_TRY_MISSSINGNESS:
@@ -291,7 +293,7 @@ class DatasetGenerator(object):
                     # Simulate missing samples
                     for i in range(self._X.shape[0]):  # randomly remove features
 
-                        if self._X_raw[i,0] > 0 and self._X_raw[i,1] > 0:
+                        if (self.dataset_name!= 'blobs' and self._X_raw[i,1] > 0 and self._X_raw[i,1] > 0) or (self.dataset_name== 'blobs' and self._X_raw[i,1] > 0):
 
                             if self.missingness_parameters['missing_X1'] and np.random.random() < self.missingness_parameters['ratio_of_missing_values']:  
                                 # equal probability
@@ -334,7 +336,7 @@ class DatasetGenerator(object):
                         # Simulate missing samples
                         for i in range(self._X.shape[0]):  # randomly remove features
                             
-                            if self._y[i]==label and self._X_raw[i,0] > 0 and self._X_raw[i,1] > 0:
+                            if (self.dataset_name!= 'blobs' and self._y[i]==label and self._X_raw[i,0] > 0 and self._X_raw[i,1] > 0) or (self.dataset_name== 'blobs' and self._y[i]==label and self._X_raw[i,1] > 0):
 
                                 if self.missingness_parameters['missing_X1'] and np.random.random()  < self.missingness_parameters['ratio_missing_per_class'][label]:
                                     # equal probability
@@ -350,6 +352,7 @@ class DatasetGenerator(object):
             else:
                 # Making sure that the total amount of missing coordinate does not exceed the threshold
                 while not self.met_missingness_rate(label=0) and not self.met_missingness_rate(label=1) and excedded_time < MAX_TRY_MISSSINGNESS:
+
                     for label in [0, 1]:
                         
                             # Simulate missing samples
@@ -441,7 +444,7 @@ class DatasetGenerator(object):
     def get_data(self):
         return self.X, self.Z, self.y
         
-    def plot(self, verbosity=1, ax1=None, ax2=None, title=True):
+    def plot(self, ax1=None, ax2=None, title=True, verbosity=1):
 
         colors = [self.cmap[0] if l==1 else self.cmap[1] for l in self.y_train]
 
@@ -467,17 +470,19 @@ class DatasetGenerator(object):
 
         # Plot the training ans test sets
         ax1.scatter(self._X_train[:,0], self._X_train[:,1], c=colors);ax1.axis('off')
-        ax2.scatter(self._X_test[:,0], self._X_test[:,1], c=self.cmap[0]);ax2.axis('off')
 
         ax1.scatter(train_df.query(" `Z_1`==0 & `Z_2`==1 ")['X_1'].to_list(), train_df.query(" `Z_1`==0 & `Z_2`==1 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X1 ({})'.format(len(train_df.query(" `Z_1`==0 & `Z_2`==1 "))))
         ax1.scatter(train_df.query(" `Z_1`==1 & `Z_2`==0 ")['X_1'].to_list(), train_df.query(" `Z_1`==1 & `Z_2`==0 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X2 ({})'.format(len(train_df.query(" `Z_1`==1 & `Z_2`==0 "))))
         ax1.scatter(train_df.query(" `Z_1`==0 & `Z_2`==0 ")['X_1'].to_list(), train_df.query(" `Z_1`==0 & `Z_2`==0 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing both ({})'.format(len(train_df.query(" `Z_1`==0 & `Z_2`==0 "))))
         ax1.legend(prop={'size':10}, loc='lower left')
 
-        ax2.scatter(test_df.query(" `Z_1`==0 & `Z_2`==1 ")['X_1'].to_list(), test_df.query(" `Z_1`==0 & `Z_2`==1 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X1 ({})'.format(len(test_df.query(" `Z_1`==0 & `Z_2`==1 "))))
-        ax2.scatter(test_df.query(" `Z_1`==1 & `Z_2`==0 ")['X_1'].to_list(), test_df.query(" `Z_1`==1 & `Z_2`==0 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X2 ({})'.format(len(test_df.query(" `Z_1`==1 & `Z_2`==0 "))))
-        ax2.scatter(test_df.query(" `Z_1`==0 & `Z_2`==0 ")['X_1'].to_list(), test_df.query(" `Z_1`==0 & `Z_2`==0 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing both ({})'.format(len(test_df.query(" `Z_1`==0 & `Z_2`==0 "))))
-        ax2.legend(prop={'size':10}, loc='lower left')
+        if ax2 is not None: 
+
+            ax2.scatter(self._X_test[:,0], self._X_test[:,1], c=colors);ax2.axis('off') 
+            ax2.scatter(test_df.query(" `Z_1`==0 & `Z_2`==1 ")['X_1'].to_list(), test_df.query(" `Z_1`==0 & `Z_2`==1 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X1 ({})'.format(len(test_df.query(" `Z_1`==0 & `Z_2`==1 "))))
+            ax2.scatter(test_df.query(" `Z_1`==1 & `Z_2`==0 ")['X_1'].to_list(), test_df.query(" `Z_1`==1 & `Z_2`==0 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X2 ({})'.format(len(test_df.query(" `Z_1`==1 & `Z_2`==0 "))))
+            ax2.scatter(test_df.query(" `Z_1`==0 & `Z_2`==0 ")['X_1'].to_list(), test_df.query(" `Z_1`==0 & `Z_2`==0 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing both ({})'.format(len(test_df.query(" `Z_1`==0 & `Z_2`==0 "))))
+            ax2.legend(prop={'size':10}, loc='lower left')
 
         return ax1, ax2
 
@@ -532,7 +537,7 @@ class DatasetGenerator(object):
                                             'missing_X1' : True,
                                             'missing_X2' : True,
                                             'missing_first_quarter' : True,
-                                            'ratio_missing_per_class' : ratio_missing_per_class}  
+                                            'ratio_missing_per_class' : [0, ratio_missing_per_class[1]]}  
 
             self.missingness_description = 'Pattern 5 - MNAR Quarter missing\n({}% for neg. class {}% for pos. class)'.format(int(100*ratio_missing_per_class[0]), int(100*ratio_missing_per_class[1]))
 
@@ -567,12 +572,25 @@ class DatasetGenerator(object):
         # Generate the positive examples
         ################################
         if self.dataset_name=='moons':
-            X_all, labels = datasets.make_moons(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), noise=.05, random_state=self.random_state)
-        elif self.dataset_name=='circles':
-            X_all, labels = datasets.make_circles(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), factor=.5, noise=.05, random_state=self.random_state)
-        else:
-            raise ValueError("Please use 'moons' or 'circles' datasets.") 
+
+            X_all, labels = datasets.make_moons(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), noise=.15, random_state=self.random_state)
         
+        elif self.dataset_name=='circles':
+
+            X_all, labels = datasets.make_circles(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), factor=.5, noise=.15, random_state=self.random_state)
+
+        elif self.dataset_name=='blobs':
+            
+            X_all, labels = datasets.make_blobs(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), centers=[[-1, 0],[1, 0]], cluster_std=.5, random_state=self.random_state)
+
+            idx_out = np.argwhere( (X_all[:,0]>2.45) | (X_all[:,0] < -2.45) | (X_all[:,1]>2.45) | (X_all[:,1] < -2.45) ).squeeze()
+
+            X_all[idx_out], labels[idx_out] = datasets.make_blobs(n_samples=len(idx_out), centers=[[-1, 0],[1, 0]],
+                                                                    cluster_std=.4, random_state=self.random_state)
+
+        else:
+            raise ValueError("Please use 'moons', 'circles', or 'blobs' datasets.")             
+
         # normalize dataset for easier parameter selection
         X_all = StandardScaler().fit_transform(X_all)
 
@@ -590,12 +608,24 @@ class DatasetGenerator(object):
         # Generate the negative examples
         ################################
         if self.dataset_name=='moons':
-            X_all, labels = datasets.make_moons(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), noise=.05, random_state=self.random_state)
-        elif self.dataset_name=='circles':
-            X_all, labels = datasets.make_circles(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), factor=.5, noise=.05, random_state=self.random_state)
-        else:
-            raise ValueError("Please use 'moons' or 'circles' datasets.") 
 
+            X_all, labels = datasets.make_moons(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), noise=.15, random_state=self.random_state)
+
+        elif self.dataset_name=='circles':
+
+            X_all, labels = datasets.make_circles(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), factor=.5, noise=.15, random_state=self.random_state)
+
+        elif self.dataset_name=='blobs':
+
+            X_all, labels = datasets.make_blobs(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), centers=[[-1, 0],[1, 0]], cluster_std=.5, random_state=self.random_state)
+
+            idx_out = np.argwhere( (X_all[:,0]>2.45) | (X_all[:,0] < -2.45) | (X_all[:,1]>2.45) | (X_all[:,1] < -2.45) ).squeeze()
+
+            X_all[idx_out], labels[idx_out] = datasets.make_blobs(n_samples=len(idx_out), centers=[[-1, 0],[1, 0]],
+                                                                    cluster_std=.4, random_state=self.random_state)
+
+        else:
+            raise ValueError("Please use 'moons', 'circles', or 'blobs' datasets.")               
 
         # normalize dataset for easier parameter selection
         X_all = StandardScaler().fit_transform(X_all)

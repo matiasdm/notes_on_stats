@@ -44,7 +44,6 @@ def feature_values_positive_to_negative_ratio(Xp=None, Xn=None, x_range=None, y_
     elif Xp.shape[1]==2:
         return feature_values_positive_to_negative_ratio_2D(Xp=Xp, Xn=Xn, verbose=verbose, x_range=x_range, y_range=y_range, num_bins=num_bins)
 
-
 def feature_values_positive_to_negative_ratio_1D(Xp=None, Xn=None, x_range=None, num_bins=50, verbose=1):
     """
     This functions computes the ratio 
@@ -95,8 +94,6 @@ def feature_values_positive_to_negative_ratio_1D(Xp=None, Xn=None, x_range=None,
         plt.xlabel('X'); plt.ylabel('Q'); plt.title('$Q = log_{10}( P(X|y=1)/P(X|y=-1) )$'); 
         
     return Q
-
-
 
 def feature_values_positive_to_negative_ratio_2D(Xp=None, Xn=None, x_range=None, y_range=None, num_bins=50, verbose=1):
     """
@@ -171,7 +168,6 @@ def feature_values_positive_to_negative_ratio_2D(Xp=None, Xn=None, x_range=None,
         cbar = plt.colorbar(cfset);ax2.set_xlabel('x'); ax2.set_ylabel('y'); ax2.set_title('$Q = log_{10}( P(X|y=1)/P(X|y=-1) )$'); 
         plt.show()
     return Q
-
 
 def define_colormap(min_value=-1., max_value=1., zero=0., num_tones=10):
     """
