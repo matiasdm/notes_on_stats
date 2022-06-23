@@ -53,7 +53,7 @@ class Distributions(object):
     def __call__(self):
         return repr(self)
 
-    def estimate_pdf(self, resolution=20, bandwidth=.2):
+    def estimate_pdf(self, resolution=RESOLUTION, bandwidth=BANDWIDTH):
 
         assert self.dataset.X_train is not None, "/!\. You need to generate missing data first.\n call `experiment.dataset.generate_missing_coordinates(missingness_mechanism='MCAR')` for instance! :-)"
 
@@ -140,20 +140,20 @@ class Distributions(object):
         alpha=.3
 
         # Plot the distributions common to every distributions-based approaches
-        axes[6+shift].imshow(self.f_2_marginal[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[6+shift].set_title("B)\nf(X_2|Z_1=1)")
-        axes[7+shift].imshow(self.f, cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -2.5, 2.5]);axes[7].set_title("C)\nf(X_1, X_2|Z_1=1, Z_2=1)")
-        axes[8+shift].imshow(self.f_1_marginal[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[8+shift].set_title("D)\nf(X_1|Z_2=1)")
+        axes[6+shift].imshow(self.f_2_marginal[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -3, 3]);axes[6+shift].set_title("B)\nf(X_2|Z_1=1)")
+        axes[7+shift].imshow(self.f, cmap=self.cmap, origin='lower', extent=[-3, 3, -3, 3]);axes[7].set_title("C)\nf(X_1, X_2|Z_1=1, Z_2=1)")
+        axes[8+shift].imshow(self.f_1_marginal[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-3, 3, -.5, .5]);axes[8+shift].set_title("D)\nf(X_1|Z_2=1)")
 
         if self.approach == 'multi_distributions':
 
-            axes[5+shift].imshow(self.f_2[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[5+shift].set_title("A)\nf(X_2|Z_1=0)")
+            axes[5+shift].imshow(self.f_2[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -3, 3]);axes[5+shift].set_title("A)\nf(X_2|Z_1=0)")
 
-            axes[9+shift].imshow(self.f_1[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[9+shift].set_title("E)\nf(X_1|Z_2=0)")
+            axes[9+shift].imshow(self.f_1[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-3, 3, -.5, .5]);axes[9+shift].set_title("E)\nf(X_1|Z_2=0)")
             
-            axes[10+shift].imshow(self.f_z1_bar[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[10+shift].set_title("F)\nf(Z_1=0|X_2)")
-            axes[11+shift].imshow(self.f_z1[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -2.5, 2.5]);axes[11+shift].set_title("G)\nf(Z_1=1|X_2)")
-            axes[13+shift].imshow(self.f_z2[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[13+shift].set_title("I)\nf(Z_2=1|X_1)")
-            axes[14+shift].imshow(self.f_z2_bar[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-2.5, 2.5, -.5, .5]);axes[14+shift].set_title("J)\nf(Z_2=0|X_1)")        
+            axes[10+shift].imshow(self.f_z1_bar[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -3, 3]);axes[10+shift].set_title("F)\nf(Z_1=0|X_2)")
+            axes[11+shift].imshow(self.f_z1[:,None].repeat(2, axis=1), cmap=self.cmap, origin='lower', extent=[-.5, .5, -3, 3]);axes[11+shift].set_title("G)\nf(Z_1=1|X_2)")
+            axes[13+shift].imshow(self.f_z2[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-3, 3, -.5, .5]);axes[13+shift].set_title("I)\nf(Z_2=1|X_1)")
+            axes[14+shift].imshow(self.f_z2_bar[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-3, 3, -.5, .5]);axes[14+shift].set_title("J)\nf(Z_2=0|X_1)")        
 
         if predictions_df is not None and self.class_used == 1:
 

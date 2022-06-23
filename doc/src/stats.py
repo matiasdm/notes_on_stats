@@ -202,7 +202,7 @@ def define_colormap(min_value=-1., max_value=1., zero=0., num_tones=10):
 
 
 ############## Weighted scheme data imputation            
-
+#@jit(nopython=True, parallel=True)
 def impute_missing_data(X_train, X_test, method='multi_dimensional_weighting', h=.2):
     """
     Imputation of the missing values of the different rows of X_test based on X_train. 

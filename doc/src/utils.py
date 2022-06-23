@@ -3,6 +3,7 @@ import os
 import sys
 import json
 from glob import glob
+from copy import deepcopy
 
 import numpy as np 
 import matplotlib.pyplot as plt
@@ -127,13 +128,13 @@ def compare_imputation_methods(dataset='None', kernel_bandwidth=.2, num_samples=
     
     print('{} samples created'.format(X.shape[0]))
     plt.figure(figsize=[10,10]); plt.subplot(3,3,1); plt.scatter(X[:,0],X[:,1]); 
-    plt.title('Toy data'); plt.xlim(-2.5, 2.5); plt.ylim(2.5, -2.5); 
+    plt.title('Toy data'); plt.xlim(-3, 3); plt.ylim(2.5, -2.5); 
     plt.xticks(()); plt.yticks(()); plt.axis('equal'); plt.axis('off')
 
     # Ground truth
     from sklearn.neighbors import KernelDensity
     kde = KernelDensity(kernel='gaussian', bandwidth=h).fit(Xgt)
-    xygrid = np.meshgrid(np.linspace(-2.5,2.5,resolution),np.linspace(-2.5,2.5,resolution))
+    xygrid = np.meshgrid(np.linspace(-3, 3,resolution),np.linspace(-3, 3,resolution))
     H,W = xygrid[0].shape
     hat_f = np.zeros_like(xygrid[0])  # init. the pdf estimation
     for i in range(H):
@@ -159,7 +160,7 @@ def compare_imputation_methods(dataset='None', kernel_bandwidth=.2, num_samples=
 
 def estimate_pdf_TODO(X=None, method='multi_distributions', resolution=20, bandwidth=None):
     
-    xygrid = np.meshgrid(np.linspace(-2.5,2.5,resolution),np.linspace(-2.5,2.5,resolution))
+    xygrid = np.meshgrid(np.linspace(-3, 3,resolution),np.linspace(-3, 3,resolution))
     H,W = xygrid[0].shape
     hat_f = np.zeros_like(xygrid[0])  # init. the pdf estimation
     h = bandwidth
@@ -260,6 +261,30 @@ def label_bar(rects,ax):
                  fontsize = 11,
                 ha='center', va='bottom')
 
+def check_experiment_already_done(df, **kwargs):
+    
+    narrowed_df=deepcopy(df)
+    for key, value in kwargs.items():
+        
+        if key=='ratio_missing_per_class':
+            if value is None:
+                narrowed_df = narrowed_df[narrowed_df['ratio_missing_per_class_0'].isnull()]
+                narrowed_df = narrowed_df[narrowed_df['ratio_missing_per_class_1'].isnull()]
+            else:
+                narrowed_df = narrowed_df[narrowed_df['ratio_missing_per_class_0']==value[0]]
+                narrowed_df = narrowed_df[narrowed_df['ratio_missing_per_class_1']==value[1]]    
+                
+        elif key in ['use_missing_indicator_variables']:
+            narrowed_df = narrowed_df[narrowed_df['use_missing_indicator_variables'].isnull()]
+        
+        else:
+        
+            narrowed_df = narrowed_df[narrowed_df[key]==value]
+            
+        #print(len(narrowed_df), key, value)
+        
+
+
 def create_df():
     
     df = pd.DataFrame(columns = ['dataset_name','experiment_number', 'approach', 'missing_data_handling','imputation_method', 'use_missing_indicator_variables', 
@@ -327,7 +352,7 @@ def create_df():
                         'approach' : experiment_data['approach'],  
                         'missing_data_handling' : dataset_data['missing_data_handling'],  
                         'imputation_method' : dataset_data['imputation_method'],  
-                        'use_missing_indicator_variables': experiment_data['use_missing_indicator_variables'] if 'use_missing_indicator_variables' in experiment_data.keys() else np.nan,   # TODO 
+                        'use_missing_indicator_variables': experiment_data['use_missing_indicator_variables'] if 'use_missing_indicator_variables' in experiment_data.keys() else None,   # TODO 
                         'num_samples' : dataset_data['num_samples'],  
                         'imbalance_ratio' : dataset_data['imbalance_ratio'],  
                         'missingness_pattern' : int(dataset_data['missingness_pattern']),  
@@ -336,8 +361,8 @@ def create_df():
                         'missing_X1' : dataset_data['missingness_parameters']['missing_X1'],  
                         'missing_X2' : dataset_data['missingness_parameters']['missing_X2'],  
                         'missing_first_quarter' : dataset_data['missingness_parameters']['missing_first_quarter'],  
-                        'ratio_missing_per_class_0' : dataset_data['missingness_parameters']['ratio_missing_per_class'][0] if dataset_data['missingness_parameters']['ratio_missing_per_class'] is not None else np.nan,
-                        'ratio_missing_per_class_1' : dataset_data['missingness_parameters']['ratio_missing_per_class'][1] if dataset_data['missingness_parameters']['ratio_missing_per_class'] is not None else np.nan,
+                        'ratio_missing_per_class_0' : dataset_data['missingness_parameters']['ratio_missing_per_class'][0] if dataset_data['missingness_parameters']['ratio_missing_per_class'] is not None else None,
+                        'ratio_missing_per_class_1' : dataset_data['missingness_parameters']['ratio_missing_per_class'][1] if dataset_data['missingness_parameters']['ratio_missing_per_class'] is not None else None,
                         'resolution' : experiment_data['resolution'],
                         'bandwidth' : experiment_data['bandwidth'],
                         'auc' : experiment_data['performances_df']['Area Under the Curve (AUC)'][0] if 'Area Under the Curve (AUC)' in experiment_data['performances_df'].keys() else np.nan,

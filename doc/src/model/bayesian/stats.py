@@ -338,7 +338,7 @@ def impute_missing_data(X_train, X_test, method='custom_imputations', h=.2):
         # Init. the imputed test set.
         imp_X_test = deepcopy(X_test)
 
-        # TODO: KEep track of the weights ? As a measure of confidence for the imputation ?
+        # TODO: Keep track of the weights ? As a measure of confidence for the imputation ?
 
         for i, X_i in enumerate(X_test):
 
@@ -591,6 +591,125 @@ def f_xi_side_spaces(X_i, x, bandwidth):
     # Define the switch function between coordinates. It is needed as if X1 is missing, we need to build the distribution of x_2 knowing xi is missing, so the other line...
     # The switch function in general should send 0 to 1 and 1 to 0 in 2D. In 3D, 0 should be sent to [1,2], 1 to [0,2] and 2 to [0,1].
     switch = lambda j: -j+1
+
+    # Since we are using a isomorph kernel, each axis can be handeled independently. 
+    hat_fi = 1
+
+    hat_fi_0 = 0
+    hat_fi_1 = 0
+    hat_fi_2 = 0
+
+    # Handle the case where both are missing
+    if np.isnan(X_i[0]) and np.isnan(X_i[1]):
+        hat_fi_0 = 1 
+
+    # Handle the case where both known
+    elif not np.isnan(X_i[0]) and not np.isnan(X_i[1]):
+        for j in range(k):
+            # We can compute the contribution of the jth coordinate using the standard term
+            hat_fi *= 1/bandwidth * K( (x[j]-X_i[j])/bandwidth )
+
+    # Handle the case where X1 is missing
+    elif np.isnan(X_i[0]) and not np.isnan(X_i[1]):
+
+        hat_fi_2 = 1/bandwidth * K( (x[1]-X_i[1]) /bandwidth )
+
+
+    else:
+
+        hat_fi_1 = 1/bandwidth * K( (x[0]-X_i[0])/bandwidth )
+
+    return hat_fi, hat_fi_0, hat_fi_1, hat_fi_2
+
+
+####### Kernel_based_pdf_estimation using the side spaces but doing imputation for the joint probability distributio
+
+def kernel_based_pdf_estimation_side_spaces_imputation(X, x=None, h=.2, verbose=0):
+    """
+    Estimate the pdf distribution of "X" at "x" using the set of observations X[i,:]. x has lenght k (the dimension of the problem), X has shape nxk (n observations of dimension k). 
+    X can have missing values which should be filled with np.nan. A Kernel approximation is computed when the coordinates of the observations are know. 
+    If a coordinate is unknown, the contribution of this term is replaced by a prior on the missingness distribution of that coordinate, computed from all the other samples. *The contribution is limited to the range of values, based on the rest of the dataset.*
+    
+    Example: 
+    X = np.random.random((10,3))  # 10 Observations of a 3d problem
+    X[0,1] = np.nan; X[4,2] = np.nan  # We don't know some entries. 
+    h = .1  # bandwidth of the gaussian kernel
+    x = [0.1, 0.1, 0.1]  # where we want to evaluate the pdf (in the 3d space)
+    pdf_x = kernel_based_pdf_estimation_z_prior_limited_range(X,x=x,h=h,verbose=0)
+    print('The prob at {} is {}.format(x,pdf_x))
+
+    """
+    n = X.shape[0]  # number "training" samples   
+    
+    # Define the set of samples for which all the data is available. 
+    # (This set is used to compute priors)
+    m = [not np.isnan(np.sum(X[i,:])) for i in range(X.shape[0])]
+    X_prior = X[m,:]
+
+    hat_f, hat_f_0, hat_f_1, hat_f_2 = F_side_spaces_imputation(X=X, X_prior=X_prior, x=x, h=h)
+    return hat_f, hat_f_0, hat_f_1, hat_f_2
+
+#@jit(nopython=True, parallel=True)
+def F_side_spaces_imputation(X=None, X_prior=None, x=None, h=.2, verbose=0):
+    """
+    Computation of the pdf at x, using the prior on the missingness meachanism of each features. 
+    Z_priors contains the empirical probability that feature j/k is missing, which are used as prior when the contribution of sample with partially missing data is calculated.
+    """
+
+    # init 
+    hat_f = []
+    hat_f_0 = []
+    hat_f_1 = []  
+    hat_f_2 = []  
+
+    # Compute contribution of each samples to the estimation of the pdf at point x 
+    for X_i in X:
+        contribution_f, contribution_f_0, contribution_f_1, contribution_f_2 = f_xi_side_spaces_imputation(X_i, X_prior, x, h)
+        hat_f.append(contribution_f)
+        hat_f_0.append(contribution_f_0)
+        hat_f_1.append(contribution_f_1)
+        hat_f_2.append(contribution_f_2)
+
+    hat_f = np.mean(np.array(hat_f))   
+    hat_f_0 = np.mean(np.array(hat_f_0))   
+    hat_f_1 = np.mean(np.array(hat_f_1))      
+    hat_f_2 = np.mean(np.array(hat_f_2))  
+
+    return hat_f, hat_f_0, hat_f_1, hat_f_2
+
+@jit(nopython=True, parallel=True)
+def f_xi_side_spaces_imputation(X_i, X_prior=None, x, bandwidth):
+    """
+    Contribution of the X_i sample to the estimation of the pdf of X at x. 
+    Z_priors contains the empirical probability that feature j/k is missing, which are used as prior when the contribution of sample with partially missing data is calculated.
+    """
+    k = X_prior.shape[1]  # dimension of the space of samples. 
+    K = lambda u: 1/np.sqrt(2*np.pi) * np.exp(-u**2 / 2)  # Define the kernel
+    
+    def W(X_1,X_2):
+        """
+        Weight between two samples X_1 and X_2 to measure the proximity of the hyperplane (in the case of missing values.)
+        W(X_1,X_2) = e^( -1/2 1/h**2 sum_k(x_1k-x_2k)**2 )  for k s.t. x_1k and x_2k isn't nan. 
+        """
+        def dist(X_1,X_2):
+            ks = [i for i in range(len(X_1)) if not np.isnan(X_1[i]) and not np.isnan(X_2[i])]
+            if not ks:  # if ks is empty the distance can't be computed
+                return np.nan
+            
+            d = 0
+            for k in ks:
+                x_1 = X_1[k]
+                x_2 = X_2[k]
+                d += (x_1-x_2)**2
+            return np.sqrt(d)
+        
+        d = dist(X_1, X_2)
+        if np.isnan(d):
+            # Is the vectors don't share at least one common coordinate 
+            return 0
+        
+        W = K( d/h )
+        return W
 
     # Since we are using a isomorph kernel, each axis can be handeled independently. 
     hat_fi = 1

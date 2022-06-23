@@ -573,20 +573,54 @@ class DatasetGenerator(object):
         ################################
         if self.dataset_name=='moons':
 
-            X_all, labels = datasets.make_moons(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), noise=.15, random_state=self.random_state)
-        
+            found=False
+            while not found:
+
+                X_all, labels = datasets.make_moons(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), noise=.15, random_state=self.random_state)
+
+                idx_out = np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()
+
+                if len(idx_out) > 0:
+
+                    X_all[idx_out], labels[idx_out] = datasets.make_moons(n_samples=len(idx_out), noise=.15)
+                    
+                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()) == 0:
+                    found=True
+
+
         elif self.dataset_name=='circles':
 
-            X_all, labels = datasets.make_circles(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), factor=.5, noise=.15, random_state=self.random_state)
+            found=False
+            while not found:
+                X_all, labels = datasets.make_circles(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), factor=.5, noise=.15, random_state=self.random_state)
+
+    
+                idx_out = np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()
+
+                if len(idx_out) > 0:
+
+                    X_all[idx_out], labels[idx_out] = datasets.make_circles(n_samples=len(idx_out), factor=.5, noise=.15, random_state=self.random_state)
+                
+                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()) == 0:
+                    found=True
+
 
         elif self.dataset_name=='blobs':
-            
-            X_all, labels = datasets.make_blobs(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), centers=[[-1, 0],[1, 0]], cluster_std=.5, random_state=self.random_state)
 
-            idx_out = np.argwhere( (X_all[:,0]>2.45) | (X_all[:,0] < -2.45) | (X_all[:,1]>2.45) | (X_all[:,1] < -2.45) ).squeeze()
+            found=False
+            while not found:
+                
+                X_all, labels = datasets.make_blobs(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), centers=[[-1, 0],[1, 0]], cluster_std=.3, random_state=self.random_state)
 
-            X_all[idx_out], labels[idx_out] = datasets.make_blobs(n_samples=len(idx_out), centers=[[-1, 0],[1, 0]],
-                                                                    cluster_std=.4, random_state=self.random_state)
+                idx_out = np.argwhere( (X_all[:,0]>2.4) | (X_all[:,0] < -2.4) | (X_all[:,1]>2.4) | (X_all[:,1] < -2.4) ).squeeze()
+
+                if len(idx_out) > 0:
+    
+                    X_all[idx_out], labels[idx_out] = datasets.make_blobs(n_samples=len(idx_out), centers=[[-1, 0],[1, 0]],
+                                                                        cluster_std=.05)
+
+                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()) == 0:
+                    found=True
 
         else:
             raise ValueError("Please use 'moons', 'circles', or 'blobs' datasets.")             
@@ -609,27 +643,61 @@ class DatasetGenerator(object):
         ################################
         if self.dataset_name=='moons':
 
-            X_all, labels = datasets.make_moons(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), noise=.15, random_state=self.random_state)
+            found=False
+            while not found:
+
+                X_all, labels = datasets.make_moons(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), noise=.15, random_state=self.random_state)
+
+                idx_out = np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()
+
+                if len(idx_out) > 0:
+    
+                    X_all[idx_out], labels[idx_out] = datasets.make_moons(n_samples=len(idx_out), noise=.15)
+                
+                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()) == 0:
+                    found=True
 
         elif self.dataset_name=='circles':
 
-            X_all, labels = datasets.make_circles(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), factor=.5, noise=.15, random_state=self.random_state)
+            found=False
+            while not found:
+
+                X_all, labels = datasets.make_circles(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), factor=.5, noise=.15, random_state=self.random_state)
+
+                idx_out = np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()
+
+                if len(idx_out) > 0:
+    
+                    X_all[idx_out], labels[idx_out] = datasets.make_circles(n_samples=len(idx_out), factor=.5, noise=.15, random_state=self.random_state)
+                
+                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()) == 0:
+                    found=True
+
+
 
         elif self.dataset_name=='blobs':
 
-            X_all, labels = datasets.make_blobs(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), centers=[[-1, 0],[1, 0]], cluster_std=.5, random_state=self.random_state)
+            found=False
+            while not found:
 
-            idx_out = np.argwhere( (X_all[:,0]>2.45) | (X_all[:,0] < -2.45) | (X_all[:,1]>2.45) | (X_all[:,1] < -2.45) ).squeeze()
+                X_all, labels = datasets.make_blobs(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), centers=[[-1, 0],[1, 0]], cluster_std=.3, random_state=self.random_state)
 
-            X_all[idx_out], labels[idx_out] = datasets.make_blobs(n_samples=len(idx_out), centers=[[-1, 0],[1, 0]],
-                                                                    cluster_std=.4, random_state=self.random_state)
+                idx_out = np.argwhere( (X_all[:,0]>2.4) | (X_all[:,0] < -2.4) | (X_all[:,1]>2.4) | (X_all[:,1] < -2.4) ).squeeze()
+
+                if len(idx_out) > 0:
+    
+                    X_all[idx_out], labels[idx_out] = datasets.make_blobs(n_samples=len(idx_out), centers=[[-1, 0],[1, 0]],
+                                                                        cluster_std=.05, random_state=self.random_state)
+
+                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()) == 0:
+                    found=True
 
         else:
             raise ValueError("Please use 'moons', 'circles', or 'blobs' datasets.")               
 
         # normalize dataset for easier parameter selection
         X_all = StandardScaler().fit_transform(X_all)
-
+        
         # Select the negative examples
         X_all = X_all[np.argwhere(labels==0).squeeze()]
 

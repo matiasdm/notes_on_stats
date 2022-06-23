@@ -112,10 +112,9 @@ def create_dataset(name, num_samples=10, ratio_of_missing_values=.5, imbalance_r
     else:
         return X, Xgt
 
-
 def estimate_pdf(X=None, method='our', resolution=20, bandwidth=None):
 
-    xygrid = np.meshgrid(np.linspace(-2.5,2.5,resolution),np.linspace(-2.5,2.5,resolution))
+    xygrid = np.meshgrid(np.linspace(-3, 3,resolution),np.linspace(-3, 3,resolution))
     H,W = xygrid[0].shape
     hat_f = np.zeros_like(xygrid[0])  # init. the pdf estimation
     h = bandwidth
@@ -147,7 +146,7 @@ def estimate_pdf(X=None, method='our', resolution=20, bandwidth=None):
         # Compute the space mask to be sure not to add contribution on expty space, based on the resolution of the space
         m = [not np.isnan(np.sum(X[i,:])) for i in range(X.shape[0])]
         X_prior = X[m,:]
-        hist2d, _, _ = np.histogram2d(X_prior[:,0], X_prior[:,1], bins=[np.linspace(-2.5,2.5,resolution), np.linspace(-2.5,2.5,resolution)])
+        hist2d, _, _ = np.histogram2d(X_prior[:,0], X_prior[:,1], bins=[np.linspace(-3, 3,resolution), np.linspace(-3, 3,resolution)])
         hist2d_up = np.concatenate([np.concatenate([hist2d, np.zeros((1, W-1))], axis=0), np.zeros((H, 1))], axis=1)
         mask_space = hist2d_up>0
         for i in range(H):
@@ -228,9 +227,6 @@ def estimate_pdf(X=None, method='our', resolution=20, bandwidth=None):
 
     return hat_f
 
-
-
-
 def compare_imputation_methods(dataset='None', kernel_bandwidth=.2, num_samples=100, ratio_of_missing_values=.7, imbalance_ratio=.5, resolution=20, methods=None):
     
     h = kernel_bandwidth
@@ -245,13 +241,13 @@ def compare_imputation_methods(dataset='None', kernel_bandwidth=.2, num_samples=
     
     print('{} samples created'.format(X.shape[0]))
     plt.figure(figsize=[10,10]); plt.subplot(3,3,1); plt.scatter(X[:,0],X[:,1]); 
-    plt.title('Toy data'); plt.xlim(-2.5, 2.5); plt.ylim(2.5, -2.5); 
+    plt.title('Toy data'); plt.xlim(-3, 3); plt.ylim(2.5, -2.5); 
     plt.xticks(()); plt.yticks(()); plt.axis('equal'); plt.axis('off')
 
     # Ground truth
     from sklearn.neighbors import KernelDensity
     kde = KernelDensity(kernel='gaussian', bandwidth=h).fit(Xgt)
-    xygrid = np.meshgrid(np.linspace(-2.5,2.5,resolution),np.linspace(-2.5,2.5,resolution))
+    xygrid = np.meshgrid(np.linspace(-3, 3,resolution),np.linspace(-3, 3,resolution))
     H,W = xygrid[0].shape
     hat_f = np.zeros_like(xygrid[0])  # init. the pdf estimation
     for i in range(H):
@@ -273,7 +269,6 @@ def compare_imputation_methods(dataset='None', kernel_bandwidth=.2, num_samples=
         plt.title('{} error {:2.5f}'.format(method,1e6*l2diff))
     
     return
-
 
 def split_dataset(X, y, proportion_train):
 
@@ -331,7 +326,6 @@ def my_classification_report(y_true, y_pred, ax=None, verbose=False):
             print("  {0:70}\t {1}".format(item, value))
         
     return ax, pd.DataFrame(performances_metrics, index=['0'])
-
 
 def performance(X_test, y_true, y_pred, verbose=True):
     

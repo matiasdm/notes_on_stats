@@ -14,7 +14,7 @@ from const import *
 
 def estimate_pdf(X=None, approach='multi_distributions', imputation_method='multi_dimensional_weighting', resolution=20, bandwidth=None):
 
-    xygrid = np.meshgrid(np.linspace(-2.5,2.5,resolution),np.linspace(-2.5,2.5,resolution))
+    xygrid = np.meshgrid(np.linspace(-3, 3,resolution),np.linspace(-3, 3,resolution))
     H,W = xygrid[0].shape
     hat_f = np.zeros_like(xygrid[0])  # init. the pdf estimation
     h = bandwidth
@@ -87,7 +87,7 @@ def estimate_pdf(X=None, approach='multi_distributions', imputation_method='mult
             # Compute the space mask to be sure not to add contribution on expty space, based on the resolution of the space
             m = [not np.isnan(np.sum(X[i,:])) for i in range(X.shape[0])]
             X_prior = X[m,:]
-            hist2d, _, _ = np.histogram2d(X_prior[:,0], X_prior[:,1], bins=[np.linspace(-2.5,2.5,resolution), np.linspace(-2.5,2.5,resolution)])
+            hist2d, _, _ = np.histogram2d(X_prior[:,0], X_prior[:,1], bins=[np.linspace(-3, 3,resolution), np.linspace(-3, 3,resolution)])
             hist2d_up = np.concatenate([np.concatenate([hist2d, np.zeros((1, W-1))], axis=0), np.zeros((H, 1))], axis=1)
             mask_space = hist2d_up>0
             for i in range(H):

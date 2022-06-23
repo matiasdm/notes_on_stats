@@ -775,7 +775,7 @@ class Experiments(object):
         #  Prediction using maximum likelihood estimation
         #################################################################
 
-        _, step = np.linspace(-2.5,2.5, self.dist_pos.resolution, retstep=True)
+        _, step = np.linspace(-3, 3, self.dist_pos.resolution, retstep=True)
 
         # Contains for each sample of the Test set, the corresponding x and y index coordinates, in the matrix of the 2D pdf... 
         coord_to_index = np.floor_divide(self.dataset.X_test+2.5, step)
@@ -800,13 +800,13 @@ class Experiments(object):
         else:
             y_pred[X_indexes_none_known] = np.array( len(X_indexes_none_known) * [int(self.dist_pos.f_0  > self.dist_neg.f_0)])
 
-        arr.extend(X_indexes_none_known)
+        arr.extend(list(X_indexes_none_known))
 
 
         #----------- Treat the case of when both coordinates are known
 
         # Index of the samples in the test set where both first coordinates are known 
-        X_indexes_both_known = np.argwhere((~np.isnan(coord_to_index)).sum(axis=1)==2).squeeze(); arr.extend(X_indexes_both_known)
+        X_indexes_both_known = np.argwhere((~np.isnan(coord_to_index)).sum(axis=1)==2).squeeze(); arr.extend(list(X_indexes_both_known))
 
         # Coordinates of indexes in the feature space of the samples in the test set where both first coordinates are known 
         hat_f_coordinates = coord_to_index[X_indexes_both_known].astype(int)
@@ -822,7 +822,7 @@ class Experiments(object):
         #----------- Treat the case of when only the first coordinate is known
 
         # Index of the samples in the test set where only the first coordinate is known 
-        X_indexes_first_known = np.argwhere(~np.isnan(coord_to_index[:,0]) & np.isnan(coord_to_index[:,1])).squeeze(); arr.extend(X_indexes_first_known)
+        X_indexes_first_known = np.argwhere(~np.isnan(coord_to_index[:,0]) & np.isnan(coord_to_index[:,1])).squeeze(); arr.extend(list(X_indexes_first_known))
 
         # Coordinates of index in the feature space of the samples in the test set where only the first coordinate is known 
         hat_f_coordinates = coord_to_index[X_indexes_first_known][:,0].astype(int)
@@ -840,7 +840,7 @@ class Experiments(object):
 
 
         # Index of the samples in the test set where only the first coordinate is known 
-        X_indexes_second_known = np.argwhere(np.isnan(coord_to_index[:,0]) & ~np.isnan(coord_to_index[:,1])).squeeze(); arr.extend(X_indexes_second_known)
+        X_indexes_second_known = np.argwhere(np.isnan(coord_to_index[:,0]) & ~np.isnan(coord_to_index[:,1])).squeeze(); arr.extend(list(X_indexes_second_known))
 
         # Coordinates of index in the feature space of the samples in the test set where only the first coordinate is known 
         hat_f_coordinates = coord_to_index[X_indexes_second_known][:,1].astype(int)
