@@ -677,8 +677,8 @@ def F_side_spaces_imputation(X=None, X_prior=None, x=None, h=.2, verbose=0):
 
     return hat_f, hat_f_0, hat_f_1, hat_f_2
 
-@jit(nopython=True, parallel=True)
-def f_xi_side_spaces_imputation(X_i, X_prior=None, x, bandwidth):
+#@jit(nopython=True, parallel=True)
+def f_xi_side_spaces_imputation(X_i, X_prior, x, bandwidth):
     """
     Contribution of the X_i sample to the estimation of the pdf of X at x. 
     Z_priors contains the empirical probability that feature j/k is missing, which are used as prior when the contribution of sample with partially missing data is calculated.
@@ -708,7 +708,7 @@ def f_xi_side_spaces_imputation(X_i, X_prior=None, x, bandwidth):
             # Is the vectors don't share at least one common coordinate 
             return 0
         
-        W = K( d/h )
+        W = K( d/bandwidth)
         return W
 
     # Since we are using a isomorph kernel, each axis can be handeled independently. 
@@ -730,12 +730,39 @@ def f_xi_side_spaces_imputation(X_i, X_prior=None, x, bandwidth):
 
     # Handle the case where X1 is missing
     elif np.isnan(X_i[0]) and not np.isnan(X_i[1]):
+        # We use the term associate to the j-th coordinate for the 
+        # rest of the samples in the training set (for which the j-th component is know).
+        # The contribution of each term is weighted with the distance to the sample hyperplane.
+        hat_fip = 0
+        Ws = 1e-10  # eps
+        for X_p in X_prior:
+            w_p = W(X_i, X_p)
+            hat_fip += w_p * 1/bandwidth * K( (x[0]-X_p[0])/bandwidth )
+            Ws += w_p
+        hat_fip /= Ws
+        
+        hat_fi *= hat_fip    
 
+
+        # Contribution to the 1D space
         hat_fi_2 = 1/bandwidth * K( (x[1]-X_i[1]) /bandwidth )
 
 
     else:
+        # We use the term associate to the j-th coordinate for the 
+        # rest of the samples in the training set (for which the j-th component is know).
+        # The contribution of each term is weighted with the distance to the sample hyperplane.
+        hat_fip = 0
+        Ws = 1e-10  # eps
+        for X_p in X_prior:
+            w_p = W(X_i, X_p)
+            hat_fip += w_p * 1/bandwidth * K( (x[1]-X_p[1])/bandwidth )
+            Ws += w_p
+        hat_fip /= Ws
+        
+        hat_fi *= hat_fip    
 
+        # Contribution to the 1D space
         hat_fi_1 = 1/bandwidth * K( (x[0]-X_i[0])/bandwidth )
 
     return hat_fi, hat_fi_0, hat_fi_1, hat_fi_2

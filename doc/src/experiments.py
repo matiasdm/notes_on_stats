@@ -500,12 +500,12 @@ class Experiments(object):
             /!\ Not implemented yet  
         """
 
-        experiment_path = os.path.join(DATA_DIR,  'experiments', self.dataset_name, str(previous_experiment), 'experiment_log.json')
-        dataset_path = os.path.join(DATA_DIR,  'experiments', self.dataset_name, str(previous_experiment), 'dataset_log.json')
-        dist_None_path = os.path.join(DATA_DIR,  'experiments', self.dataset_name, str(previous_experiment), 'distributions_None_log.json')
-        dist_pos_path = os.path.join(DATA_DIR,  'experiments', self.dataset_name, str(previous_experiment), 'distributions_1_log.json')
-        dist_neg_path = os.path.join(DATA_DIR,  'experiments', self.dataset_name, str(previous_experiment), 'distributions_0_log.json')
-        model_path = os.path.join(DATA_DIR,  'experiments', self.dataset_name, str(previous_experiment), 'best_model.pt')
+        experiment_path = os.path.join(DATA_DIR,  EXPERIMENT_FOLDER_NAME, self.dataset_name, str(previous_experiment), 'experiment_log.json')
+        dataset_path = os.path.join(DATA_DIR,  EXPERIMENT_FOLDER_NAME, self.dataset_name, str(previous_experiment), 'dataset_log.json')
+        dist_None_path = os.path.join(DATA_DIR,  EXPERIMENT_FOLDER_NAME, self.dataset_name, str(previous_experiment), 'distributions_None_log.json')
+        dist_pos_path = os.path.join(DATA_DIR,  EXPERIMENT_FOLDER_NAME, self.dataset_name, str(previous_experiment), 'distributions_1_log.json')
+        dist_neg_path = os.path.join(DATA_DIR,  EXPERIMENT_FOLDER_NAME, self.dataset_name, str(previous_experiment), 'distributions_0_log.json')
+        model_path = os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, str(previous_experiment), 'best_model.pt')
 
 
         #---------------- Loading Experiment  ----------------#
@@ -652,23 +652,23 @@ class Experiments(object):
         
         # Create experiment folder if not already created
 
-        if not os.path.isdir(os.path.join(DATA_DIR, 'experiments')):
-            os.mkdir(os.path.join(DATA_DIR, 'experiments'))
+        if not os.path.isdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME)):
+            os.mkdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME))
 
         if not os.path.isdir(os.path.join(DATA_DIR, 'tmp')):
             os.mkdir(os.path.join(DATA_DIR, 'tmp'))  
 
         # Create dataset experiment folder  if not already created
-        if not os.path.isdir(os.path.join(DATA_DIR, 'experiments', self.dataset_name)):
-            os.mkdir(os.path.join(DATA_DIR, 'experiments', self.dataset_name))
+        if not os.path.isdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name)):
+            os.mkdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name))
 
-        if not os.path.isdir(os.path.join(DATA_DIR, 'experiments', self.dataset_name, '0')):
-            os.mkdir(os.path.join(DATA_DIR, 'experiments', self.dataset_name, '0'))
+        if not os.path.isdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, '0')):
+            os.mkdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, '0'))
     
         # Looking for the number of the new experiment number
-        experiment_number = np.max([int(os.path.basename(path)) for path in glob(os.path.join(DATA_DIR, 'experiments', self.dataset_name, '*'))])+1
+        experiment_number = np.max([int(os.path.basename(path)) for path in glob(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, '*'))])+1
 
-        experiment_path = os.path.join(DATA_DIR, 'experiments', self.dataset_name, str(experiment_number))
+        experiment_path = os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, str(experiment_number))
         print('Doing experiment {}!'.format(experiment_number))
 
         # Create experiment folder 

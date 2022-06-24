@@ -102,7 +102,7 @@ def estimate_pdf(X=None, approach='multi_distributions', imputation_method='mult
             #  Estimation of f(X_1,X_2|Z_1=1, Z_2=1), f(X_2|Z_1=0,Z_2=1) and f(X_1|Z_1=1,Z_2=0)
             #----------------------------------------------------------------------------------
 
-            from .stats import kernel_based_pdf_estimation_side_spaces
+            from .stats import kernel_based_pdf_estimation_side_spaces_imputation
 
             hat_f_0 = np.zeros_like(xygrid[0])  # init. the pdf estimation
             hat_f_1 = np.zeros_like(xygrid[0])  # init. the pdf estimation
@@ -113,7 +113,7 @@ def estimate_pdf(X=None, approach='multi_distributions', imputation_method='mult
                     x = xygrid[0][i,j]
                     y = xygrid[1][i,j]
                     # Computing contribution on coordinates i, j of hat_f, and coordinate i of hat_f_1 and coordinate j of hat_f_2
-                    hat_f[i,j], hat_f_0[i,j], hat_f_1[i,j], hat_f_2[i,j] =  kernel_based_pdf_estimation_side_spaces(X=X, x=[x, y], h=h)
+                    hat_f[i,j], hat_f_0[i,j], hat_f_1[i,j], hat_f_2[i,j] =  kernel_based_pdf_estimation_side_spaces_imputation(X=X, x=[x, y], h=h)
                     
             # Average the contribution of all i's and j's coordinate
             hat_f_0 = np.mean(hat_f_0)

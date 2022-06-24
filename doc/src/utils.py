@@ -285,7 +285,7 @@ def check_experiment_already_done(df, **kwargs):
         
 
 
-def create_df():
+def create_df(folder_name=EXPERIMENT_FOLDER_NAME):
     
     df = pd.DataFrame(columns = ['dataset_name','experiment_number', 'approach', 'missing_data_handling','imputation_method', 'use_missing_indicator_variables', 
                                 'num_samples', 'imbalance_ratio', 'missingness_pattern', 'missingness_mechanism', 
@@ -294,7 +294,7 @@ def create_df():
                                 'resolution', 'bandwidth', 'estimation_time_0', 'estimation_time_1'])
 
 
-    experiments_paths = glob(os.path.join(DATA_DIR, 'experiments', "*", '*'))
+    experiments_paths = glob(os.path.join(DATA_DIR, folder_name, "*", '*'))
 
 
     for experiment_path in experiments_paths:

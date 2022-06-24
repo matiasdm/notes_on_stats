@@ -4,10 +4,12 @@ import numpy as np
 # Data settings
 ROOT_DIR = '/Users/samperochon/Duke/work/notes_on_stats/doc/'
 DATA_DIR = '/Users/samperochon/Duke/work/notes_on_stats/doc/src/data'
+EXPERIMENT_FOLDER_NAME = 'experiments_24_june'
+
 
 # DATASET PARAMETERS
 DATASET_NAME = 'circles'
-NUM_SAMPLES = 8000
+NUM_SAMPLES = 5000
 IMBALANCE_RATIO = .5
 
 # Missingness default parameters
@@ -22,7 +24,7 @@ DEFAULT_IMPUTATION_METHOD = 'multi_dimensional_weighting'
 DEFAULT_MISSING_VALUE = -5
 
 # pdf estimation default parameters
-RESOLUTION = 30
+RESOLUTION = 20
 BANDWIDTH = .2
 
 # Classification default parameters

@@ -104,7 +104,7 @@ class DatasetGenerator(object):
                                         'allow_missing_both_coordinates' : None}
         
         
-        self.dataset_description = 'Number of samples: {}'.format(self.num_samples)
+        self.dataset_description = 'Number of samples: {} ({} (#+/#-)'.format(self.num_samples, self.imbalance_ratio)
         self.missingness_description = ''
         self.cmap = sns.color_palette(plt.get_cmap('tab20')(np.arange(0,2)))
         self.verbosity = verbosity    
@@ -266,6 +266,7 @@ class DatasetGenerator(object):
         self._X = deepcopy(self._X_raw)
 
         excedded_time = 0
+
                 
         if self.missingness_parameters['missingness_mechanism'] == 'MCAR':
 
@@ -288,7 +289,7 @@ class DatasetGenerator(object):
             if self.missingness_parameters['missing_first_quarter']: 
 
                 # Making sure that the total amount of missing coordinate does not exceed the threshold
-                while not self.met_missingness_rate() and excedded_time < MAX_TRY_MISSSINGNESS:
+                while not self.met_missingness_rate() or excedded_time < MAX_TRY_MISSSINGNESS:
 
                     # Simulate missing samples
                     for i in range(self._X.shape[0]):  # randomly remove features
@@ -309,7 +310,7 @@ class DatasetGenerator(object):
             else:
                 
                 # Making sure that the total amount of missing coordinate does not exceed the threshold
-                while not self.met_missingness_rate() and excedded_time < MAX_TRY_MISSSINGNESS:
+                while not self.met_missingness_rate() or excedded_time < MAX_TRY_MISSSINGNESS:
                 
                     for i in range(self.X.shape[0]):  # randomly remove features
 
@@ -330,7 +331,7 @@ class DatasetGenerator(object):
             if self.missingness_parameters['missing_first_quarter']:
 
                 # Making sure that the total amount of missing coordinate does not exceed the threshold
-                while not self.met_missingness_rate(label=0) and not self.met_missingness_rate(label=1) and excedded_time < MAX_TRY_MISSSINGNESS:
+                while not self.met_missingness_rate(label=0) or not self.met_missingness_rate(label=1) or excedded_time < MAX_TRY_MISSSINGNESS:
                     for label in [0, 1]:
                         
                         # Simulate missing samples
@@ -351,23 +352,23 @@ class DatasetGenerator(object):
                                     
             else:
                 # Making sure that the total amount of missing coordinate does not exceed the threshold
-                while not self.met_missingness_rate(label=0) and not self.met_missingness_rate(label=1) and excedded_time < MAX_TRY_MISSSINGNESS:
+                while not self.met_missingness_rate(label=0) or not self.met_missingness_rate(label=1) or excedded_time < MAX_TRY_MISSSINGNESS:
 
                     for label in [0, 1]:
-                        
-                            # Simulate missing samples
-                            for i in range(self._X.shape[0]):  # randomly remove features
+                    
+                        # Simulate missing samples
+                        for i in range(self._X.shape[0]):  # randomly remove features
+                            if self._y[i]==label:
+                                
 
-                                if self._y[i]==label:
+                                if self.missingness_parameters['missing_X1'] and np.random.random() < self.missingness_parameters['ratio_missing_per_class'][label]:
+                                    self._X[i,0] = np.nan
 
-                                    if self.missingness_parameters['missing_X1'] and np.random.random() < self.missingness_parameters['ratio_missing_per_class'][label]:
-                                        self._X[i,0] = np.nan
+                                if self.missingness_parameters['missing_X2'] and np.random.random() < self.missingness_parameters['ratio_missing_per_class'][label]:
+                                    self._X[i,1] = np.nan 
 
-                                    if self.missingness_parameters['missing_X2'] and np.random.random() < self.missingness_parameters['ratio_missing_per_class'][label]:
-                                        self._X[i,1] = np.nan 
-
-                                if self.met_missingness_rate(label=label): 
-                                    break  
+                            if self.met_missingness_rate(label=label): 
+                                break  
                     excedded_time+=1
 
         if excedded_time == MAX_TRY_MISSSINGNESS:
@@ -401,6 +402,7 @@ class DatasetGenerator(object):
         else:
             print("/!\. No missing data.")
             return True
+
         
         if verbose or self.debug:
             if self.missingness_parameters['missingness_mechanism'] in ['MCAR', 'MAR']:
@@ -410,10 +412,12 @@ class DatasetGenerator(object):
                     print("Class {} - Ratio of number-wise missing data {:.5f} (thres. {})".format(label, np.isnan(self._X[(self._y==label).squeeze()]).sum() /((self._y==label).sum()*missing_dimension), self.missingness_parameters['ratio_missing_per_class'][label]))
         
         if label is None and not return_values:
-            return np.isnan(self._X).sum()/(self.num_samples*missing_dimension) >= self.missingness_parameters['ratio_of_missing_values'] 
-        elif label is None and not return_values:
-            return np.isnan(self._X[(self._y==label).squeeze()]).sum() /((self._y==label).sum()*missing_dimension) >= self.missingness_parameters['ratio_missing_per_class'][label] 
 
+            return np.isnan(self._X).sum()/(self.num_samples*missing_dimension) >= self.missingness_parameters['ratio_of_missing_values'] 
+
+        elif label is not None and not return_values:
+
+            return np.isnan(self._X[(self._y==label).squeeze()]).sum() /((self._y==label).sum()*missing_dimension) >= self.missingness_parameters['ratio_missing_per_class'][label] 
 
         if return_values:
             if self.missingness_parameters['missingness_mechanism'] in ['MCAR', 'MAR']:
@@ -477,6 +481,7 @@ class DatasetGenerator(object):
         ax1.legend(prop={'size':10}, loc='lower left')
 
         if ax2 is not None: 
+            colors = [self.cmap[0] if l==1 else self.cmap[1] for l in self.y_test]
 
             ax2.scatter(self._X_test[:,0], self._X_test[:,1], c=colors);ax2.axis('off') 
             ax2.scatter(test_df.query(" `Z_1`==0 & `Z_2`==1 ")['X_1'].to_list(), test_df.query(" `Z_1`==0 & `Z_2`==1 ")['X_2'].to_list(), c='purple' if self.verbosity==4 else 'r',alpha=.7, label='Missing X1 ({})'.format(len(test_df.query(" `Z_1`==0 & `Z_2`==1 "))))
@@ -539,7 +544,7 @@ class DatasetGenerator(object):
                                             'missing_first_quarter' : True,
                                             'ratio_missing_per_class' : [0, ratio_missing_per_class[1]]}  
 
-            self.missingness_description = 'Pattern 5 - MNAR Quarter missing\n({}% for neg. class {}% for pos. class)'.format(int(100*ratio_missing_per_class[0]), int(100*ratio_missing_per_class[1]))
+            self.missingness_description = 'Pattern 5 - MNAR Quarter missing\n({}% for neg. class {}% for pos. class)'.format(int(0), int(100*ratio_missing_per_class[1]))
 
         elif missingness_pattern==6:
             self.missingness_parameters = {'missingness_mechanism' : 'MNAR', 
@@ -578,13 +583,14 @@ class DatasetGenerator(object):
 
                 X_all, labels = datasets.make_moons(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), noise=.15, random_state=self.random_state)
 
-                idx_out = np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()
+                idx_out = np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) )
 
                 if len(idx_out) > 0:
+                    idx_out = idx_out.squeeze() if len(idx_out)>1 else idx_out
 
                     X_all[idx_out], labels[idx_out] = datasets.make_moons(n_samples=len(idx_out), noise=.15)
                     
-                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()) == 0:
+                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) )) == 0:
                     found=True
 
 
@@ -595,13 +601,13 @@ class DatasetGenerator(object):
                 X_all, labels = datasets.make_circles(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), factor=.5, noise=.15, random_state=self.random_state)
 
     
-                idx_out = np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()
+                idx_out = np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) )
 
                 if len(idx_out) > 0:
-
+                    idx_out = idx_out.squeeze() if len(idx_out)>1 else idx_out
                     X_all[idx_out], labels[idx_out] = datasets.make_circles(n_samples=len(idx_out), factor=.5, noise=.15, random_state=self.random_state)
                 
-                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()) == 0:
+                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) )) == 0:
                     found=True
 
 
@@ -610,16 +616,17 @@ class DatasetGenerator(object):
             found=False
             while not found:
                 
-                X_all, labels = datasets.make_blobs(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), centers=[[-1, 0],[1, 0]], cluster_std=.3, random_state=self.random_state)
+                X_all, labels = datasets.make_blobs(n_samples=int(2*self.imbalance_ratio*(self.num_samples+num_samples_gt)), centers=[[-1, 0],[1, 0]], cluster_std=.5, random_state=self.random_state)
 
-                idx_out = np.argwhere( (X_all[:,0]>2.4) | (X_all[:,0] < -2.4) | (X_all[:,1]>2.4) | (X_all[:,1] < -2.4) ).squeeze()
+                idx_out = np.argwhere( (X_all[:,0]>2.4) | (X_all[:,0] < -2.4) | (X_all[:,1]>2.4) | (X_all[:,1] < -2.4) )
 
                 if len(idx_out) > 0:
-    
+                    idx_out = idx_out.squeeze() if len(idx_out)>1 else idx_out
+
                     X_all[idx_out], labels[idx_out] = datasets.make_blobs(n_samples=len(idx_out), centers=[[-1, 0],[1, 0]],
                                                                         cluster_std=.05)
 
-                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()) == 0:
+                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) )) == 0:
                     found=True
 
         else:
@@ -648,13 +655,13 @@ class DatasetGenerator(object):
 
                 X_all, labels = datasets.make_moons(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), noise=.15, random_state=self.random_state)
 
-                idx_out = np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()
+                idx_out = np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) )
 
                 if len(idx_out) > 0:
-    
+                    idx_out = idx_out.squeeze() if len(idx_out)>1 else idx_out
                     X_all[idx_out], labels[idx_out] = datasets.make_moons(n_samples=len(idx_out), noise=.15)
                 
-                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()) == 0:
+                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) )) == 0:
                     found=True
 
         elif self.dataset_name=='circles':
@@ -664,13 +671,13 @@ class DatasetGenerator(object):
 
                 X_all, labels = datasets.make_circles(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), factor=.5, noise=.15, random_state=self.random_state)
 
-                idx_out = np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()
+                idx_out = np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) )
 
                 if len(idx_out) > 0:
-    
+                    idx_out = idx_out.squeeze() if len(idx_out)>1 else idx_out
                     X_all[idx_out], labels[idx_out] = datasets.make_circles(n_samples=len(idx_out), factor=.5, noise=.15, random_state=self.random_state)
                 
-                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()) == 0:
+                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) )) == 0:
                     found=True
 
 
@@ -680,16 +687,16 @@ class DatasetGenerator(object):
             found=False
             while not found:
 
-                X_all, labels = datasets.make_blobs(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), centers=[[-1, 0],[1, 0]], cluster_std=.3, random_state=self.random_state)
+                X_all, labels = datasets.make_blobs(n_samples=int(2*(1-self.imbalance_ratio)*(self.num_samples+num_samples_gt)), centers=[[-1, 0],[1, 0]], cluster_std=.5, random_state=self.random_state)
 
-                idx_out = np.argwhere( (X_all[:,0]>2.4) | (X_all[:,0] < -2.4) | (X_all[:,1]>2.4) | (X_all[:,1] < -2.4) ).squeeze()
+                idx_out = np.argwhere( (X_all[:,0]>2.4) | (X_all[:,0] < -2.4) | (X_all[:,1]>2.4) | (X_all[:,1] < -2.4) )
 
                 if len(idx_out) > 0:
-    
+                    idx_out = idx_out.squeeze() if len(idx_out)>1 else idx_out
                     X_all[idx_out], labels[idx_out] = datasets.make_blobs(n_samples=len(idx_out), centers=[[-1, 0],[1, 0]],
                                                                         cluster_std=.05, random_state=self.random_state)
 
-                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) ).squeeze()) == 0:
+                if len(np.argwhere( (X_all[:,0]>2.49) | (X_all[:,0] < -2.49) | (X_all[:,1]>2.49) | (X_all[:,1] < -2.49) )) == 0:
                     found=True
 
         else:
