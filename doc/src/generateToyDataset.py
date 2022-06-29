@@ -331,7 +331,7 @@ class DatasetGenerator(object):
             if self.missingness_parameters['missing_first_quarter']:
 
                 # Making sure that the total amount of missing coordinate does not exceed the threshold
-                while not self.met_missingness_rate(label=0) or not self.met_missingness_rate(label=1) or excedded_time < MAX_TRY_MISSSINGNESS:
+                while (not self.met_missingness_rate(label=0) or not self.met_missingness_rate(label=1)) and excedded_time < MAX_TRY_MISSSINGNESS:
                     for label in [0, 1]:
                         
                         # Simulate missing samples
@@ -352,7 +352,7 @@ class DatasetGenerator(object):
                                     
             else:
                 # Making sure that the total amount of missing coordinate does not exceed the threshold
-                while not self.met_missingness_rate(label=0) or not self.met_missingness_rate(label=1) or excedded_time < MAX_TRY_MISSSINGNESS:
+                while (not self.met_missingness_rate(label=0) or not self.met_missingness_rate(label=1)) and excedded_time < MAX_TRY_MISSSINGNESS:
 
                     for label in [0, 1]:
                     
@@ -542,9 +542,9 @@ class DatasetGenerator(object):
                                             'missing_X1' : True,
                                             'missing_X2' : True,
                                             'missing_first_quarter' : True,
-                                            'ratio_missing_per_class' : [0, ratio_missing_per_class[1]]}  
+                                            'ratio_missing_per_class' : [ratio_missing_per_class[0], ratio_missing_per_class[1]]}  
 
-            self.missingness_description = 'Pattern 5 - MNAR Quarter missing\n({}% for neg. class {}% for pos. class)'.format(int(0), int(100*ratio_missing_per_class[1]))
+            self.missingness_description = 'Pattern 5 - MNAR Quarter missing\n({}% for neg. class {}% for pos. class)'.format(int(ratio_missing_per_class[0]), int(100*ratio_missing_per_class[1]))
 
         elif missingness_pattern==6:
             self.missingness_parameters = {'missingness_mechanism' : 'MNAR', 

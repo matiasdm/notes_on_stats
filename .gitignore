@@ -132,3 +132,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 doc/_build/.doctrees/glue_cache.json
+.DS_Store
+.gitignore
+doc/src/data/
