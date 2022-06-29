@@ -5,6 +5,7 @@ import json
 from glob import glob
 from tqdm import tqdm
 from time import time
+import pickle
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,6 +13,10 @@ import pandas as pd
 import seaborn as sns
 
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_curve, auc
+from xgboost import XGBClassifier, plot_importance, plot_tree
+
+import torch
+
 
 # add tools path and import our own tools
 sys.path.insert(0, '../src')
@@ -23,10 +28,12 @@ from generateToyDataset import DatasetGenerator
 from model.bayesian.distributions import Distributions
 
 from model.neural_additive_models.nam import NAM
-from model.neural_additive_models.visualization import plot_roc_curves, plot_shape_functions
+from model.neural_additive_models.visualization import plot_roc_curves_nam, plot_shape_functions
 from model.neural_additive_models.utils import train_model, eval_model
 from model.neural_additive_models.dataset import TabularData
-import torch
+
+from model.xgboost.visualization import plot_roc_curves_xgboost
+
 
 
 class Experiments(object):
@@ -68,12 +75,17 @@ class Experiments(object):
         self.dist = None
         self.dist_pos = None
         self.dist_neg = None
-        self.fitted = False
-
+        
         # NAMs related attributs
         self.model = None
-        self.use_missing_indicator_variables = None
 
+        # XGBoost related attributs
+        self.model = None
+        
+
+        self.use_missing_indicator_variables = None
+        self.fitted = False
+        
         # Interesting byproducts
         self.predictions_df = None
         self.performances_df = None
@@ -135,7 +147,23 @@ class Experiments(object):
             # Through self.dataset.y_pred. Note also this is called when plotting! 
             self.predictions_df = self._train_nam(**kwargs)
 
+        elif self.approach == 'xgboost':
+            
+            self.model = XGBClassifier(use_label_encoder=False, # TODO ADD PLAYING WITH PARAMETERS 
+                                      learning_rate=0.01,
+                                       n_estimators= 1000,
+                                      max_depth = 3,
+                                      verbosity=1,
+                                      objective='binary:logistic',
+                                      eval_metric='auc',
+                                      booster='gbtree',
+                                      tree_method='exact',
+                                      subsample=1,
+                                      colsample_bylevel=.8,
+                                      alpha=0)
 
+            self.predictions_df = self._fit_xgboost(**kwargs)
+            
         self.fitted = True
 
     def predict(self):
@@ -157,114 +185,21 @@ class Experiments(object):
 
             # Compute perf.
             self._performances_nam()
+            
+        elif self.approach == 'xgboost':
+            
+            # Do the prediction with the best model
+            self._predict_xgboost()
 
+            # Compute perf.
+            self._performances_bayesian()
+            
         else:
             raise ValueError("Please use 'single_distribution', 'multi_distributions' or 'nam' approachs.")
         
         if self.save_experiment:
             self.save() 
 
-        return
-
-    def _performances_bayesian(self):
-
-        y_true = self.dataset.y_test.squeeze()
-        y_pred = self.dataset.y_pred
-
-        # Creation of a df for the prediction
-        predictions_df = pd.DataFrame({'X1':self.dataset.X_test[:,0], 
-                      'X2':self.dataset.X_test[:,1], 
-                      'Z1':[1 if not np.isnan(x) else 0 for x in self.dataset.X_test[:,0]],
-                      'Z2': [1 if not np.isnan(x) else 0 for x in self.dataset.X_test[:,1]],
-                      'y_true': y_true, 
-                      'y_pred': y_pred, 
-                      'True Positive': [1 if y_true==1 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                      'True Negative': [1 if y_true==0 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                      'False Positive': [1 if y_true==0 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                      'False Negative': [1 if y_true==1 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                      })
-
-        self.predictions_df = predictions_df
-
-        #Compute metrics of interest  
-        tn, fp, fn, tp = confusion_matrix(y_true, y_pred).ravel()
-
-        acc = (tp + tn) / (tp + tn + fp +  fn)
-        f1 = 2*tp / (2*tp + fp + fn)
-        mcc = (tp*tn - fp*fn) / np.sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))
-        tpr =  tp / (tp+fn)
-        tnr = tn / (tn+fp)
-        ppv = tp / (tp+fp)
-        npv = tn / (tn+fn)
-        fnr = fn / (tp+fn)
-
-        performances_dict = {'Accuracy' : round(acc, 3),
-                            'F1 score (2 PPVxTPR/(PPV+TPR))': round(f1, 3),
-                            'Matthews correlation coefficient (MCC)': round(mcc, 3),
-                            'Sensitivity, recall, hit rate, or true positive rate (TPR)': round(tpr, 3),
-                            'Specificity, selectivity or true negative rate (TNR)': round(tnr, 3),
-                            'Precision or positive predictive value (PPV)': round(ppv, 3),
-                            'Negative predictive value (NPV)': round(npv, 3),
-                            'Miss rate or false negative rate (FNR)': round(fnr, 3),
-                            'False discovery rate (FDR=1-PPV)': round(1-ppv, 3),
-                            'False omission rate (FOR=1-NPV)': round(1-npv, 3)}
-
-        self.performances_df = pd.DataFrame(performances_dict, index=['0'])  
-
-        return 
-
-    def _performances_nam(self):
-        """
-            Create the predictions_df and performances_df based on the dataframe that recap all the results for the replciates. 
-        """
-
-        performances_dict = {'Accuracy' : [],
-                            'F1 score (2 PPVxTPR/(PPV+TPR))': [],
-                            'Matthews correlation coefficient (MCC)': [],
-                            'Sensitivity, recall, hit rate, or true positive rate (TPR)': [],
-                            'Specificity, selectivity or true negative rate (TNR)': [],
-                            'Precision or positive predictive value (PPV)': [],
-                            'Negative predictive value (NPV)': [],
-                            'Miss rate or false negative rate (FNR)': [],
-                            'False discovery rate (FDR=1-PPV)': [],
-                            'False omission rate (FOR=1-NPV)': [],
-                            'Area Under the Curve (AUC)': []}
-
-
-        for _, res in self.predictions_df.groupby('replicate'):
-            y_true = res['y_true'].to_numpy()
-            y_pred = res['y_pred'].to_numpy()
-            
-            tn, fp, fn, tp = confusion_matrix(y_true, y_pred > CLASSIFICATION_THRESHOLD).ravel()
-
-            acc = (tp + tn) / (tp + tn + fp +  fn)
-            f1 = 2*tp / (2*tp + fp + fn)
-            mcc = (tp*tn - fp*fn) / np.sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))
-            tpr =  tp / (tp+fn)
-            tnr = tn / (tn+fp)
-            ppv = tp / (tp+fp)
-            npv = tn / (tn+fn)
-            fnr = fn / (tp+fn)
-            
-            fpr_auc, tpr_auc, _ = roc_curve(y_true, y_pred)      
-            roc_auc = auc(fpr_auc, tpr_auc)    
-
-
-            performances_dict['Accuracy'].append(round(acc, 3))
-            performances_dict['F1 score (2 PPVxTPR/(PPV+TPR))'].append(round(f1, 3))
-            performances_dict['Matthews correlation coefficient (MCC)'].append(round(mcc, 3))
-            performances_dict['Sensitivity, recall, hit rate, or true positive rate (TPR)'].append(round(tpr, 3))
-            performances_dict['Specificity, selectivity or true negative rate (TNR)'].append(round(tnr, 3))
-            performances_dict['Precision or positive predictive value (PPV)'].append(round(ppv, 3))
-            performances_dict['Negative predictive value (NPV)'].append(round(npv, 3))
-            performances_dict['Miss rate or false negative rate (FNR)'].append(round(fnr, 3))
-            performances_dict['False discovery rate (FDR=1-PPV)'].append(round(1-ppv, 3))
-            performances_dict['False omission rate (FOR=1-NPV)'].append(round(1-npv, 3))
-            performances_dict['Area Under the Curve (AUC)'].append(round(roc_auc, 3))
-            
-        # Create the performace df
-        performances_dict = {metric: np.mean(values) for metric, values in performances_dict.items()}
-        self.performances_df = pd.DataFrame(performances_dict, index = [0])
         return
 
     def plot(self):
@@ -282,7 +217,10 @@ class Experiments(object):
         elif self.approach == 'nam':
             
             self._plot_nam()
-        
+            
+        elif self.approach == 'xgboost':
+            
+            self._plot_xgboost()        
         return
 
     def _plot_estimation(self):
@@ -444,6 +382,216 @@ class Experiments(object):
 
         plt.tight_layout();plt.show()
 
+        
+    def _plot_xgboost(self):
+        
+        # Create the pannel 
+        fig_mosaic = """
+                        ABCD
+                        EGHI
+                        FFFF
+                        FFFF
+                    """
+
+        fig, axes = plt.subplot_mosaic(mosaic=fig_mosaic, figsize=(25,18))
+        
+        fig.suptitle("({}) {}\n{}".format(int(self.experiment_number), self.description, self.dataset.missingness_description), y=1.1, weight='bold', fontsize=12)
+
+        # Plot the dataset 
+        axes['A'], axes['B'] = self.dataset.plot(ax1=axes['A'], ax2=axes['B'], title=False)
+        axes['A'].set_title("Training set ({})".format(self.dataset.X_train.shape[0])); axes['B'].set_title("Test set ({})".format(self.dataset.X_test.shape[0]))
+
+        # Plot the performances 
+        cm = confusion_matrix(self.predictions_df['y_true'].to_numpy(), self.predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+        disp.plot(cmap='Blues', ax=axes['C']);disp.im_.colorbar.remove()    
+                                                                                                    
+        # Plot the shapes functions
+        features = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.use_missing_indicator_variables else ['X_1', 'X_2']                                                                               
+
+        # Plot the roc curves
+        axes['D'] = plot_roc_curves_xgboost(self.predictions_df, ax=axes['D']) 
+        
+        # Plot features importance
+        self.model.get_booster().feature_names = features
+        axes['E'] = plot_importance(self.model.get_booster(),  height=0.5, ax = axes['E'])
+        
+        # Plot Tree
+        axes['F'] = plot_tree(self.model.get_booster(), num_trees=self.model.best_iteration, ax=axes['F'])
+        
+        
+
+        y_true = self.dataset.y_test.squeeze()
+        y_pred = (self.dataset.y_pred > CLASSIFICATION_THRESHOLD).astype(int)
+
+        # Creation of a df for the prediction
+        predictions_df = pd.DataFrame({'X1':self.dataset._X_raw[self.dataset.test_index][:,0], 
+                                    'X2':self.dataset._X_raw[self.dataset.test_index][:,1], 
+                                    'Z1':[1 if not np.isnan(x) else 0 for x in self.dataset._X_test[:,0]],
+                                    'Z2': [1 if not np.isnan(x) else 0 for x in self.dataset._X_test[:,1]],
+                                    'Have missing' : [(np.isnan(x).sum()>0).astype(int)  for x in self.dataset._X_test],
+                                    'y_true': y_true, 
+                                    'y_pred': y_pred, 
+                                    'True Positive': [1 if y_true==1 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    'True Negative': [1 if y_true==0 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    'False Positive': [1 if y_true==0 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    'False Negative': [1 if y_true==1 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    })
+
+        alpha=1
+        axes['G'].set_title("Classification result (th={})".format(CLASSIFICATION_THRESHOLD));axes['G'].grid()#;axes['G'].axis('off')
+
+        # Plot the sample points without missing data
+        axes['G'].scatter(predictions_df.query(" `Have missing`==0 and `True Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `True Positive`==1")['X2'],
+                    color='tab:blue', alpha=alpha, label="TP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Positive`==1"))))
+        axes['G'].scatter(predictions_df.query(" `Have missing`==0 and `True Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `True Negative`==1")['X2'],
+                    color='tab:blue', alpha=alpha, label="TN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Negative`==1"))))
+        axes['G'].scatter(predictions_df.query(" `Have missing`==0 and `False Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `False Positive`==1")['X2'],
+                    color='tab:orange', s=100, alpha=alpha, label="FP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Positive`==1"))))
+        axes['G'].scatter(predictions_df.query(" `Have missing`==0 and `False Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `False Negative`==1")['X2'],
+                    color='tab:red', s=100, alpha=alpha, label="FN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Negative`==1"))))
+
+
+        # Plot the sample points without missing data
+        axes['G'].scatter(predictions_df.query(" `Have missing`==1 and `True Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `True Positive`==1")['X2'],
+                    color='tab:blue', facecolors='none', alpha=alpha, label="TP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Positive`==1"))))
+        axes['G'].scatter(predictions_df.query(" `Have missing`==1 and `True Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `True Negative`==1")['X2'],
+                    color='tab:blue', facecolors='none', alpha=alpha, label="TN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Negative`==1"))))
+        axes['G'].scatter(predictions_df.query(" `Have missing`==1 and `False Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `False Positive`==1")['X2'],
+                    color='tab:orange', s=100, facecolors='none', alpha=alpha, label="FP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Positive`==1"))))
+        axes['G'].scatter(predictions_df.query(" `Have missing`==1 and `False Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `False Negative`==1")['X2'],
+                    color='tab:red', s=100, facecolors='none', alpha=alpha, label="FN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Negative`==1"))))
+
+        # Plot the sample points without missing data
+        axes['H'].scatter([-5], [-5],color='tab:blue', alpha=alpha, label="TP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Positive`==1"))))
+        axes['H'].scatter([-5], [-5],color='tab:blue', alpha=alpha, label="TN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Negative`==1"))))
+        axes['H'].scatter([-5], [-5],color='tab:orange', s=100, alpha=alpha, label="FP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Positive`==1"))))
+        axes['H'].scatter([-5], [-5],color='tab:red', s=100, alpha=alpha, label="FN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Negative`==1"))))
+        axes['H'].scatter([-5], [-5],color='tab:blue', facecolors='none', alpha=alpha, label="TP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Positive`==1"))))
+        axes['H'].scatter([-5], [-5],color='tab:blue', facecolors='none', alpha=alpha, label="TN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Negative`==1"))))
+        axes['H'].scatter([-5], [-5],color='tab:orange', s=100, facecolors='none', alpha=alpha, label="FP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Positive`==1"))))
+        axes['H'].scatter([-5], [-5], color='tab:red', s=100, facecolors='none', alpha=alpha, label="FN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Negative`==1"))))
+        axes['H'].set_xlim([0,1]);axes['H'].set_ylim([0,1]);axes['H'].axis('off');axes['H'].legend(loc='center', prop={'size':15})
+
+        #if not self.use_missing_indicator_variables:
+        #    [axes[i].axis('off') for i in [7, 8, 9]]
+        #else:
+        axes['I'].axis('off')
+
+
+        plt.tight_layout();plt.show()
+
+        return 
+
+        
+    def _plot_xgboost_old(self):
+        
+        # Create the pannel 
+        fig, axes = plt.subplots(2, 5, figsize=(25, 8)); axes = axes.flatten()
+        fig.suptitle("({}) {}\n{}".format(int(self.experiment_number), self.description, self.dataset.missingness_description), y=1.1, weight='bold', fontsize=12)
+
+        # Plot the dataset 
+        axes[0], axes[1] = self.dataset.plot(ax1=axes[0], ax2=axes[1], title=False)
+        axes[0].set_title("Training set ({})".format(self.dataset.X_train.shape[0])); axes[1].set_title("Test set ({})".format(self.dataset.X_test.shape[0]))
+
+        # Plot the performances 
+        cm = confusion_matrix(self.predictions_df['y_true'].to_numpy(), self.predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+        disp.plot(cmap='Blues', ax=axes[2]);disp.im_.colorbar.remove()    
+                                                                                                    
+        # Plot the shapes functions
+        features = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.use_missing_indicator_variables else ['X_1', 'X_2']                                                                                              
+
+        # Plot the roc curves
+        axes[3] = plot_roc_curves_xgboost(self.predictions_df, ax=axes[3]) 
+        
+        # Plot features importance
+        self.model.get_booster().feature_names = features
+        axes[5] = plot_importance(self.model.get_booster(),  height=0.5, ax = axes[5])
+        
+        # Plot Tree
+        axes[6] = plot_tree(self.model.get_booster(), num_trees=self.model.best_iteration, ax=axes[6])
+        
+        
+
+        y_true = self.dataset.y_test.squeeze()
+        y_pred = (self.dataset.y_pred > CLASSIFICATION_THRESHOLD).astype(int)
+
+        # Creation of a df for the prediction
+        predictions_df = pd.DataFrame({'X1':self.dataset._X_raw[self.dataset.test_index][:,0], 
+                                    'X2':self.dataset._X_raw[self.dataset.test_index][:,1], 
+                                    'Z1':[1 if not np.isnan(x) else 0 for x in self.dataset._X_test[:,0]],
+                                    'Z2': [1 if not np.isnan(x) else 0 for x in self.dataset._X_test[:,1]],
+                                    'Have missing' : [(np.isnan(x).sum()>0).astype(int)  for x in self.dataset._X_test],
+                                    'y_true': y_true, 
+                                    'y_pred': y_pred, 
+                                    'True Positive': [1 if y_true==1 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    'True Negative': [1 if y_true==0 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    'False Positive': [1 if y_true==0 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    'False Negative': [1 if y_true==1 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    })
+
+        alpha=1
+        axes[4].set_title("Classification result (th={})".format(CLASSIFICATION_THRESHOLD));axes[4].axis('off')
+
+        # Plot the sample points without missing data
+        axes[4].scatter(predictions_df.query(" `Have missing`==0 and `True Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `True Positive`==1")['X2'],
+                    color='tab:blue', alpha=alpha, label="TP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Positive`==1"))))
+        axes[4].scatter(predictions_df.query(" `Have missing`==0 and `True Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `True Negative`==1")['X2'],
+                    color='tab:blue', alpha=alpha, label="TN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Negative`==1"))))
+        axes[4].scatter(predictions_df.query(" `Have missing`==0 and `False Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `False Positive`==1")['X2'],
+                    color='tab:orange', s=100, alpha=alpha, label="FP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Positive`==1"))))
+        axes[4].scatter(predictions_df.query(" `Have missing`==0 and `False Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `False Negative`==1")['X2'],
+                    color='tab:red', s=100, alpha=alpha, label="FN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Negative`==1"))))
+
+
+        # Plot the sample points without missing data
+        axes[4].scatter(predictions_df.query(" `Have missing`==1 and `True Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `True Positive`==1")['X2'],
+                    color='tab:blue', facecolors='none', alpha=alpha, label="TP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Positive`==1"))))
+        axes[4].scatter(predictions_df.query(" `Have missing`==1 and `True Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `True Negative`==1")['X2'],
+                    color='tab:blue', facecolors='none', alpha=alpha, label="TN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Negative`==1"))))
+        axes[4].scatter(predictions_df.query(" `Have missing`==1 and `False Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `False Positive`==1")['X2'],
+                    color='tab:orange', s=100, facecolors='none', alpha=alpha, label="FP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Positive`==1"))))
+        axes[4].scatter(predictions_df.query(" `Have missing`==1 and `False Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `False Negative`==1")['X2'],
+                    color='tab:red', s=100, facecolors='none', alpha=alpha, label="FN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Negative`==1"))))
+
+        # Plot the sample points without missing data
+        axes[9].scatter([-5], [-5],color='tab:blue', alpha=alpha, label="TP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Positive`==1"))))
+        axes[9].scatter([-5], [-5],color='tab:blue', alpha=alpha, label="TN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Negative`==1"))))
+        axes[9].scatter([-5], [-5],color='tab:orange', s=100, alpha=alpha, label="FP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Positive`==1"))))
+        axes[9].scatter([-5], [-5],color='tab:red', s=100, alpha=alpha, label="FN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Negative`==1"))))
+        axes[9].scatter([-5], [-5],color='tab:blue', facecolors='none', alpha=alpha, label="TP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Positive`==1"))))
+        axes[9].scatter([-5], [-5],color='tab:blue', facecolors='none', alpha=alpha, label="TN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Negative`==1"))))
+        axes[9].scatter([-5], [-5],color='tab:orange', s=100, facecolors='none', alpha=alpha, label="FP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Positive`==1"))))
+        axes[9].scatter([-5], [-5], color='tab:red', s=100, facecolors='none', alpha=alpha, label="FN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Negative`==1"))))
+        axes[9].set_xlim([0,1]);axes[9].set_ylim([0,1]);axes[9].axis('off');axes[9].legend(loc='center', prop={'size':15})
+
+        if not self.use_missing_indicator_variables:
+            [axes[i].axis('off') for i in [7, 8, 9]]
+        else:
+            [axes[i].axis('off') for i in [9]]
+
+
+        plt.tight_layout();plt.show()
+
+        return 
+        
     def __call__(self):
         return repr(self)       
     
@@ -603,23 +751,52 @@ class Experiments(object):
             self.predict()      
 
         elif self.approach == 'nam':
+            
             self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
             self.performance_df = pd.DataFrame(self.performances_df, index=[0])
 
             if os.path.isfile(model_path):
                 
                 if self.use_missing_indicator_variables :
+                    
                     NAM_DEFAULT_PARAMETERS['model']['num_features'] = 4
+                    
                 else:
+                    
                     NAM_DEFAULT_PARAMETERS['model']['num_features'] = 2
+                    
                 self.model = NAM(**NAM_DEFAULT_PARAMETERS['model'])
                 self.model = self.model.double()
                 self.model.load_state_dict(torch.load(model_path))
                 self.model.eval()
+                
             else:
+                
                 raise ValueError("No model stored for this experiment.")
+                
+        elif self.approach == 'xgboost':
+            
+            self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
+            self.performance_df = pd.DataFrame(self.performances_df, index=[0])
+            
+            self.model = XGBClassifier(use_label_encoder=False, # TODO ADD PLAYING WITH PARAMETERS 
+                                      learning_rate=0.01,
+                                      verbosity=1,
+                                      objective='binary:logistic',
+                                      eval_metric='auc',
+                                      booster='gbtree',
+                                      tree_method='exact',
+                                      subsample=1,
+                                      colsample_bylevel=.8,
+                                      alpha=0)    
+            
+            if os.path.isfile(model_path):
+                
+                self.model = pickle.load(open(model_path, "rb"))
+                
+            else:
         
-            print("This experiemnt did not have the best model saved at that time, sorry! Re-do experiment.")
+                raise ValueError("No model stored for this experiment.")
 
         print("Experiment {} loaded successfully! :-)".format(previous_experiment))
         return  
@@ -757,7 +934,6 @@ class Experiments(object):
 
         # Finally load the best model
         
-
         self.model = NAM(**NAM_DEFAULT_PARAMETERS['model'])
         self.model = self.model.double()
         if self.save_experiment:
@@ -769,6 +945,38 @@ class Experiments(object):
         
         return  pd.concat(replicates_results)
 
+    def _fit_xgboost(self, use_missing_indicator_variables=XGBOOST_DEFAULT_PARAMETERS['use_missing_indicator_variables'], **kwargs): #TODO not NAM
+
+        self.use_missing_indicator_variables = use_missing_indicator_variables
+        
+        if use_missing_indicator_variables:
+            features = ['X_1', 'X_2', 'Z_1', 'Z_2']
+        else:
+            features = ['X_1', 'X_2']
+
+        # Create data loader
+        if use_missing_indicator_variables:
+            X_train, X_test = np.concatenate([self.dataset.X_train, (~np.isnan(self.dataset._X_train)).astype(int)], axis=1), np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
+        else:
+            X_train, X_test = self.dataset.X_train, self.dataset.X_test
+            
+        y_train, y_test = self.dataset.y_train.squeeze(), self.dataset.y_test.squeeze()
+        
+        # Fit model 
+        self.model.fit(X_train, y_train)
+
+        # Create the df associated to the test sample 
+        test_dict = {i:X_test[:,i] for i in range(X_test.shape[1])}
+        test_dict['y_true'] = y_test
+        test_dict['y_pred'] = self.model.predict_proba(X_test)[:,1]
+
+        test_df = pd.DataFrame.from_dict(test_dict);test_df.columns = features + ["y_true", "y_pred"]
+
+        if self.save_experiment:
+            pickle.dump(self.model, open(os.path.join(self.experiment_path, 'best_model.pt'), "wb"))
+        
+        return test_df
+    
     def _predict_map(self):
     
         #################################################################
@@ -878,4 +1086,116 @@ class Experiments(object):
 
         self.dataset.y_pred, _ = eval_model(self.model, data_test)
 
+        return
+    
+    def _predict_xgboost(self):
+    
+        if self.use_missing_indicator_variables:
+            X_test = np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
+        else:
+            X_test = self.dataset.X_test        
+
+        self.dataset.y_pred = self.model.predict_proba(X_test)[:,1]
+
+        return
+    
+    def _performances_bayesian(self): # TODO CHANGE NAME
+
+        y_true = self.dataset.y_test.squeeze()
+        y_pred = self.dataset.y_pred
+
+        # Creation of a df for the prediction
+        predictions_df = pd.DataFrame({'X1':self.dataset.X_test[:,0], 
+                      'X2':self.dataset.X_test[:,1], 
+                      'Z1':[1 if not np.isnan(x) else 0 for x in self.dataset.X_test[:,0]],
+                      'Z2': [1 if not np.isnan(x) else 0 for x in self.dataset.X_test[:,1]],
+                      'y_true': y_true, 
+                      'y_pred': y_pred, 
+                      'True Positive': [1 if y_true==1 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                      'True Negative': [1 if y_true==0 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                      'False Positive': [1 if y_true==0 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                      'False Negative': [1 if y_true==1 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                      })
+
+        self.predictions_df = predictions_df
+
+        #Compute metrics of interest  
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred > CLASSIFICATION_THRESHOLD if self.approach == 'xgboost' else y_pred).ravel()
+
+        acc = (tp + tn) / (tp + tn + fp +  fn)
+        f1 = 2*tp / (2*tp + fp + fn)
+        mcc = (tp*tn - fp*fn) / np.sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))
+        tpr =  tp / (tp+fn)
+        tnr = tn / (tn+fp)
+        ppv = tp / (tp+fp)
+        npv = tn / (tn+fn)
+        fnr = fn / (tp+fn)
+
+        performances_dict = {'Accuracy' : round(acc, 3),
+                            'F1 score (2 PPVxTPR/(PPV+TPR))': round(f1, 3),
+                            'Matthews correlation coefficient (MCC)': round(mcc, 3),
+                            'Sensitivity, recall, hit rate, or true positive rate (TPR)': round(tpr, 3),
+                            'Specificity, selectivity or true negative rate (TNR)': round(tnr, 3),
+                            'Precision or positive predictive value (PPV)': round(ppv, 3),
+                            'Negative predictive value (NPV)': round(npv, 3),
+                            'Miss rate or false negative rate (FNR)': round(fnr, 3),
+                            'False discovery rate (FDR=1-PPV)': round(1-ppv, 3),
+                            'False omission rate (FOR=1-NPV)': round(1-npv, 3)}
+
+        self.performances_df = pd.DataFrame(performances_dict, index=['0'])  
+
+        return 
+
+    def _performances_nam(self):
+        """
+            Create the predictions_df and performances_df based on the dataframe that recap all the results for the replciates. 
+        """
+
+        performances_dict = {'Accuracy' : [],
+                            'F1 score (2 PPVxTPR/(PPV+TPR))': [],
+                            'Matthews correlation coefficient (MCC)': [],
+                            'Sensitivity, recall, hit rate, or true positive rate (TPR)': [],
+                            'Specificity, selectivity or true negative rate (TNR)': [],
+                            'Precision or positive predictive value (PPV)': [],
+                            'Negative predictive value (NPV)': [],
+                            'Miss rate or false negative rate (FNR)': [],
+                            'False discovery rate (FDR=1-PPV)': [],
+                            'False omission rate (FOR=1-NPV)': [],
+                            'Area Under the Curve (AUC)': []}
+
+
+        for _, res in self.predictions_df.groupby('replicate'):
+            y_true = res['y_true'].to_numpy()
+            y_pred = res['y_pred'].to_numpy()
+            
+            tn, fp, fn, tp = confusion_matrix(y_true, y_pred > CLASSIFICATION_THRESHOLD).ravel()
+
+            acc = (tp + tn) / (tp + tn + fp +  fn)
+            f1 = 2*tp / (2*tp + fp + fn)
+            mcc = (tp*tn - fp*fn) / np.sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))
+            tpr =  tp / (tp+fn)
+            tnr = tn / (tn+fp)
+            ppv = tp / (tp+fp)
+            npv = tn / (tn+fn)
+            fnr = fn / (tp+fn)
+            
+            fpr_auc, tpr_auc, _ = roc_curve(y_true, y_pred)      
+            roc_auc = auc(fpr_auc, tpr_auc)    
+
+
+            performances_dict['Accuracy'].append(round(acc, 3))
+            performances_dict['F1 score (2 PPVxTPR/(PPV+TPR))'].append(round(f1, 3))
+            performances_dict['Matthews correlation coefficient (MCC)'].append(round(mcc, 3))
+            performances_dict['Sensitivity, recall, hit rate, or true positive rate (TPR)'].append(round(tpr, 3))
+            performances_dict['Specificity, selectivity or true negative rate (TNR)'].append(round(tnr, 3))
+            performances_dict['Precision or positive predictive value (PPV)'].append(round(ppv, 3))
+            performances_dict['Negative predictive value (NPV)'].append(round(npv, 3))
+            performances_dict['Miss rate or false negative rate (FNR)'].append(round(fnr, 3))
+            performances_dict['False discovery rate (FDR=1-PPV)'].append(round(1-ppv, 3))
+            performances_dict['False omission rate (FOR=1-NPV)'].append(round(1-npv, 3))
+            performances_dict['Area Under the Curve (AUC)'].append(round(roc_auc, 3))
+            
+        # Create the performace df
+        performances_dict = {metric: np.mean(values) for metric, values in performances_dict.items()}
+        self.performances_df = pd.DataFrame(performances_dict, index = [0])
         return

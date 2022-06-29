@@ -331,7 +331,7 @@ class DatasetGenerator(object):
             if self.missingness_parameters['missing_first_quarter']:
 
                 # Making sure that the total amount of missing coordinate does not exceed the threshold
-                while not self.met_missingness_rate(label=0) or not self.met_missingness_rate(label=1) or excedded_time < MAX_TRY_MISSSINGNESS:
+                while (not self.met_missingness_rate(label=0) or not self.met_missingness_rate(label=1)) and excedded_time < MAX_TRY_MISSSINGNESS:
                     for label in [0, 1]:
                         
                         # Simulate missing samples
@@ -352,7 +352,7 @@ class DatasetGenerator(object):
                                     
             else:
                 # Making sure that the total amount of missing coordinate does not exceed the threshold
-                while not self.met_missingness_rate(label=0) or not self.met_missingness_rate(label=1) or excedded_time < MAX_TRY_MISSSINGNESS:
+                while (not self.met_missingness_rate(label=0) or not self.met_missingness_rate(label=1)) and excedded_time < MAX_TRY_MISSSINGNESS:
 
                     for label in [0, 1]:
                     

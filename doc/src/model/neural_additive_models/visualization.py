@@ -5,7 +5,7 @@ import pandas as pd
 from sklearn.metrics import roc_curve, auc
 
 
-def plot_roc_curves(results, ax = None):
+def plot_roc_curves_nam(results, ax = None):
 
     if ax is None:
         fig, ax =  plt.subplots(1, 1, figsize=(5, 5))
