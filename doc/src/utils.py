@@ -264,6 +264,7 @@ def label_bar(rects,ax):
 def check_experiment_already_done(df, **kwargs):
     
     narrowed_df=deepcopy(df)
+    #print(len(narrowed_df))
     for key, value in kwargs.items():
         
         if key=='ratio_missing_per_class':
@@ -283,9 +284,15 @@ def check_experiment_already_done(df, **kwargs):
             
         #print(len(narrowed_df), key, value)
         
+    return len(narrowed_df) > 0
+        
 
 
-def create_df(folder_name=EXPERIMENT_FOLDER_NAME):
+def create_df(folder_names=EXPERIMENT_FOLDER_NAME):
+
+    if not isinstance(folder_names, list):
+        folder_names = list(folder_names)
+
     
     df = pd.DataFrame(columns = ['dataset_name','experiment_number', 'approach', 'missing_data_handling','imputation_method', 'use_missing_indicator_variables', 
                                 'num_samples', 'imbalance_ratio', 'missingness_pattern', 'missingness_mechanism', 
@@ -293,8 +300,10 @@ def create_df(folder_name=EXPERIMENT_FOLDER_NAME):
                                 'Accuracy', 'F1', 'MCC', 'Sensitivity', 'Specificity', 'Precision', 'PPV', 'NPV', 'FNR', 'FDR', 'FOR', 
                                 'resolution', 'bandwidth', 'estimation_time_0', 'estimation_time_1'])
 
-
-    experiments_paths = glob(os.path.join(DATA_DIR, folder_name, "*", '*'))
+    
+    experiments_paths = []
+    for folder_name in folder_names:
+        experiments_paths.extend(glob(os.path.join(DATA_DIR, folder_name, "*", '*')))
 
 
     for experiment_path in experiments_paths:

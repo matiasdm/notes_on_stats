@@ -4,7 +4,7 @@ import numpy as np
 # Data settings
 ROOT_DIR = '/Users/samperochon/Duke/work/notes_on_stats/doc/'
 DATA_DIR = '/Users/samperochon/Duke/work/notes_on_stats/doc/src/data'
-EXPERIMENT_FOLDER_NAME = 'experiments_24_june'
+EXPERIMENT_FOLDER_NAME = 'experiments_28_june'
 
 
 # DATASET PARAMETERS

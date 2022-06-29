@@ -542,9 +542,9 @@ class DatasetGenerator(object):
                                             'missing_X1' : True,
                                             'missing_X2' : True,
                                             'missing_first_quarter' : True,
-                                            'ratio_missing_per_class' : [0, ratio_missing_per_class[1]]}  
+                                            'ratio_missing_per_class' : [ratio_missing_per_class[0], ratio_missing_per_class[1]]}  
 
-            self.missingness_description = 'Pattern 5 - MNAR Quarter missing\n({}% for neg. class {}% for pos. class)'.format(int(0), int(100*ratio_missing_per_class[1]))
+            self.missingness_description = 'Pattern 5 - MNAR Quarter missing\n({}% for neg. class {}% for pos. class)'.format(int(ratio_missing_per_class[0]), int(100*ratio_missing_per_class[1]))
 
         elif missingness_pattern==6:
             self.missingness_parameters = {'missingness_mechanism' : 'MNAR', 
