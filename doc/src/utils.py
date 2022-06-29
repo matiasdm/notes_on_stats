@@ -261,10 +261,12 @@ def label_bar(rects,ax):
                  fontsize = 11,
                 ha='center', va='bottom')
 
-def check_experiment_already_done(df, **kwargs):
+def check_experiment_already_done(df, verbose=False, **kwargs):
     
     narrowed_df=deepcopy(df)
-    #print(len(narrowed_df))
+    if verbose:
+        print(len(narrowed_df)) 
+    
     for key, value in kwargs.items():
         
         if key=='ratio_missing_per_class':
@@ -274,15 +276,16 @@ def check_experiment_already_done(df, **kwargs):
             else:
                 narrowed_df = narrowed_df[narrowed_df['ratio_missing_per_class_0']==value[0]]
                 narrowed_df = narrowed_df[narrowed_df['ratio_missing_per_class_1']==value[1]]    
-                
-        elif key in ['use_missing_indicator_variables']:
-            narrowed_df = narrowed_df[narrowed_df['use_missing_indicator_variables'].isnull()]
-        
+        elif key == 'use_missing_indicator_variables':
+            if value is None:
+                narrowed_df = narrowed_df[narrowed_df['use_missing_indicator_variables'].isnull()]
+            else:
+                narrowed_df = narrowed_df[narrowed_df['use_missing_indicator_variables']==value]
         else:
         
             narrowed_df = narrowed_df[narrowed_df[key]==value]
             
-        #print(len(narrowed_df), key, value)
+        print(len(narrowed_df), key, value) if verbose else None
         
     return len(narrowed_df) > 0
         
