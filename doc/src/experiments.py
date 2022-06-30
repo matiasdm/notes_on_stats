@@ -514,11 +514,9 @@ class Experiments(object):
             else: 
                 setattr(self, key, value)
 
-    def _train_nam(self, use_missing_indicator_variables=DEFAULT_USE_INDICATOR_VARIABLE):
+    def _train_nam(self):
 
-        self.use_missing_indicator_variables = use_missing_indicator_variables
-
-        if use_missing_indicator_variables:
+        if self.use_missing_indicator_variables:
             features = ['X_1', 'X_2', 'Z_1', 'Z_2']
         else:
             features = ['X_1', 'X_2']
@@ -533,7 +531,7 @@ class Experiments(object):
             self.dataset.split_test_train()
 
             # Create data loader
-            if use_missing_indicator_variables:
+            if self.use_missing_indicator_variables:
                 X_train, X_test = np.concatenate([self.dataset.X_train, (~np.isnan(self.dataset._X_train)).astype(int)], axis=1), np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
                 NAM_DEFAULT_PARAMETERS['model']['num_features'] = 4
             else:
@@ -592,19 +590,14 @@ class Experiments(object):
         
         return  pd.concat(replicates_results)
 
-    def _fit_xgboost_ebm(self, use_missing_indicator_variables=DEFAULT_USE_INDICATOR_VARIABLE, **kwargs): #TODO not NAM
-
-        self.use_missing_indicator_variables = use_missing_indicator_variables
+    def _fit_xgboost_ebm(self, **kwargs): #TODO not NAM
         
-        if use_missing_indicator_variables:
-            features = ['X_1', 'X_2', 'Z_1', 'Z_2']
-        else:
-            features = ['X_1', 'X_2']
-
         # Create data loader
-        if use_missing_indicator_variables:
+        if self.use_missing_indicator_variables:
+            features = ['X_1', 'X_2', 'Z_1', 'Z_2']
             X_train, X_test = np.concatenate([self.dataset.X_train, (~np.isnan(self.dataset._X_train)).astype(int)], axis=1), np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
         else:
+            features = ['X_1', 'X_2']
             X_train, X_test = self.dataset.X_train, self.dataset.X_test
             
         y_train, y_test = self.dataset.y_train.squeeze(), self.dataset.y_test.squeeze()

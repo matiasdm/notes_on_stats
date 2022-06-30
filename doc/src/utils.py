@@ -281,6 +281,28 @@ def check_experiment_already_done(df, verbose=False, **kwargs):
                 narrowed_df = narrowed_df[narrowed_df['use_missing_indicator_variables'].isnull()]
             else:
                 narrowed_df = narrowed_df[narrowed_df['use_missing_indicator_variables']==value]
+                
+                
+        elif key == 'ratio_of_missing_values':
+            if value is None:
+                narrowed_df = narrowed_df[narrowed_df['ratio_of_missing_values'].isnull()]
+            else:
+                narrowed_df = narrowed_df[narrowed_df['ratio_of_missing_values']==value]
+                
+                
+        elif key == 'ratio_missing_per_class_0':
+            if value is None:
+                narrowed_df = narrowed_df[narrowed_df['ratio_missing_per_class_0'].isnull()]
+            else:
+                narrowed_df = narrowed_df[narrowed_df['ratio_missing_per_class_0']==value]
+                
+        elif key == 'ratio_missing_per_class_1':
+            if value is None:
+                narrowed_df = narrowed_df[narrowed_df['ratio_missing_per_class_1'].isnull()]
+            else:
+                narrowed_df = narrowed_df[narrowed_df['ratio_missing_per_class_1']==value]   
+                
+                
         else:
         
             narrowed_df = narrowed_df[narrowed_df[key]==value]
@@ -364,7 +386,7 @@ def create_df(folder_names=EXPERIMENT_FOLDER_NAME):
                         'approach' : experiment_data['approach'],  
                         'missing_data_handling' : dataset_data['missing_data_handling'],  
                         'imputation_method' : dataset_data['imputation_method'],  
-                        'use_missing_indicator_variables': experiment_data['use_missing_indicator_variables'] if 'use_missing_indicator_variables' in experiment_data.keys() else None,   # TODO 
+                        'use_missing_indicator_variables': experiment_data['use_missing_indicator_variables'], #if 'use_missing_indicator_variables' in experiment_data.keys() else None,   # TODO 
                         'num_samples' : dataset_data['num_samples'],  
                         'imbalance_ratio' : dataset_data['imbalance_ratio'],  
                         'missingness_pattern' : int(dataset_data['missingness_pattern']),  
@@ -391,6 +413,9 @@ def create_df(folder_names=EXPERIMENT_FOLDER_NAME):
                         'FOR' : experiment_data['performances_df']['False omission rate (FOR=1-NPV)'][0],  
                         }, 
                         ignore_index = True)
+        
+    df['ratio_missing_per_class_0'] = df['ratio_missing_per_class_0'].astype(float).round(2)
+    df['ratio_missing_per_class_1'] = df['ratio_missing_per_class_1'].astype(float).round(2)
 
     df.drop_duplicates(inplace=True)
     df = df.astype({"missingness_pattern": int, "experiment_number": int})

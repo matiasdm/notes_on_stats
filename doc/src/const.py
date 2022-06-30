@@ -2,9 +2,13 @@ import os
 import numpy as np
 
 # Data settings
-ROOT_DIR = '/Users/samperochon/Duke/work/notes_on_stats/doc/'
-DATA_DIR = '/Users/samperochon/Duke/work/notes_on_stats/doc/src/data'
-EXPERIMENT_FOLDER_NAME = 'experiments_28_june'
+#ROOT_DIR = '/Users/samperochon/Duke/work/notes_on_stats/doc/'
+#DATA_DIR = '/Users/samperochon/Duke/work/notes_on_stats/doc/src/data'
+
+ROOT_DIR = '/home01/sam/notes_on_stats/doc/'
+DATA_DIR = '/home01/sam/notes_on_stats/doc/src/data'
+
+EXPERIMENT_FOLDER_NAME = 'experiments_29_june_duke'
 
 
 # DATASET PARAMETERS
@@ -17,6 +21,7 @@ MISSINGNESS_PATTERN = 3
 MAX_TRY_MISSSINGNESS = 10
 RATIO_OF_MISSING_VALUES = .25
 RATIO_MISSING_PER_CLASS = [.1, .3]
+DEFAULT_USE_INDICATOR_VARIABLE = True
 
 # Handling of issing data in the case of non-robust algorithms, or for experimental purposes.
 MISSING_DATA_HANDLING = 'without'
