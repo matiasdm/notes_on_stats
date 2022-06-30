@@ -441,9 +441,18 @@ class Experiments(object):
                 
                 self.model = pickle.load(open(model_path, "rb"))
                 
-            else:
-        
-                raise ValueError("No model stored for this experiment.")
+        elif self.approach == 'ebm':
+            
+            self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
+            self.performance_df = pd.DataFrame(self.performances_df, index=[0])
+            
+            features_name = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.use_missing_indicator_variables else ['X_1', 'X_2']                                                                                              
+            self.model = ExplainableBoostingClassifier(feature_names=features_name, n_jobs=-1, random_state=RANDOM_STATE)
+            
+            
+
+                        
+            self._fit_xgboost_ebm()
 
         print("Experiment {} loaded successfully! :-)".format(previous_experiment))
         return  
@@ -1204,6 +1213,5 @@ class Experiments(object):
 
 
         ebm_global = self.model.explain_global()
-        show(ebm_global)
 
-        return 
+        return show(ebm_global)

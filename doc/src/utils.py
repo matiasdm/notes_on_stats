@@ -261,7 +261,7 @@ def label_bar(rects,ax):
                  fontsize = 11,
                 ha='center', va='bottom')
 
-def check_experiment_already_done(df, verbose=False, **kwargs):
+def check_experiment_already_done(df, verbose=False,return_df=False, **kwargs):
     
     narrowed_df=deepcopy(df)
     if verbose:
@@ -309,7 +309,13 @@ def check_experiment_already_done(df, verbose=False, **kwargs):
             
         print(len(narrowed_df), key, value) if verbose else None
         
-    return len(narrowed_df) > 0
+    if not return_df:
+        
+        return len(narrowed_df) > 0
+    
+    else:
+        
+        return narrowed_df
         
 
 
@@ -416,6 +422,8 @@ def create_df(folder_names=EXPERIMENT_FOLDER_NAME):
         
     df['ratio_missing_per_class_0'] = df['ratio_missing_per_class_0'].astype(float).round(2)
     df['ratio_missing_per_class_1'] = df['ratio_missing_per_class_1'].astype(float).round(2)
+    df['ratio_of_missing_values'] = df['ratio_of_missing_values'].astype(float).round(2)
+    
 
     df.drop_duplicates(inplace=True)
     df = df.astype({"missingness_pattern": int, "experiment_number": int})
