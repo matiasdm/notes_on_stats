@@ -420,9 +420,9 @@ def create_df(folder_names=EXPERIMENT_FOLDER_NAME):
                         }, 
                         ignore_index = True)
         
-    df['ratio_missing_per_class_0'] = df['ratio_missing_per_class_0'].astype(float).round(2)
-    df['ratio_missing_per_class_1'] = df['ratio_missing_per_class_1'].astype(float).round(2)
-    df['ratio_of_missing_values'] = df['ratio_of_missing_values'].astype(float).round(2)
+    #df['ratio_missing_per_class_0'] = df['ratio_missing_per_class_0'].astype(float).round(2)
+    #df['ratio_missing_per_class_1'] = df['ratio_missing_per_class_1'].astype(float).round(2)
+    #df['ratio_of_missing_values'] = df['ratio_of_missing_values'].astype(float).round(2)
     
 
     df.drop_duplicates(inplace=True)
