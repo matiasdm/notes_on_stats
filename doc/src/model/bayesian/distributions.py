@@ -127,7 +127,7 @@ class Distributions(object):
 
         self.computed = True
 
-    def plot(self, axes=None, predictions_df=None, **kwargs):
+    def plot(self, axes=None, predictions_df=None, plot_points=True, *args, **kwargs):
         
         if axes is None:
             fig, axes = plt.subplots(3, 5, figsize=(30, 12));axes = axes.flatten()
@@ -136,6 +136,7 @@ class Distributions(object):
             shift = 0
         elif self.class_used == 0:
             shift = 10
+
 
         alpha=.3
 
@@ -155,7 +156,7 @@ class Distributions(object):
             axes[13+shift].imshow(self.f_z2[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-3, 3, -.5, .5]);axes[13+shift].set_title("I)\nf(Z_2=1|X_1)")
             axes[14+shift].imshow(self.f_z2_bar[None, :].repeat(2, axis=0), cmap=self.cmap, origin='lower', extent=[-3, 3, -.5, .5]);axes[14+shift].set_title("J)\nf(Z_2=0|X_1)")        
 
-        if predictions_df is not None and self.class_used == 1:
+        if plot_points and predictions_df is not None and self.class_used == 1:
 
             # plot on the A) plot the sample having only X2 
             axes[5 if self.approach == 'multi_distributions' else 6].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Positive`==1")), 
@@ -191,7 +192,7 @@ class Distributions(object):
             bar = axes[12].bar([0], self.f_0, color = 'tab:blue', label="Pos. {} TP {} FP".format(len(predictions_df.query(" `Z1`==0 and  `Z2`==0 and `True Positive`==1")), len(predictions_df.query(" `Z1`==0 and  `Z2`==0 and `False Positive`==1")) ));label_bar(bar,axes[12])
 
 
-        elif predictions_df is not None and self.class_used == 0:
+        elif plot_points and predictions_df is not None and self.class_used == 0:
             # plot on the A) plot the sample having only X2 
             axes[5+shift if self.approach == 'multi_distributions' else 6+shift].scatter([0]*len(predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Negative`==1")), 
                             predictions_df.query(" `Z1`==0 and  `Z2`==1 and `True Negative`==1")['X2'], 

@@ -67,5 +67,4 @@ COLUMNS_DF = ['dataset_name', 'experiment_number','num_samples', 'imbalance_rati
 
 
 
-
-
+DICT_MISSINGNESS= {1: 'MCAR (?->Z)', 3:'MAR (X->Z)', 4: 'MNAR (Y->Z)', 5:'MNAR (Y,X ->Z)'}

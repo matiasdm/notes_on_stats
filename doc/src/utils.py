@@ -338,92 +338,100 @@ def create_df(folder_names=EXPERIMENT_FOLDER_NAME):
 
 
     for experiment_path in experiments_paths:
-
-        exp_path = os.path.join(experiment_path, 'experiment_log.json')
-        dataset_path = os.path.join(experiment_path, 'dataset_log.json')
-
-        dist_None_path = os.path.join(experiment_path, 'distributions_None_log.json')
-        dist_1_path = os.path.join(experiment_path, 'distributions_1_log.json')
-        dist_0_path = os.path.join(experiment_path, 'distributions_0_log.json')
-
-        dist_0_data, dist_0_data, dist_None_data = None, None, None
-
-        if os.path.isfile(exp_path):
-
-            with open(exp_path) as experiment_json:
-
-                # Load experiment data
-                experiment_data = json.load(experiment_json)
-        else:
-            continue
-
-        if os.path.isfile(dataset_path):
-            with open(dataset_path) as data_json:
-
-                # Load experiment data
-                dataset_data = json.load(data_json)
-        else:
-            continue
-
-        if os.path.isfile(dist_None_path):
-
-            with open(dist_None_path) as dist_json:
-
-                # Load experiment data
-                dist_None_data = json.load(dist_json)
-
-        if os.path.isfile(dist_1_path):
-
-            with open(dist_1_path) as dist_json:
-
-                # Load experiment data
-                dist_1_data = json.load(dist_json)
-
-        if os.path.isfile(dist_0_path):
-
-            with open(dist_0_path) as dist_json:
-
-                # Load experiment data
-                dist_0_data = json.load(dist_json)
-                
-        # append rows to an empty DataFrame
-        df = df.append({'dataset_name' : experiment_data['dataset_name'], 
-                        'experiment_number' : experiment_data['experiment_number'],  
-                        'approach' : experiment_data['approach'],  
-                        'missing_data_handling' : dataset_data['missing_data_handling'],  
-                        'imputation_method' : dataset_data['imputation_method'],  
-                        'use_missing_indicator_variables': experiment_data['use_missing_indicator_variables'], #if 'use_missing_indicator_variables' in experiment_data.keys() else None,   # TODO 
-                        'num_samples' : dataset_data['num_samples'],  
-                        'imbalance_ratio' : dataset_data['imbalance_ratio'],  
-                        'missingness_pattern' : int(dataset_data['missingness_pattern']),  
-                        'missingness_mechanism' : dataset_data['missingness_parameters']['missingness_mechanism'],  
-                        'ratio_of_missing_values' : dataset_data['missingness_parameters']['ratio_of_missing_values'],  
-                        'missing_X1' : dataset_data['missingness_parameters']['missing_X1'],  
-                        'missing_X2' : dataset_data['missingness_parameters']['missing_X2'],  
-                        'missing_first_quarter' : dataset_data['missingness_parameters']['missing_first_quarter'],  
-                        'ratio_missing_per_class_0' : dataset_data['missingness_parameters']['ratio_missing_per_class'][0] if dataset_data['missingness_parameters']['ratio_missing_per_class'] is not None else None,
-                        'ratio_missing_per_class_1' : dataset_data['missingness_parameters']['ratio_missing_per_class'][1] if dataset_data['missingness_parameters']['ratio_missing_per_class'] is not None else None,
-                        'resolution' : experiment_data['resolution'],
-                        'bandwidth' : experiment_data['bandwidth'],
-                        'auc' : experiment_data['performances_df']['Area Under the Curve (AUC)'][0] if 'Area Under the Curve (AUC)' in experiment_data['performances_df'].keys() else np.nan,
-                        'Accuracy' : experiment_data['performances_df']['Accuracy'][0],  
-                        'F1' : experiment_data['performances_df']['F1 score (2 PPVxTPR/(PPV+TPR))'][0],  
-                        'MCC' : experiment_data['performances_df']['Matthews correlation coefficient (MCC)'][0],  
-                        'Sensitivity' : experiment_data['performances_df']['Sensitivity, recall, hit rate, or true positive rate (TPR)'][0],  
-                        'Specificity' : experiment_data['performances_df']['Specificity, selectivity or true negative rate (TNR)'][0],  
-                        'Precision' : experiment_data['performances_df']['Precision or positive predictive value (PPV)'][0],  
-                        'PPV' : experiment_data['performances_df']['Precision or positive predictive value (PPV)'][0],  
-                        'NPV' : experiment_data['performances_df']['Negative predictive value (NPV)'][0],  
-                        'FNR' : experiment_data['performances_df']['Miss rate or false negative rate (FNR)'][0],  
-                        'FDR' : experiment_data['performances_df']['False discovery rate (FDR=1-PPV)'][0],  
-                        'FOR' : experiment_data['performances_df']['False omission rate (FOR=1-NPV)'][0],  
-                        }, 
-                        ignore_index = True)
         
-    #df['ratio_missing_per_class_0'] = df['ratio_missing_per_class_0'].astype(float).round(2)
-    #df['ratio_missing_per_class_1'] = df['ratio_missing_per_class_1'].astype(float).round(2)
-    #df['ratio_of_missing_values'] = df['ratio_of_missing_values'].astype(float).round(2)
-    
+        try:
+
+            exp_path = os.path.join(experiment_path, 'experiment_log.json')
+            dataset_path = os.path.join(experiment_path, 'dataset_log.json')
+
+            dist_None_path = os.path.join(experiment_path, 'distributions_None_log.json')
+            dist_1_path = os.path.join(experiment_path, 'distributions_1_log.json')
+            dist_0_path = os.path.join(experiment_path, 'distributions_0_log.json')
+
+            dist_0_data, dist_0_data, dist_None_data = None, None, None
+
+            if os.path.isfile(exp_path):
+
+                with open(exp_path) as experiment_json:
+
+                    # Load experiment data
+                    experiment_data = json.load(experiment_json)
+            else:
+                continue
+
+            if os.path.isfile(dataset_path):
+                with open(dataset_path) as data_json:
+
+                    # Load experiment data
+                    dataset_data = json.load(data_json)
+            else:
+                continue
+
+            if os.path.isfile(dist_None_path):
+
+                with open(dist_None_path) as dist_json:
+
+                    # Load experiment data
+                    dist_None_data = json.load(dist_json)
+
+            if os.path.isfile(dist_1_path):
+
+                with open(dist_1_path) as dist_json:
+
+                    # Load experiment data
+                    dist_1_data = json.load(dist_json)
+
+            if os.path.isfile(dist_0_path):
+
+                with open(dist_0_path) as dist_json:
+
+                    # Load experiment data
+                    dist_0_data = json.load(dist_json)
+
+            # append rows to an empty DataFrame
+            df = df.append({'dataset_name' : experiment_data['dataset_name'], 
+                            'experiment_number' : experiment_data['experiment_number'],  
+                            'approach' : experiment_data['approach'],  
+                            'missing_data_handling' : dataset_data['missing_data_handling'],  
+                            'imputation_method' : dataset_data['imputation_method'],  
+                            'use_missing_indicator_variables': experiment_data['use_missing_indicator_variables'], #if 'use_missing_indicator_variables' in experiment_data.keys() else None,   # TODO 
+                            'num_samples' : dataset_data['num_samples'],  
+                            'imbalance_ratio' : dataset_data['imbalance_ratio'],  
+                            'missingness_pattern' : int(dataset_data['missingness_pattern']),  
+                            'missingness_mechanism' : dataset_data['missingness_parameters']['missingness_mechanism'],  
+                            'ratio_of_missing_values' : dataset_data['missingness_parameters']['ratio_of_missing_values'],  
+                            'missing_X1' : dataset_data['missingness_parameters']['missing_X1'],  
+                            'missing_X2' : dataset_data['missingness_parameters']['missing_X2'],  
+                            'missing_first_quarter' : dataset_data['missingness_parameters']['missing_first_quarter'],  
+                            'ratio_missing_per_class_0' : dataset_data['missingness_parameters']['ratio_missing_per_class'][0] if dataset_data['missingness_parameters']['ratio_missing_per_class'] is not None else None,
+                            'ratio_missing_per_class_1' : dataset_data['missingness_parameters']['ratio_missing_per_class'][1] if dataset_data['missingness_parameters']['ratio_missing_per_class'] is not None else None,
+                            'resolution' : experiment_data['resolution'],
+                            'bandwidth' : experiment_data['bandwidth'],
+                            'auc' : experiment_data['performances_df']['Area Under the Curve (AUC)'][0] if 'Area Under the Curve (AUC)' in experiment_data['performances_df'].keys() else np.nan,
+                            'Accuracy' : experiment_data['performances_df']['Accuracy'][0],  
+                            'F1' : experiment_data['performances_df']['F1 score (2 PPVxTPR/(PPV+TPR))'][0],  
+                            'MCC' : experiment_data['performances_df']['Matthews correlation coefficient (MCC)'][0],  
+                            'Sensitivity' : experiment_data['performances_df']['Sensitivity, recall, hit rate, or true positive rate (TPR)'][0],  
+                            'Specificity' : experiment_data['performances_df']['Specificity, selectivity or true negative rate (TNR)'][0],  
+                            'Precision' : experiment_data['performances_df']['Precision or positive predictive value (PPV)'][0],  
+                            'PPV' : experiment_data['performances_df']['Precision or positive predictive value (PPV)'][0],  
+                            'NPV' : experiment_data['performances_df']['Negative predictive value (NPV)'][0],  
+                            'FNR' : experiment_data['performances_df']['Miss rate or false negative rate (FNR)'][0],  
+                            'FDR' : experiment_data['performances_df']['False discovery rate (FDR=1-PPV)'][0],  
+                            'FOR' : experiment_data['performances_df']['False omission rate (FOR=1-NPV)'][0],  
+                            }, 
+                            ignore_index = True)
+        except:
+            pass
+
+    df['ratio_missing_per_class_0'] = df['ratio_missing_per_class_0'].astype(float).round(2)
+    df['ratio_missing_per_class_0'] = df['ratio_missing_per_class_0'].astype(float).round(2)
+        
+    df['ratio_missing_per_class_0'] = df['ratio_missing_per_class_0'].astype(float).round(2)
+    df['ratio_missing_per_class_1'] = df['ratio_missing_per_class_1'].astype(float).round(2)
+    df['ratio_of_missing_values'] = df['ratio_of_missing_values'].astype(float).round(2)
+    df.loc[df['use_missing_indicator_variables'].isna(), 'use_missing_indicator_variables'] = False
+    df.loc[df['use_missing_indicator_variables'].isnull(), 'use_missing_indicator_variables'] = False
 
     df.drop_duplicates(inplace=True)
     df = df.astype({"missingness_pattern": int, "experiment_number": int})

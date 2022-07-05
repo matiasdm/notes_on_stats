@@ -187,7 +187,7 @@ class DatasetGenerator(object):
             self.X_test = deepcopy(self._imp_X_test)
             self.y_test = deepcopy(self._y_test)
             
-            print("Imputed {} values (train) and {} (test) using method {}.".format(len(np.isnan(self.X_train)), len(np.isnan(self.X_test)), self.imputation_method)) if (self.debug or self.verbosity > 0)  else None                
+            print("Imputed {} values (train) and {} (test) using method {}.".format(len(np.isnan(self.X_train)), len(np.isnan(self.X_test)), self.imputation_method)) if (self.debug or self.verbosity > 2)  else None                
 
         elif self.missing_data_handling == 'encoding':
 
@@ -199,7 +199,7 @@ class DatasetGenerator(object):
             self.X_test[np.isnan(self.X_test)] = DEFAULT_MISSING_VALUE
             self.y_test = deepcopy(self._y_test)
 
-            print("Encoding {} (train) and {} (test) missing values with {}.".format(len(np.isnan(self._X_train)), len(np.isnan(self._X_test)), DEFAULT_MISSING_VALUE)) if (self.debug or self.verbosity > 0)  else None
+            print("Encoding {} (train) and {} (test) missing values with {}.".format(len(np.isnan(self._X_train)), len(np.isnan(self._X_test)), DEFAULT_MISSING_VALUE)) if (self.debug or self.verbosity > 2)  else None
 
         elif self.missing_data_handling == 'without':
 
@@ -209,7 +209,7 @@ class DatasetGenerator(object):
             self.y_test = deepcopy(self._y_test)
 
         else:
-            raise ValueError("Please use one of the following missing variables handling: imputing, encoding, or without")
+            raise ValueError("Please use one of the following missing variables handling: imputation, encoding, or without")
 
         return 
         
@@ -454,9 +454,10 @@ class DatasetGenerator(object):
 
         if ax1 is None:
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
-
-        if title:
-            fig.suptitle("{}\n{}".format(self.dataset_description, self.missingness_description), weight='bold')
+            if title:
+                fig.suptitle("{}\n{}".format(self.dataset_description, self.missingness_description), weight='bold')
+        elif title:
+            ax1.set_title(title, weight='bold')
 
         Z_train = np.isnan(self.X_train[:,0])
 
