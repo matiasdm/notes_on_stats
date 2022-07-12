@@ -170,7 +170,23 @@ class Experiments(object):
         elif self.approach == 'ebm':
 
             features_name = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.use_missing_indicator_variables else ['X_1', 'X_2']                                                                                              
-            self.model = ExplainableBoostingClassifier(feature_names=features_name, n_jobs=-1, random_state=RANDOM_STATE)
+            self.model = ExplainableBoostingClassifier(feature_names=features_name, 
+                                                        max_bins=1024,
+                                                        max_interaction_bins=512,
+                                                        binning='quantile',
+                                                        mains='all',
+                                                        interactions=20,
+                                                        outer_bags=8,
+                                                        inner_bags=0,
+                                                        learning_rate=0.01,
+                                                        validation_size=0.15,
+                                                        early_stopping_rounds=50,
+                                                        early_stopping_tolerance=0.0001,
+                                                        max_rounds=1000,
+                                                        min_samples_leaf=2,
+                                                        max_leaves=3,
+                                                        n_jobs=-2,
+                                                        random_state=RANDOM_STATE)
 
             self.predictions_df = self._fit_xgboost_ebm(**kwargs)
             
@@ -523,10 +539,16 @@ class Experiments(object):
             else: 
                 setattr(self, key, value)
 
-    def _train_nam(self):
 
-        if self.use_missing_indicator_variables:
+    def _train_nam(self):
+    
+        if self.use_missing_indicator_variables==True:
             features = ['X_1', 'X_2', 'Z_1', 'Z_2']
+
+        elif self.use_missing_indicator_variables=='redundant':
+
+            features = ['X_1', 'X_2', 'X_1_bis', 'X_2_bis']
+
         else:
             features = ['X_1', 'X_2']
 
@@ -540,14 +562,22 @@ class Experiments(object):
             self.dataset.split_test_train()
 
             # Create data loader
-            if self.use_missing_indicator_variables:
+            if self.use_missing_indicator_variables==True:
+
                 X_train, X_test = np.concatenate([self.dataset.X_train, (~np.isnan(self.dataset._X_train)).astype(int)], axis=1), np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
                 NAM_DEFAULT_PARAMETERS['model']['num_features'] = 4
+
+            elif self.use_missing_indicator_variables=='redundant':
+
+                X_train, X_test = np.concatenate([self.dataset.X_train, self.dataset.X_train], axis=1), np.concatenate([self.dataset.X_test, self.dataset.X_test], axis=1)
+                NAM_DEFAULT_PARAMETERS['model']['num_features'] = 4
+
             else:
                 X_train, X_test = self.dataset.X_train, self.dataset.X_test
                 NAM_DEFAULT_PARAMETERS['model']['num_features'] = 2
 
             y_train, y_test = self.dataset.y_train.squeeze(), self.dataset.y_test.squeeze()
+
 
             # Create the df associated to the test sample 
             test_dict = {i:X_test[:,i] for i in range(X_test.shape[1])}
@@ -603,8 +633,10 @@ class Experiments(object):
         
         # Create data loader
         if self.use_missing_indicator_variables:
+
             features = ['X_1', 'X_2', 'Z_1', 'Z_2']
             X_train, X_test = np.concatenate([self.dataset.X_train, (~np.isnan(self.dataset._X_train)).astype(int)], axis=1), np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
+
         else:
             features = ['X_1', 'X_2']
             X_train, X_test = self.dataset.X_train, self.dataset.X_test
@@ -721,9 +753,16 @@ class Experiments(object):
 
     def _predict_nam(self):
     
-        if self.use_missing_indicator_variables:
+        if self.use_missing_indicator_variables==True:
             features = ['X_1', 'X_2', 'Z_1', 'Z_2']
             X_test = np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
+
+
+        elif self.use_missing_indicator_variables=='redundant':
+    
+            features = ['X_1', 'X_2', 'X_1_bis', 'X_2_bis']
+            X_test = np.concatenate([self.dataset.X_test, self.dataset.X_test], axis=1)
+
         else:
             features = ['X_1', 'X_2']
             X_test = self.dataset.X_test
@@ -932,7 +971,7 @@ class Experiments(object):
         disp.im_.colorbar.remove()    
                                                                                                     
         # Plot the shapes functions
-        features = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.use_missing_indicator_variables else ['X_1', 'X_2']                                                                                              
+        features = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.use_missing_indicator_variables==True else ['X_1', 'X_2', 'X_1_bis', 'X_2_bis'] if self.use_missing_indicator_variables=='redundant' else ['X_1', 'X_2']                                                                                              
 
         # Plot the roc curves
         axes[3] = plot_roc_curves_nam(self.predictions_df, ax=axes[3]) 
