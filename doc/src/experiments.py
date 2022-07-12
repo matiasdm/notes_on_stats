@@ -13,6 +13,9 @@ import pandas as pd
 import seaborn as sns
 
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_curve, auc
+from sklearn.tree import DecisionTreeClassifier
+from sklearn.linear_model import LogisticRegression
+
 from xgboost import XGBClassifier, plot_importance, plot_tree
 from interpret.glassbox import ExplainableBoostingClassifier
 from interpret import show
@@ -60,9 +63,7 @@ class Experiments(object):
         self.debug=debug
         self.verbosity=verbosity
 
-        if previous_experiment is not None:
-            self.load(previous_experiment)
-            return
+
 
         # Dataset 
         self.dataset = dataset
@@ -79,12 +80,8 @@ class Experiments(object):
         self.dist_pos = None
         self.dist_neg = None
         
-        # NAMs related attributs
+        # NAMs and XGboost related attributs
         self.model = None
-
-        # XGBoost related attributs
-        self.model = None
-        
 
         self.use_missing_indicator_variables = use_missing_indicator_variables
         self.fitted = False
@@ -92,6 +89,10 @@ class Experiments(object):
         # Interesting byproducts
         self.predictions_df = None
         self.performances_df = None
+
+        if previous_experiment is not None:
+            self.load(previous_experiment)
+            return
 
         # Create experiment folder
         if self.save_experiment:
@@ -189,6 +190,30 @@ class Experiments(object):
                                                         random_state=RANDOM_STATE)
 
             self.predictions_df = self._fit_xgboost_ebm(**kwargs)
+
+        elif self.approach == 'DecisionTree':
+                                                                                           
+            self.model = DecisionTreeClassifier(criterion='gini',
+                                splitter='best',
+                                max_depth=3,
+                                min_samples_split=2,
+                                min_samples_leaf=1,
+                                min_weight_fraction_leaf=0.0,
+                                max_features=None,
+                                random_state=None,
+                                max_leaf_nodes=None,
+                                min_impurity_decrease=0.0,
+                                min_impurity_split=None,
+                                class_weight=None,
+                                presort='deprecated',
+                                ccp_alpha=0.0)
+
+            self.predictions_df = self._fit_xgboost_ebm(**kwargs)
+
+        elif self.approach == 'LogisticRegression':
+            self.model = LogisticRegression(random_state=0)
+
+            self.predictions_df = self._fit_xgboost_ebm(**kwargs)
             
         self.fitted = True
 
@@ -196,6 +221,7 @@ class Experiments(object):
 
         assert self.purpose == 'classification', "/!\. Purpose mode is set to `estimation`, you should set it to `classification`. :-)"
         # TODO: if we don't enlarge the scope of those classes (only use fit and predict with distributions), then no need to distinguish here...
+
         if self.approach in ['multi_distributions', 'single_distribution']:
 
             # Do the prediction for the test set.
@@ -212,7 +238,7 @@ class Experiments(object):
             # Compute perf.
             self._performances_nam()
             
-        elif self.approach in ['xgboost', 'ebm']:
+        elif self.approach in ['xgboost', 'ebm', 'DecisionTree', 'LogisticRegression']:
             
             # Do the prediction with the best model
             self._predict_xgboost_ebm()
@@ -228,13 +254,13 @@ class Experiments(object):
 
         return
 
-    def plot(self):
+    def plot(self,  *args, **kwargs):
 
         if self.approach in ['single_distribution', 'multi_distributions']:
 
             if self.purpose == 'classification':
 
-                self._plot_classification()
+                self._plot_classification(*args, **kwargs)
 
             elif self.purpose == 'estimation':
 
@@ -249,9 +275,11 @@ class Experiments(object):
             self._plot_xgboost()    
 
         elif self.approach == 'ebm':
-            self._plot_ebm()    
+            self._plot_ebm()   
 
-
+        elif self.approach in ['DecisionTree', 'LogisticRegression']:
+            self._plot_logistic_regression()
+            print("Not implemented yet.")
 
         return
 
@@ -541,7 +569,7 @@ class Experiments(object):
 
 
     def _train_nam(self):
-    
+        
         if self.use_missing_indicator_variables==True:
             features = ['X_1', 'X_2', 'Z_1', 'Z_2']
 
@@ -632,8 +660,8 @@ class Experiments(object):
     def _fit_xgboost_ebm(self, **kwargs): #TODO not NAM
         
         # Create data loader
-        if self.use_missing_indicator_variables:
-
+        if self.use_missing_indicator_variables==True:
+    
             features = ['X_1', 'X_2', 'Z_1', 'Z_2']
             X_train, X_test = np.concatenate([self.dataset.X_train, (~np.isnan(self.dataset._X_train)).astype(int)], axis=1), np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
 
@@ -808,7 +836,7 @@ class Experiments(object):
         self.predictions_df = predictions_df
 
         #Compute metrics of interest  
-        tn, fp, fn, tp = confusion_matrix(y_true, y_pred > CLASSIFICATION_THRESHOLD if self.approach in['xgboost', 'ebm'] else y_pred).ravel()
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred > CLASSIFICATION_THRESHOLD if self.approach in['xgboost', 'ebm', 'LogisticRegression', 'DecisionTree'] else y_pred).ravel()
 
         acc = (tp + tn) / (tp + tn + fp +  fn)
         f1 = 2*tp / (2*tp + fp + fn)
@@ -914,7 +942,7 @@ class Experiments(object):
 
         return      
 
-    def _plot_classification(self):
+    def _plot_classification(self, *args, **kwargs):
     
         # Create the pannel 
         fig, axes = plt.subplots(5, 5, figsize=(20, 14)); axes = axes.flatten()
@@ -930,8 +958,8 @@ class Experiments(object):
         disp.plot(cmap='Blues', ax=axes[22])
         disp.im_.colorbar.remove()    
         
-        axes = self.dist_pos.plot(axes=axes, predictions_df=self.predictions_df)
-        axes = self.dist_neg.plot(axes=axes, predictions_df=self.predictions_df)
+        axes = self.dist_pos.plot(axes=axes, predictions_df=self.predictions_df, *args, **kwargs)
+        axes = self.dist_neg.plot(axes=axes, predictions_df=self.predictions_df, *args, **kwargs)
 
         # Handle legend and set axis off
         axes_with_legend = [5, 7, 9, 12, 15, 17, 19] if self.approach == 'multi_distributions' else [6, 7, 8, 12, 16, 17, 18]
@@ -1254,3 +1282,102 @@ class Experiments(object):
         ebm_global = self.model.explain_global()
 
         return show(ebm_global)
+
+
+    def _plot_logistic_regression(self):
+
+        
+        # Create the pannel 
+        fig_mosaic = """
+                        ABC
+                        DGH
+                    """
+
+        fig, axes = plt.subplot_mosaic(mosaic=fig_mosaic, figsize=(20,12))
+
+        fig.suptitle("({}) {}\n{}".format(int(self.experiment_number), self.description, self.dataset.missingness_description), y=1.1, weight='bold', fontsize=12)
+
+        # Plot the dataset 
+        axes['A'], axes['B'] = self.dataset.plot(ax1=axes['A'], ax2=axes['B'], title=False)
+        axes['A'].set_title("Training set ({})".format(self.dataset.X_train.shape[0])); axes['B'].set_title("Test set ({})".format(self.dataset.X_test.shape[0]))
+
+        # Plot the performances 
+        cm = confusion_matrix(self.predictions_df['y_true'].to_numpy(), self.predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+        disp.plot(cmap='Blues', ax=axes['C']);disp.im_.colorbar.remove()    
+                                                                                                    
+        # Plot the shapes functions
+        features = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.use_missing_indicator_variables else ['X_1', 'X_2']                                                                               
+
+        # Plot the roc curves
+        axes['D'] = plot_roc_curves_xgboost(self.predictions_df, ax=axes['D']) 
+        
+        y_true = self.dataset.y_test.squeeze()
+        y_pred = (self.dataset.y_pred > CLASSIFICATION_THRESHOLD).astype(int)
+
+        # Creation of a df for the prediction
+        predictions_df = pd.DataFrame({'X1':self.dataset._X_raw[self.dataset.test_index][:,0], 
+                                    'X2':self.dataset._X_raw[self.dataset.test_index][:,1], 
+                                    'Z1':[1 if not np.isnan(x) else 0 for x in self.dataset._X_test[:,0]],
+                                    'Z2': [1 if not np.isnan(x) else 0 for x in self.dataset._X_test[:,1]],
+                                    'Have missing' : [(np.isnan(x).sum()>0).astype(int)  for x in self.dataset._X_test],
+                                    'y_true': y_true, 
+                                    'y_pred': y_pred, 
+                                    'True Positive': [1 if y_true==1 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    'True Negative': [1 if y_true==0 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    'False Positive': [1 if y_true==0 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    'False Negative': [1 if y_true==1 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                    })
+
+        alpha=1
+        axes['G'].set_title("Classification result (th={})".format(CLASSIFICATION_THRESHOLD));axes['G'].grid()#;axes['G'].axis('off')
+
+        # Plot the sample points without missing data
+        axes['G'].scatter(predictions_df.query(" `Have missing`==0 and `True Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `True Positive`==1")['X2'],
+                    color='tab:blue', alpha=alpha, label="TP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Positive`==1"))))
+        axes['G'].scatter(predictions_df.query(" `Have missing`==0 and `True Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `True Negative`==1")['X2'],
+                    color='tab:blue', alpha=alpha, label="TN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Negative`==1"))))
+        axes['G'].scatter(predictions_df.query(" `Have missing`==0 and `False Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `False Positive`==1")['X2'],
+                    color='tab:orange', s=100, alpha=alpha, label="FP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Positive`==1"))))
+        axes['G'].scatter(predictions_df.query(" `Have missing`==0 and `False Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==0 and `False Negative`==1")['X2'],
+                    color='tab:red', s=100, alpha=alpha, label="FN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Negative`==1"))))
+
+
+        # Plot the sample points without missing data
+        axes['G'].scatter(predictions_df.query(" `Have missing`==1 and `True Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `True Positive`==1")['X2'],
+                    color='tab:blue', facecolors='none', alpha=alpha, label="TP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Positive`==1"))))
+        axes['G'].scatter(predictions_df.query(" `Have missing`==1 and `True Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `True Negative`==1")['X2'],
+                    color='tab:blue', facecolors='none', alpha=alpha, label="TN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Negative`==1"))))
+        axes['G'].scatter(predictions_df.query(" `Have missing`==1 and `False Positive`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `False Positive`==1")['X2'],
+                    color='tab:orange', s=100, facecolors='none', alpha=alpha, label="FP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Positive`==1"))))
+        axes['G'].scatter(predictions_df.query(" `Have missing`==1 and `False Negative`==1")['X1'], 
+                    predictions_df.query(" `Have missing`==1 and `False Negative`==1")['X2'],
+                    color='tab:red', s=100, facecolors='none', alpha=alpha, label="FN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Negative`==1"))))
+
+        # Plot the sample points without missing data
+        axes['H'].scatter([-5], [-5],color='tab:blue', alpha=alpha, label="TP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Positive`==1"))))
+        axes['H'].scatter([-5], [-5],color='tab:blue', alpha=alpha, label="TN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `True Negative`==1"))))
+        axes['H'].scatter([-5], [-5],color='tab:orange', s=100, alpha=alpha, label="FP (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Positive`==1"))))
+        axes['H'].scatter([-5], [-5],color='tab:red', s=100, alpha=alpha, label="FN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Negative`==1"))))
+        axes['H'].scatter([-5], [-5],color='tab:blue', facecolors='none', alpha=alpha, label="TP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Positive`==1"))))
+        axes['H'].scatter([-5], [-5],color='tab:blue', facecolors='none', alpha=alpha, label="TN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `True Negative`==1"))))
+        axes['H'].scatter([-5], [-5],color='tab:orange', s=100, facecolors='none', alpha=alpha, label="FP (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Positive`==1"))))
+        axes['H'].scatter([-5], [-5], color='tab:red', s=100, facecolors='none', alpha=alpha, label="FN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Negative`==1"))))
+        axes['H'].set_xlim([0,1]);axes['H'].set_ylim([0,1]);axes['H'].axis('off');axes['H'].legend(loc='center', prop={'size':15})
+
+        #if not self.use_missing_indicator_variables:
+        #    [axes[i].axis('off') for i in [7, 8, 9]]
+        #else:
+        #axes['I'].axis('off')
+
+
+        plt.tight_layout();plt.show()
+
+        return 

@@ -209,7 +209,7 @@ class DatasetGenerator(object):
             self.y_test = deepcopy(self._y_test)
 
         else:
-            raise ValueError("Please use one of the following missing variables handling: imputing, encoding, or without")
+            raise ValueError("Please use one of the following missing variables handling: imputation, encoding, or without")
 
         return 
         
@@ -454,9 +454,10 @@ class DatasetGenerator(object):
 
         if ax1 is None:
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
-
-        if title:
-            fig.suptitle("{}\n{}".format(self.dataset_description, self.missingness_description), weight='bold')
+            if title:
+                fig.suptitle("{}\n{}".format(self.dataset_description, self.missingness_description), weight='bold')
+        elif title:
+            ax1.set_title(title, weight='bold')
 
         Z_train = np.isnan(self.X_train[:,0])
 
