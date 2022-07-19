@@ -76,6 +76,7 @@ class Dataset(object):
                 missing_data_handling='encoding',
                 imputation_method='without',
                 proportion_train = PROPORTION_TRAIN,
+                use_missing_indicator_variables=DEFAULT_USE_INDICATOR_VARIABLE,
                 verbosity=4,
                 debug=False, 
                 random_state=RANDOM_STATE):
@@ -84,9 +85,10 @@ class Dataset(object):
 
         self.dataset_name = dataset_name
         self.outcome_column = outcome_column
-        self._features_name = features_name
         self.proportion_train = proportion_train
-
+        self.use_missing_indicator_variables = use_missing_indicator_variables
+        self._features_name = self._init_features_name(features_name)
+        
         self.missing_data_handling = missing_data_handling
         self.imputation_method = imputation_method
         
@@ -98,6 +100,12 @@ class Dataset(object):
 
         # Generate a dataset with samples from both classes - stored for internal use and for keeping track of changes etc...
         self._X, self._y = self._init_data()
+        
+        self.imbalance_ratio = np.sum(self._y==1)/np.sum(self._y==0)
+        self.ratio_of_missing_values = np.isnan(self._X).sum()/(self._X.shape[0]*self._X.shape[1])
+        self.ratio_missing_per_class = [np.isnan(self._X[(self._y==0).squeeze()]).sum()/(self._X[(self._y==0).squeeze()].shape[0]*self._X.shape[1]), 
+                                        np.isnan(self._X[(self._y==1).squeeze()]).sum()/(self._X[(self._y==1).squeeze()].shape[0]*self._X.shape[1])]
+
 
         # Imputed data (depend on the experiences/settings). If state is training, it contains imputation of 
         # the train set, otherwise the test set.
@@ -129,9 +137,14 @@ class Dataset(object):
         return self._features_name
 
     @features_name.setter  
-    def features_name(self, value):
-        self._features_name = value 
+    def features_name(self, features_name):
+        self._features_name = self._init_features_name(features_name)
         self._X, _ = self._init_data()
+        self.ratio_of_missing_values = np.isnan(self._X).sum()/(self._X.shape[0]*self._X.shape[1])
+        self.ratio_missing_per_class = [np.isnan(self._X[(self._y==0).squeeze()]).sum()/(self._X[(self._y==0).squeeze()].shape[0]*self._X.shape[1]), 
+                                        np.isnan(self._X[(self._y==1).squeeze()]).sum()/(self._X[(self._y==1).squeeze()].shape[0]*self._X.shape[1])]
+
+        self.split_test_train()
 
     def reset(self):
         self.df = deepcopy(self._raw_df)
@@ -242,6 +255,12 @@ class Dataset(object):
 
         self.num_samples = len(self.df)
         self._X, self._y  = self._init_data(verbose=False)
+        self.imbalance_ratio = np.sum(self._y==1)/np.sum(self._y==0)
+        self.ratio_of_missing_values = np.isnan(self._X).sum()/(self._X.shape[0]*self._X.shape[1])
+        self.ratio_missing_per_class = [np.isnan(self._X[(self._y==0).squeeze()]).sum()/(self._X[(self._y==0).squeeze()].shape[0]*self._X.shape[1]), 
+                                        np.isnan(self._X[(self._y==1).squeeze()]).sum()/(self._X[(self._y==1).squeeze()].shape[0]*self._X.shape[1])]
+
+        self.split_test_train()
 
         return
 
@@ -408,9 +427,19 @@ class Dataset(object):
         return df 
        
     def _init_data(self, verbose=None):
+        
+        if self.use_missing_indicator_variables:
+            
+            features_name = self.features_name[:int(len(self.features_name)/2)]
+            X_raw = np.concatenate([self.df[features_name].to_numpy().astype(float), (~np.isnan(self.df[features_name].to_numpy().astype(float))).astype(int)], axis=1) 
+
+        else:
+            features_name = self.features_name
+            X_raw = self.df[self.features_name].to_numpy().astype(float)
+
 
         y = self.df[self.outcome_column].to_numpy().astype(float)
-        X_raw = self.df[self.features_name].to_numpy().astype(float)
+        
 
         if self.verbosity>1 and verbose != False:
             print("Predicting {} based on {} features".format(self.outcome_column, len(self.features_name)))
@@ -465,4 +494,22 @@ class Dataset(object):
             plt.title("Percentage of values missing (the higher the more missing)", weight='bold', fontsize=18)
             plt.show()
         else:
+            
             print('No NAs found')
+            
+    def _init_features_name(self, features_name):
+
+        if self.use_missing_indicator_variables==True:
+
+            return features_name + ['Z_' + feat for feat in features_name]
+
+        elif self.use_missing_indicator_variables=='redundant':
+    
+            assert len(features_name)==2, "Only for toy dataset."
+
+            return ['X_1', 'X_2', 'X_1_bis', 'X_2_bis']
+
+        else:
+
+            return features_name
+        

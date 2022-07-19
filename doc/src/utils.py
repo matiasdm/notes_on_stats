@@ -394,7 +394,7 @@ def create_df(folder_names=EXPERIMENT_FOLDER_NAME):
                             'approach' : experiment_data['approach'],  
                             'missing_data_handling' : dataset_data['missing_data_handling'],  
                             'imputation_method' : dataset_data['imputation_method'],  
-                            'use_missing_indicator_variables': experiment_data['use_missing_indicator_variables'], #if 'use_missing_indicator_variables' in experiment_data.keys() else None,   # TODO 
+                            'use_missing_indicator_variables': experiment_data['use_missing_indicator_variables'] if 'use_missing_indicator_variables' in experiment_data.keys() else dataset_data['use_missing_indicator_variables'],   # TODO 
                             'num_samples' : dataset_data['num_samples'],  
                             'imbalance_ratio' : dataset_data['imbalance_ratio'],  
                             'missingness_pattern' : int(dataset_data['missingness_pattern']),  

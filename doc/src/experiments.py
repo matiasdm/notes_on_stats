@@ -53,7 +53,6 @@ class Experiments(object):
                 proportion_train=PROPORTION_TRAIN, 
                 resolution=RESOLUTION, 
                 bandwidth=BANDWIDTH, 
-                use_missing_indicator_variables=DEFAULT_USE_INDICATOR_VARIABLE,
                 previous_experiment=None,        
                 save_experiment=True, 
                 verbosity=1, 
@@ -76,18 +75,15 @@ class Experiments(object):
         # Beyesian-related attributes
         self.resolution = resolution
         self.bandwidth = bandwidth
+        self.estimation_time = None
         self.dist = None
         self.dist_pos = None
         self.dist_neg = None
 
-        self.use_missing_indicator_variables = use_missing_indicator_variables
-        self.features_name = self._init_features_name()
         # NAMs and XGboost related attributs
         self._init_model()
         self.fitted = False
 
-
-        
         # Interesting byproducts
         self.predictions_df = None
         self.performances_df = None
@@ -112,6 +108,14 @@ class Experiments(object):
     def __call__(self):
         return repr(self)       
     
+    @property
+    def features_name(self):
+        return self.dataset._features_name
+
+    @features_name.setter  
+    def features_name(self, features_name):
+        self.dataset.features_name = features_name
+    
     def fit_predict(self, **kwargs):
 
         """ 
@@ -120,14 +124,13 @@ class Experiments(object):
 
         """
 
-        
-
-
         self.dataset.impute_data()
 
         if self.verbosity >1:
             print("Predicting {} based on {} features using {} approach.".format(self.dataset.outcome_column, len(self.dataset.features_name), self.approach))
             print(*self.dataset.features_name, sep='\n')
+            
+        t0 = time()
 
         if self.approach in ['single_distribution', 'multi_distributions']:
 
@@ -153,9 +156,6 @@ class Experiments(object):
             # Through self.dataset.y_pred. Note also this is called when plotting! 
             self.predictions_df = self._train_nam(**kwargs)
 
-            # Do the prediction with the best model
-            self._predict_nam()
-
         elif self.approach == 'xgboost':
 
             self.predictions_df = self._fit_predict_vanilla(**kwargs)
@@ -171,6 +171,8 @@ class Experiments(object):
         elif self.approach == 'LogisticRegression':
 
             self.predictions_df = self._fit_predict_vanilla(**kwargs)
+            
+        self.estimation_time = time() - t0
 
         self._performances()
             
@@ -371,7 +373,7 @@ class Experiments(object):
 
             if os.path.isfile(model_path):
                 
-                if self.use_missing_indicator_variables :
+                if self.dataset.use_missing_indicator_variables :
                     
                     NAM_DEFAULT_PARAMETERS['model']['num_features'] = 4
                     
@@ -413,11 +415,8 @@ class Experiments(object):
             self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
             self.performance_df = pd.DataFrame(self.performances_df, index=[0])
             
-            features_name = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.use_missing_indicator_variables else ['X_1', 'X_2']                                                                                              
+            features_name = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.dataset.use_missing_indicator_variables else ['X_1', 'X_2']                                                                                              
             self.model = ExplainableBoostingClassifier(feature_names=features_name, n_jobs=-1, random_state=RANDOM_STATE)
-            
-            
-
                         
             self._fit_vanilla()
 
@@ -447,8 +446,9 @@ class Experiments(object):
             self.dataset.split_test_train()
 
             # Init data
-            X_train, X_test, y_train, y_test = self._init_train_test(return_y=True)
-        
+            X_train, X_test = self.dataset.X_train, self.dataset.X_train
+            y_train, y_test = self.dataset._y.squeeze(), self.dataset._y.squeeze()
+                
             # Create the df associated to the test sample 
             test_dict = {i:X_test[:,i] for i in range(X_test.shape[1])}
             test_dict['y_true'] = y_test
@@ -520,20 +520,18 @@ class Experiments(object):
             y_pred_all = np.zeros(self.dataset.num_samples).astype('float32') 
             feature_net_values_all = np.zeros((self.dataset.num_samples, len(self.features_name))).astype('float32') 
 
-            test_dict = {k:np.zeros(self.dataset.num_samples) for k in range(len(self.features_name))}
+            test_dict = { k :np.zeros(self.dataset.num_samples) for k in range(len(self.features_name))}
             test_dict['y_true'] = np.zeros(self.dataset.num_samples)
-            for idx_split, (train, test) in enumerate(cv.split(self.dataset._X, self.dataset._y)):
+            for _, (train, test) in enumerate(cv.split(self.dataset._X, self.dataset._y)):
             
                 # Init data
-                X_train, X_test, y_train, y_test = self._init_train_test(train=train, test=test, return_y=True)
+                X_train, X_test = self.dataset.X_train[train], self.dataset.X_train[test]
+                y_train, y_test = self.dataset._y[train].squeeze(), self.dataset._y[test].squeeze()
 
                 # Create the df associated to the test sample 
                 for k in range(X_test.shape[1]):
                     test_dict[k][test] = X_test[:,k]
-                    
-
-                #test_dict = {i:X_test[:,i] for i in range(X_test.shape[1])}
-                
+                                    
                 test_dict['y_true'][test] = y_test
                 test_df = pd.DataFrame.from_dict(test_dict);test_df.columns = self.features_name + ["y_true"]
 
@@ -593,8 +591,9 @@ class Experiments(object):
             return self._fit_predict_vanilla_cv(num_cv)
              
         # Init data
-        X_train, X_test, y_train, y_test = self._init_train_test(return_y=True)
-        
+        X_train, X_test = self.dataset.X_train, self.dataset.X_train
+        y_train, y_test = self.dataset._y.squeeze(), self.dataset._y.squeeze()
+
         # Fit model 
         self.model.fit(X_train, y_train)
 
@@ -624,7 +623,8 @@ class Experiments(object):
         for _, (train, test) in enumerate(cv.split(self.dataset._X, self.dataset._y)):
     
             # Init data
-            X_train, X_test, y_train, y_test = self._init_train_test(train=train, test=test, return_y=True)
+            X_train, X_test = self.dataset.X_train[train], self.dataset.X_train[test]
+            y_train, y_test = self.dataset._y[train].squeeze(), self.dataset._y[test].squeeze()
 
             # Reset model 
             self._init_model()
@@ -637,12 +637,8 @@ class Experiments(object):
 
         # Create the df associated to the test sample 
         n_features = self.dataset.X_train.shape[1]
-        test_dict = {i:self.dataset._X_train[:,i] for i in range(n_features)}
-
-        if self.use_missing_indicator_variables:
-            for i in range(n_features, 2*n_features):
-                test_dict[i] = np.isnan(self.dataset._X_train[:,i-n_features])
-
+            
+        test_dict = {k: self.dataset._X_train[:,k] for k in range(n_features)}
         test_dict['y_true'] = self.dataset._y
         test_dict['y_pred'] = y_pred_score
 
@@ -651,13 +647,8 @@ class Experiments(object):
 
         # Finally fit the model with all the data for plotting purposes 
         self._init_model()
-
-        if self.use_missing_indicator_variables==True:
-    
-            X_train = np.concatenate([self.dataset.X_train, (~np.isnan(self.dataset._X_train)).astype(int)], axis=1)
-        else:
-            X_train = self.dataset.X_train
-            
+        
+        X_train = self.dataset.X_train
         y_train = self.dataset._y.squeeze()
 
         # Fit model 
@@ -758,26 +749,6 @@ class Experiments(object):
         print("Sanity check: number of predictions: {} == {}: Num samples\n".format(len(arr), self.dataset.y_test.shape[0])) if (self.debug or self.verbosity > 1)  else None
 
         self.dataset.y_pred = y_pred
-
-        return
-
-    def _predict_nam(self): # TODO REMOVE
-
-        # Create data loader
-        if self.use_missing_indicator_variables==True:
-    
-            X_test = np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
-
-        else:
-
-            X_test = self.dataset.X_test
-
-        y_test = self.dataset.y_test.squeeze()
-
-        # Create the PyTorch Datasets
-        data_test = TabularData(X=X_test, y=y_test) 
-
-        self.dataset.y_pred, _ = eval_model(self.model, data_test)
 
         return
     
@@ -992,6 +963,10 @@ class Experiments(object):
 
     def _plot_nam(self):
         
+        if self.dataset.dataset_name not in ['blobs', 'circles', 'moons']:
+            self._plot_nam_autism()
+            return
+        
         #Select the best replicate as the predictions_df for plotting reasons. Note this is based on AUC.
         best_replicate = np.argmax(self.performances_df['Area Under the Curve (AUC)'])
         best_predictions_df = self.predictions_df.query(" `replicate` == @best_replicate")
@@ -1007,15 +982,11 @@ class Experiments(object):
         # Plot the performances 
         cm = confusion_matrix(best_predictions_df['y_true'].to_numpy(), best_predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-        disp.plot(cmap='Blues', ax=axes[2])
-        disp.im_.colorbar.remove()    
+        disp.plot(cmap='Blues', ax=axes[2]); disp.im_.colorbar.remove()    
                                                                                                     
-        # Plot the shapes functions
-        features = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.use_missing_indicator_variables==True else ['X_1', 'X_2', 'X_1_bis', 'X_2_bis'] if self.use_missing_indicator_variables=='redundant' else ['X_1', 'X_2']                                                                                              
-
         # Plot the roc curves
         axes[3] = plot_roc_curves_nam(self.predictions_df, ax=axes[3]) 
-        axes = plot_shape_functions(self.predictions_df, features, axes=axes, ncols=5, start_axes_plotting=5) 
+        axes = plot_shape_functions(self.predictions_df, self.features_name, axes=axes, ncols=5, start_axes_plotting=5) 
 
         # Plot the dataset with the errors
 
@@ -1079,15 +1050,53 @@ class Experiments(object):
         axes[9].scatter([-5], [-5], color='tab:red', s=100, facecolors='none', alpha=alpha, label="FN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Negative`==1"))))
         axes[9].set_xlim([0,1]);axes[9].set_ylim([0,1]);axes[9].axis('off');axes[9].legend(loc='center', prop={'size':15})
 
-        if not self.use_missing_indicator_variables:
+        if not self.dataset.use_missing_indicator_variables:
             [axes[i].axis('off') for i in [7, 8, 9]]
         else:
             [axes[i].axis('off') for i in [9]]
 
 
         plt.tight_layout();plt.show()
+        
+        return 
 
+    
+    def _plot_nam_autism(self):
+        
+        #Select the best replicate as the predictions_df for plotting reasons. Note this is based on AUC.
+        best_replicate = np.argmax(self.performances_df['Area Under the Curve (AUC)'])
+        best_predictions_df = self.predictions_df.query(" `replicate` == @best_replicate")
+
+        n_plots = 5 + len(self.features_name)
+        
+        # Create the pannel 
+        fig, axes = plt.subplots(n_plots//5+1, 5, figsize=(25, 8)); axes = axes.flatten()
+        fig.suptitle("({}) {}".format(int(self.experiment_number), self.description), y=1.1, weight='bold', fontsize=12)
+
+        # Plot the performances 
+        cm = confusion_matrix(best_predictions_df['y_true'].to_numpy(), best_predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+        disp.plot(cmap='Blues', ax=axes[3])
+        disp.im_.colorbar.remove()    
+                                                                                                                     
+
+        # Plot the roc curves
+        axes[1] = plot_roc_curves_nam(self.predictions_df, ax=axes[1]) 
+        axes = plot_shape_functions(self.predictions_df, self.features_name, axes=axes, ncols=5, start_axes_plotting=5) 
+
+    
+        [axes[i].axis('off') for i in [0, 2, 4]]
+
+
+        plt.tight_layout();plt.show()
+        
+        return 
+    
     def _plot_xgboost(self):
+        
+        if self.dataset.dataset_name not in ['blobs', 'circles', 'moons']:
+            self._plot_xgboost_autism()
+            return        
         
         # Create the pannel 
         fig_mosaic = """
@@ -1110,14 +1119,11 @@ class Experiments(object):
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(cmap='Blues', ax=axes['C']);disp.im_.colorbar.remove()    
                                                                                                     
-        # Plot the shapes functions
-        features = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.use_missing_indicator_variables else ['X_1', 'X_2']                                                                               
-
         # Plot the roc curves
         axes['D'] = plot_roc_curves_xgboost(self.predictions_df, ax=axes['D']) 
         
         # Plot features importance
-        self.model.get_booster().feature_names = features
+        self.model.get_booster().feature_names = self.features_name
         axes['E'] = plot_importance(self.model.get_booster(),  height=0.5, ax = axes['E'])
         
         # Plot Tree
@@ -1185,11 +1191,43 @@ class Experiments(object):
         axes['H'].scatter([-5], [-5], color='tab:red', s=100, facecolors='none', alpha=alpha, label="FN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Negative`==1"))))
         axes['H'].set_xlim([0,1]);axes['H'].set_ylim([0,1]);axes['H'].axis('off');axes['H'].legend(loc='center', prop={'size':15})
 
-        #if not self.use_missing_indicator_variables:
+        #if not self.dataset.use_missing_indicator_variables:
         #    [axes[i].axis('off') for i in [7, 8, 9]]
         #else:
         axes['I'].axis('off')
 
+
+        plt.tight_layout();plt.show()
+
+        return 
+
+    def _plot_xgboost_autism(self):
+        
+        # Create the pannel 
+        fig_mosaic = """
+                        ABCC
+                        FFFF
+                        FFFF
+                    """
+
+        fig, axes = plt.subplot_mosaic(mosaic=fig_mosaic, figsize=(25,18))
+        
+        fig.suptitle("({}) {}".format(int(self.experiment_number), self.description), y=1.1, weight='bold', fontsize=12)
+
+        # Plot the performances 
+        cm = confusion_matrix(self.predictions_df['y_true'].to_numpy(), self.predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+        disp.plot(cmap='Blues', ax=axes['B']);disp.im_.colorbar.remove()    
+                                                                                                    
+        # Plot the roc curves
+        axes['A'] = plot_roc_curves_xgboost(self.predictions_df, ax=axes['A']) 
+        
+        # Plot features importance
+        self.model.get_booster().feature_names = self.features_name
+        axes['C'] = plot_importance(self.model.get_booster(),  height=0.5, ax = axes['C'])
+        
+        # Plot Tree
+        axes['F'] = plot_tree(self.model.get_booster(), num_trees=self.model.best_iteration, ax=axes['F'])
 
         plt.tight_layout();plt.show()
 
@@ -1285,7 +1323,7 @@ class Experiments(object):
         axes['H'].scatter([-5], [-5], color='tab:red', s=100, facecolors='none', alpha=alpha, label="FN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Negative`==1"))))
         axes['H'].set_xlim([0,1]);axes['H'].set_ylim([0,1]);axes['H'].axis('off');axes['H'].legend(loc='center', prop={'size':15})
 
-        #if not self.use_missing_indicator_variables:
+        #if not self.dataset.use_missing_indicator_variables:
         #    [axes[i].axis('off') for i in [7, 8, 9]]
         #else:
         #axes['I'].axis('off')
@@ -1348,9 +1386,6 @@ class Experiments(object):
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(cmap='Blues', ax=axes['C']);disp.im_.colorbar.remove()    
                                                                                                     
-        # Plot the shapes functions
-        features = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.use_missing_indicator_variables else ['X_1', 'X_2']                                                                               
-
         # Plot the roc curves
         axes['D'] = plot_roc_curves_xgboost(self.predictions_df, ax=axes['D']) 
         
@@ -1414,7 +1449,7 @@ class Experiments(object):
         axes['H'].scatter([-5], [-5], color='tab:red', s=100, facecolors='none', alpha=alpha, label="FN (n={}) with Missing".format(len(predictions_df.query(" `Have missing`==1 and `False Negative`==1"))))
         axes['H'].set_xlim([0,1]);axes['H'].set_ylim([0,1]);axes['H'].axis('off');axes['H'].legend(loc='center', prop={'size':15})
 
-        #if not self.use_missing_indicator_variables:
+        #if not self.dataset.use_missing_indicator_variables:
         #    [axes[i].axis('off') for i in [7, 8, 9]]
         #else:
         #axes['I'].axis('off')
@@ -1507,22 +1542,6 @@ class Experiments(object):
         json_path = os.path.join(experiment_path, 'experiment_log.json')
 
         return experiment_number, experiment_path, json_path
-
-    def _init_features_name(self):
-
-        if self.use_missing_indicator_variables==True:
-
-            return self.dataset.features_name + ['Z_' + feat for feat in self.dataset.features_name]
-
-        elif self.use_missing_indicator_variables=='redundant':
-    
-            assert len(self.dataset.features_name)==2, "Only for toy dataset."
-
-            return ['X_1', 'X_2', 'X_1_bis', 'X_2_bis']
-
-        else:
-
-            return self.dataset.features_name
    
     def _init_model(self, **kwargs):
     
@@ -1620,25 +1639,6 @@ class Experiments(object):
             self.model = LogisticRegression(random_state=0)
 
         return 
-
-    def _init_train_test(self, train=[], test=[], return_y=True):
-
-        if self.use_missing_indicator_variables==True:
-
-            X_train, X_test = np.concatenate([self.dataset.X_train[train], (~np.isnan(self.dataset._X_train[train])).astype(int)], axis=1), np.concatenate([self.dataset.X_train[test], (~np.isnan(self.dataset._X_train[test])).astype(int)], axis=1)
-
-        else:
-
-            X_train, X_test = self.dataset.X_train[train], self.dataset.X_train[test]
-
-        if return_y:
-
-            y_train, y_test = self.dataset._y[train].squeeze(), self.dataset._y[test].squeeze()
-
-            return X_train, X_test, y_train, y_test
-
-        else:
-            return X_train, X_test
     
     def _load(self, data):
 

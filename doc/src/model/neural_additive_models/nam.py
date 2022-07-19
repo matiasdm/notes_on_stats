@@ -40,8 +40,6 @@ class ReLU(nn.Module):
         out = F.relu(out)
         return out
 
-
-
 class FeatureNet(nn.Module):
     def __init__(self, hidden_sizes, dropout_rate = .2, use_exu = True):
         super(FeatureNet, self).__init__()
@@ -61,7 +59,6 @@ class FeatureNet(nn.Module):
 
     def forward(self, x):
         return self.layers(x)
-
 
 class NAM(nn.Module):
     def __init__(self, num_features, hidden_sizes, dropout_rate = .2, feature_dropout = 0.0, use_exu = False):
