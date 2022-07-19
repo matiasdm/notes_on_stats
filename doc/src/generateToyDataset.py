@@ -70,7 +70,6 @@ class DatasetGenerator(object):
                 dataset_name, 
                 num_samples=NUM_SAMPLES,
                 imbalance_ratio=IMBALANCE_RATIO, 
-                class_used=None, 
                 proportion_train=PROPORTION_TRAIN, 
                 missing_data_handling=MISSING_DATA_HANDLING,
                 imputation_method=DEFAULT_IMPUTATION_METHOD, 
@@ -86,7 +85,6 @@ class DatasetGenerator(object):
             return 
 
         self.num_samples = num_samples
-        self.class_used = class_used
         
         #self.ratio_of_missing_values = ratio_of_missing_values
         self.imbalance_ratio = imbalance_ratio

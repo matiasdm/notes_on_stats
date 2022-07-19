@@ -12,9 +12,11 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, roc_curve, auc
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, roc_curve, plot_roc_curve, auc
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import StratifiedKFold
+
 
 from xgboost import XGBClassifier, plot_importance, plot_tree
 from interpret.glassbox import ExplainableBoostingClassifier
@@ -63,8 +65,6 @@ class Experiments(object):
         self.debug=debug
         self.verbosity=verbosity
 
-
-
         # Dataset 
         self.dataset = dataset
 
@@ -79,12 +79,14 @@ class Experiments(object):
         self.dist = None
         self.dist_pos = None
         self.dist_neg = None
-        
-        # NAMs and XGboost related attributs
-        self.model = None
 
         self.use_missing_indicator_variables = use_missing_indicator_variables
+        self.features_name = self._init_features_name()
+        # NAMs and XGboost related attributs
+        self._init_model()
         self.fitted = False
+
+
         
         # Interesting byproducts
         self.predictions_df = None
@@ -107,42 +109,42 @@ class Experiments(object):
         self.debug=debug
         self.random_state = random_state
 
-    def fit(self, **kwargs):
+    def __call__(self):
+        return repr(self)       
+    
+    def fit_predict(self, **kwargs):
+
+        """ 
+            This function fit the model and predict score.
+            It generates the `predictions_df` attribute, that predict score on all the dataset.
+
+        """
+
+        
+
 
         self.dataset.impute_data()
+
+        if self.verbosity >1:
+            print("Predicting {} based on {} features using {} approach.".format(self.dataset.outcome_column, len(self.dataset.features_name), self.approach))
+            print(*self.dataset.features_name, sep='\n')
 
         if self.approach in ['single_distribution', 'multi_distributions']:
 
             if self.purpose == 'classification':
-                    #Estimation of the distributions for the positive and negative class
-                self.dist_pos = Distributions(dataset=self.dataset, 
-                                            class_used=1, 
-                                            approach=self.approach,
-                                            cmap='Blues',
-                                            debug=self.debug, 
-                                            verbosity=1)
-
-                self.dist_neg = Distributions(dataset=self.dataset, 
-                                            class_used=0, 
-                                            approach=self.approach,
-                                            cmap='Greens',
-                                            debug=self.debug, 
-                                            verbosity=1)
-
+            
                 # Estimate distributions
                 self.dist_pos.estimate_pdf(resolution=self.resolution, bandwidth=self.bandwidth)
                 self.dist_neg.estimate_pdf(resolution=self.resolution, bandwidth=self.bandwidth)
             
             
             elif self.purpose == 'estimation':
-                #Estimation of the distribution
-                self.dist = Distributions(dataset=self.dataset, 
-                                        class_used=None, 
-                                        cmap='Oranges',
-                                        verbosity=1)
 
                 # Estimate distributions
                 self.dist.estimate_pdf(resolution=self.resolution, bandwidth=self.bandwidth)
+
+            # Do the prediction for the test set.
+            self._predict_map()
 
         elif self.approach == 'nam':
 
@@ -151,110 +153,34 @@ class Experiments(object):
             # Through self.dataset.y_pred. Note also this is called when plotting! 
             self.predictions_df = self._train_nam(**kwargs)
 
-        elif self.approach == 'xgboost':
-            
-            self.model = XGBClassifier(use_label_encoder=False, # TODO ADD PLAYING WITH PARAMETERS 
-                                      learning_rate=0.01,
-                                       n_estimators= 1000,
-                                      max_depth = 3,
-                                      verbosity=1,
-                                      objective='binary:logistic',
-                                      eval_metric='auc',
-                                      booster='gbtree',
-                                      tree_method='exact',
-                                      subsample=1,
-                                      colsample_bylevel=.8,
-                                      alpha=0)
-
-            self.predictions_df = self._fit_xgboost_ebm(**kwargs)
-
-        elif self.approach == 'ebm':
-
-            features_name = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.use_missing_indicator_variables else ['X_1', 'X_2']                                                                                              
-            self.model = ExplainableBoostingClassifier(feature_names=features_name, 
-                                                        max_bins=1024,
-                                                        max_interaction_bins=512,
-                                                        binning='quantile',
-                                                        mains='all',
-                                                        interactions=20,
-                                                        outer_bags=8,
-                                                        inner_bags=0,
-                                                        learning_rate=0.01,
-                                                        validation_size=0.15,
-                                                        early_stopping_rounds=50,
-                                                        early_stopping_tolerance=0.0001,
-                                                        max_rounds=1000,
-                                                        min_samples_leaf=2,
-                                                        max_leaves=3,
-                                                        n_jobs=-2,
-                                                        random_state=RANDOM_STATE)
-
-            self.predictions_df = self._fit_xgboost_ebm(**kwargs)
-
-        elif self.approach == 'DecisionTree':
-                                                                                           
-            self.model = DecisionTreeClassifier(criterion='gini',
-                                splitter='best',
-                                max_depth=3,
-                                min_samples_split=2,
-                                min_samples_leaf=1,
-                                min_weight_fraction_leaf=0.0,
-                                max_features=None,
-                                random_state=None,
-                                max_leaf_nodes=None,
-                                min_impurity_decrease=0.0,
-                                min_impurity_split=None,
-                                class_weight=None,
-                                presort='deprecated',
-                                ccp_alpha=0.0)
-
-            self.predictions_df = self._fit_xgboost_ebm(**kwargs)
-
-        elif self.approach == 'LogisticRegression':
-            self.model = LogisticRegression(random_state=0)
-
-            self.predictions_df = self._fit_xgboost_ebm(**kwargs)
-            
-        self.fitted = True
-
-    def predict(self):
-
-        assert self.purpose == 'classification', "/!\. Purpose mode is set to `estimation`, you should set it to `classification`. :-)"
-        # TODO: if we don't enlarge the scope of those classes (only use fit and predict with distributions), then no need to distinguish here...
-
-        if self.approach in ['multi_distributions', 'single_distribution']:
-
-            # Do the prediction for the test set.
-            self._predict_map()
-
-            # Compute performances
-            self._performances_vanilla()
-
-        elif self.approach == 'nam':
-            
             # Do the prediction with the best model
             self._predict_nam()
 
-            # Compute perf.
-            self._performances_nam()
-            
-        elif self.approach in ['xgboost', 'ebm', 'DecisionTree', 'LogisticRegression']:
-            
-            # Do the prediction with the best model
-            self._predict_xgboost_ebm()
+        elif self.approach == 'xgboost':
 
-            # Compute perf.
-            self._performances_vanilla()
-            
-        else:
-            raise ValueError("Please use 'single_distribution', 'multi_distributions' or 'nam', 'xgboost', or 'ebm' approach.")
-        
-        if self.save_experiment:
-            self.save() 
+            self.predictions_df = self._fit_predict_vanilla(**kwargs)
 
-        return
+        elif self.approach == 'ebm':
+
+            self.predictions_df = self._fit_predict_vanilla(**kwargs)
+
+        elif self.approach == 'DecisionTree':
+
+            self.predictions_df = self._fit_predict_vanilla(**kwargs)
+
+        elif self.approach == 'LogisticRegression':
+
+            self.predictions_df = self._fit_predict_vanilla(**kwargs)
+
+        self._performances()
+            
+        self.fitted = True
+
+        return 
 
     def plot(self,  *args, **kwargs):
+
+        display(self.performances_df)
 
         if self.approach in ['single_distribution', 'multi_distributions']:
 
@@ -278,14 +204,11 @@ class Experiments(object):
             self._plot_ebm()   
 
         elif self.approach in ['DecisionTree', 'LogisticRegression']:
-            self._plot_logistic_regression()
+            self._plot_lr_decision_tree()
             print("Not implemented yet.")
 
         return
 
-    def __call__(self):
-        return repr(self)       
-    
     def save(self):
         
         #-------- Save dataset ----------#
@@ -496,121 +419,40 @@ class Experiments(object):
             
 
                         
-            self._fit_xgboost_ebm()
+            self._fit_vanilla()
 
         print("Experiment {} loaded successfully! :-)".format(previous_experiment))
         return  
 
-    def _init_experiment_path(self, suffix=None):
+    ################################ Computing predictions (predictions_df attribute) ###########################
+
+    def _train_nam(self, num_cv=None, **kwargs):
         """
-            This method create the experiment path and folders associated with experiments. 
-            It creates into the DATA_DIR location - usually "*/data/ - several objects (here is an exemple for the autism project):
-
-                data/
-                ├── experiments/
-                │   ├── README.md
-                │   └── 0
-                │   │   ├── experiments_log.json
-                │   │   ├── model
-                |   |   |     ├── model.gz
-                │   │   └── distributions
-                |   |   |     ├── hat_f.npy
-                |   |   |     ├── hat_f_1.npy
-                |   |   |     ├── hat_f_2.npy
-                └── *Whatever you have here*
-
-
-
-            You have to figure out: 
-                - The name of the different sub-folders contained in each experiments (model (as in the example), fisher_vectors, images, etc.)
-                - The attributes of this classes which cannot be simply saved/loaded in json files. Those will be handled separately.
+            This function is a helper function to fit and predict score using loocv. 
+            It generates the `predictions_df` attribute, that predict score on all the dataset.
 
         """
-        
-        # Create experiment folder if not already created
-
-        if not os.path.isdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME)):
-            os.mkdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME))
-
-        if not os.path.isdir(os.path.join(DATA_DIR, 'tmp')):
-            os.mkdir(os.path.join(DATA_DIR, 'tmp'))  
-
-        # Create dataset experiment folder  if not already created
-        if not os.path.isdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name)):
-            os.mkdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name))
-
-        if not os.path.isdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, '0')):
-            os.mkdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, '0'))
-    
-        # Looking for the number of the new experiment number
-        experiment_number = np.max([int(os.path.basename(path)) for path in glob(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, '*'))])+1
-
-        experiment_path = os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, str(experiment_number))
-        print('Doing experiment {}!'.format(experiment_number))
-
-        # Create experiment folder 
-        os.mkdir(experiment_path)
-
-        # Create sub-folders associated to the project
-        #os.mkdir(os.path.join(experiment_path, 'dataset'))
-
-        # Create json path
-        json_path = os.path.join(experiment_path, 'experiment_log.json')
-
-        return experiment_number, experiment_path, json_path
-
-    def _load(self, data):
-
-        for key, value in data.items():
-            if isinstance(value, list):
-                setattr(self, key, np.array(value))
-            else: 
-                setattr(self, key, value)
-
-
-    def _train_nam(self):
-        
-        if self.use_missing_indicator_variables==True:
-            features = ['X_1', 'X_2', 'Z_1', 'Z_2']
-
-        elif self.use_missing_indicator_variables=='redundant':
-
-            features = ['X_1', 'X_2', 'X_1_bis', 'X_2_bis']
-
-        else:
-            features = ['X_1', 'X_2']
-
+        if num_cv is not None:
+            return self._train_predict_nam_cv(num_cv)
+             
 
         replicates_results = []
         best_roc_auc = 0
+        NAM_DEFAULT_PARAMETERS['model']['num_features'] = len(self.features_name)
+
         for i in range(NAM_DEFAULT_PARAMETERS['num_replicates']):      
             print('\t===== Replicate no. {} =====\n'.format(i + 1)) if (self.debug or self.verbosity > 1)  else None
 
             # Split test and train dataset
             self.dataset.split_test_train()
 
-            # Create data loader
-            if self.use_missing_indicator_variables==True:
-
-                X_train, X_test = np.concatenate([self.dataset.X_train, (~np.isnan(self.dataset._X_train)).astype(int)], axis=1), np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
-                NAM_DEFAULT_PARAMETERS['model']['num_features'] = 4
-
-            elif self.use_missing_indicator_variables=='redundant':
-
-                X_train, X_test = np.concatenate([self.dataset.X_train, self.dataset.X_train], axis=1), np.concatenate([self.dataset.X_test, self.dataset.X_test], axis=1)
-                NAM_DEFAULT_PARAMETERS['model']['num_features'] = 4
-
-            else:
-                X_train, X_test = self.dataset.X_train, self.dataset.X_test
-                NAM_DEFAULT_PARAMETERS['model']['num_features'] = 2
-
-            y_train, y_test = self.dataset.y_train.squeeze(), self.dataset.y_test.squeeze()
-
-
+            # Init data
+            X_train, X_test, y_train, y_test = self._init_train_test(return_y=True)
+        
             # Create the df associated to the test sample 
             test_dict = {i:X_test[:,i] for i in range(X_test.shape[1])}
             test_dict['y_true'] = y_test
-            test_df = pd.DataFrame.from_dict(test_dict);test_df.columns = features + ["y_true"]
+            test_df = pd.DataFrame.from_dict(test_dict);test_df.columns = self.features_name + ["y_true"]
 
             # Create the PyTorch Datasets
             data_train = TabularData(X=X_train, y=y_train)
@@ -623,7 +465,7 @@ class Experiments(object):
             train_model(model, data_train, verbosity=self.verbosity, **NAM_DEFAULT_PARAMETERS['training'])
             y_, p_ = eval_model(model, data_test)
 
-            res = (pd.DataFrame(p_, columns = features, index=test_df.index)
+            res = (pd.DataFrame(p_, columns = self.features_name, index=test_df.index)
                         .add_suffix('_partial')
                         .join(test_df)
                         .assign(y_pred = y_)
@@ -657,19 +499,101 @@ class Experiments(object):
         
         return  pd.concat(replicates_results)
 
-    def _fit_xgboost_ebm(self, **kwargs): #TODO not NAM
-        
-        # Create data loader
-        if self.use_missing_indicator_variables==True:
-    
-            features = ['X_1', 'X_2', 'Z_1', 'Z_2']
-            X_train, X_test = np.concatenate([self.dataset.X_train, (~np.isnan(self.dataset._X_train)).astype(int)], axis=1), np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
+    def _train_predict_nam_cv(self, num_cv, **kwargs):
+        """
+            This function is a helper function to fit and predict score using loocv. 
+            It generates the `predictions_df` attribute, that predict score on all the dataset.
+        """
 
-        else:
-            features = ['X_1', 'X_2']
-            X_train, X_test = self.dataset.X_train, self.dataset.X_test
+        
+        cv = StratifiedKFold(n_splits=num_cv, shuffle=True, random_state=0)
+        print('Performing {} fold cross-validation.'.format(num_cv)) if self.verbosity > 1 else None
             
-        y_train, y_test = self.dataset.y_train.squeeze(), self.dataset.y_test.squeeze()
+        replicates_results = []
+        best_roc_auc = 0
+        NAM_DEFAULT_PARAMETERS['model']['num_features'] = len(self.features_name)
+
+        for i in range(NAM_DEFAULT_PARAMETERS['num_replicates']):      
+            #print('\t===== Replicate no. {} =====\n'.format(i + 1)) if (self.debug or self.verbosity > 1)  else None
+            
+
+            y_pred_all = np.zeros(self.dataset.num_samples).astype('float32') 
+            feature_net_values_all = np.zeros((self.dataset.num_samples, len(self.features_name))).astype('float32') 
+
+            test_dict = {k:np.zeros(self.dataset.num_samples) for k in range(len(self.features_name))}
+            test_dict['y_true'] = np.zeros(self.dataset.num_samples)
+            for idx_split, (train, test) in enumerate(cv.split(self.dataset._X, self.dataset._y)):
+            
+                # Init data
+                X_train, X_test, y_train, y_test = self._init_train_test(train=train, test=test, return_y=True)
+
+                # Create the df associated to the test sample 
+                for k in range(X_test.shape[1]):
+                    test_dict[k][test] = X_test[:,k]
+                    
+
+                #test_dict = {i:X_test[:,i] for i in range(X_test.shape[1])}
+                
+                test_dict['y_true'][test] = y_test
+                test_df = pd.DataFrame.from_dict(test_dict);test_df.columns = self.features_name + ["y_true"]
+
+                # Create the PyTorch Datasets
+                data_train, data_test = TabularData(X=X_train, y=y_train), TabularData(X=X_test, y=y_test) 
+
+                # Init. the model
+                model = NAM(**NAM_DEFAULT_PARAMETERS['model'])
+                model = model.double()
+
+                train_model(model, data_train, verbosity=self.verbosity, **NAM_DEFAULT_PARAMETERS['training'])
+                y_pred_all[test], feature_net_values_all[test] = eval_model(model, data_test)
+
+                
+            res = (pd.DataFrame(feature_net_values_all, columns = self.features_name, index=test_df.index)
+                        .add_suffix('_partial')
+                        .join(test_df)
+                        .assign(y_pred = y_pred_all)
+                        .assign(replicate = i))
+
+            replicates_results.append(res)
+
+            # Save best model by computing auroc
+            y_true = res['y_true'].to_numpy(); y_pred = res['y_pred'].to_numpy()
+            fpr_auc, tpr_auc, _ = roc_curve(y_true, y_pred)      
+            roc_auc = auc(fpr_auc, tpr_auc)  
+            if roc_auc > best_roc_auc:
+                best_roc_auc = roc_auc
+
+                if self.save_experiment:
+                    torch.save(model.state_dict(), os.path.join(self.experiment_path, 'best_model.pt'))
+                else:
+                    torch.save(model.state_dict(), os.path.join(DATA_DIR, 'tmp', 'best_model.pt'))
+
+        # Finally load the best model
+
+        self.model = NAM(**NAM_DEFAULT_PARAMETERS['model'])
+        self.model = self.model.double()
+        if self.save_experiment:
+            self.model.load_state_dict(torch.load(os.path.join(self.experiment_path, 'best_model.pt')))
+        else:
+            self.model.load_state_dict(torch.load(os.path.join(DATA_DIR, 'tmp', 'best_model.pt')))
+
+        self.model.eval()
+
+        return  pd.concat(replicates_results)
+
+    def _fit_predict_vanilla(self, num_cv=None, **kwargs): #TODO not NAM
+        """
+            This function is a helper function to fit and predict score. The train set is used to train 
+            the algorithm, the test set for evaluating performances.
+            It generates the `predictions_df` attribute, that predict score on all the dataset.
+
+        """
+
+        if num_cv is not None:
+            return self._fit_predict_vanilla_cv(num_cv)
+             
+        # Init data
+        X_train, X_test, y_train, y_test = self._init_train_test(return_y=True)
         
         # Fit model 
         self.model.fit(X_train, y_train)
@@ -679,11 +603,69 @@ class Experiments(object):
         test_dict['y_true'] = y_test
         test_dict['y_pred'] = self.model.predict_proba(X_test)[:,1]
 
-        test_df = pd.DataFrame.from_dict(test_dict);test_df.columns = features + ["y_true", "y_pred"]
+        test_df = pd.DataFrame.from_dict(test_dict);test_df.columns = self.features_name + ["y_true", "y_pred"]
 
         if self.save_experiment and self.approach != 'ebm': # TODOADD
             pickle.dump(self.model, open(os.path.join(self.experiment_path, 'best_model.pt'), "wb"))
         
+        return test_df
+
+    def _fit_predict_vanilla_cv(self, num_cv, **kwargs): #TODO not NAM
+        """
+            This function is a helper function to fit and predict score using loocv. 
+            It generates the `predictions_df` attribute, that predict score on all the dataset.
+
+        """        
+        y_pred_score = -1*np.ones_like(self.dataset._y).astype('float32')  # init prediction scores 
+
+        cv = StratifiedKFold(n_splits=num_cv, shuffle=True, random_state=0)
+        print('Performing {} fold cross-validation.'.format(num_cv)) if self.verbosity > 1 else None
+        
+        for _, (train, test) in enumerate(cv.split(self.dataset._X, self.dataset._y)):
+    
+            # Init data
+            X_train, X_test, y_train, y_test = self._init_train_test(train=train, test=test, return_y=True)
+
+            # Reset model 
+            self._init_model()
+            # Fit model 
+            self.model.fit(X_train, y_train)
+
+            # Predict samples on the test set
+            y_pred_score[test] = self.model.predict_proba(X_test)[:,1]
+        
+
+        # Create the df associated to the test sample 
+        n_features = self.dataset.X_train.shape[1]
+        test_dict = {i:self.dataset._X_train[:,i] for i in range(n_features)}
+
+        if self.use_missing_indicator_variables:
+            for i in range(n_features, 2*n_features):
+                test_dict[i] = np.isnan(self.dataset._X_train[:,i-n_features])
+
+        test_dict['y_true'] = self.dataset._y
+        test_dict['y_pred'] = y_pred_score
+
+        test_df = pd.DataFrame.from_dict(test_dict)
+        test_df.columns = self.features_name + ["y_true", "y_pred"]
+
+        # Finally fit the model with all the data for plotting purposes 
+        self._init_model()
+
+        if self.use_missing_indicator_variables==True:
+    
+            X_train = np.concatenate([self.dataset.X_train, (~np.isnan(self.dataset._X_train)).astype(int)], axis=1)
+        else:
+            X_train = self.dataset.X_train
+            
+        y_train = self.dataset._y.squeeze()
+
+        # Fit model 
+        self.model.fit(X_train, y_train)
+
+        if self.save_experiment and self.approach != 'ebm': # TODOADD
+            pickle.dump(self.model, open(os.path.join(self.experiment_path, 'best_model.pt'), "wb"))
+
         return test_df
     
     def _predict_map(self):
@@ -779,20 +761,15 @@ class Experiments(object):
 
         return
 
-    def _predict_nam(self):
-    
+    def _predict_nam(self): # TODO REMOVE
+
+        # Create data loader
         if self.use_missing_indicator_variables==True:
-            features = ['X_1', 'X_2', 'Z_1', 'Z_2']
+    
             X_test = np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
 
-
-        elif self.use_missing_indicator_variables=='redundant':
-    
-            features = ['X_1', 'X_2', 'X_1_bis', 'X_2_bis']
-            X_test = np.concatenate([self.dataset.X_test, self.dataset.X_test], axis=1)
-
         else:
-            features = ['X_1', 'X_2']
+
             X_test = self.dataset.X_test
 
         y_test = self.dataset.y_test.squeeze()
@@ -804,38 +781,70 @@ class Experiments(object):
 
         return
     
-    def _predict_xgboost_ebm(self):
-    
-        if self.use_missing_indicator_variables:
-            X_test = np.concatenate([self.dataset.X_test, (~np.isnan(self.dataset._X_test)).astype(int)], axis=1)
-        else:
-            X_test = self.dataset.X_test        
+    ################################ Computing performances (performcances_df attribute) ###########################
 
-        self.dataset.y_pred = self.model.predict_proba(X_test)[:,1]
+    def _performances(self):
+        """
+            This function generates the `performances_df` dataframe, using the prediction scores of `predictions_df`
+
+        """
+
+        assert self.purpose == 'classification', "/!\. Purpose mode is set to `estimation`, you should set it to `classification`. :-)"
+        # TODO: if we don't enlarge the scope of those classes (only use fit and predict with distributions), then no need to distinguish here...
+
+        if self.approach == 'nam':
+            
+            # Compute perf.
+            self._performances_nam()
+            
+        elif self.approach in ['multi_distributions', 'single_distribution', 'xgboost', 'ebm', 'DecisionTree', 'LogisticRegression']:
+            
+            # Compute perf.
+            self._performances_vanilla()
+            
+        else:
+            raise ValueError("Please use 'single_distribution', 'multi_distributions' or 'nam', 'xgboost', or 'ebm' approach.")
+        
+        if self.save_experiment:
+            self.save() 
 
         return
-    
-    def _performances_vanilla(self): # TODO CHANGE NAME
 
-        y_true = self.dataset.y_test.squeeze()
-        y_pred = self.dataset.y_pred
+    def _performances_vanilla(self): 
 
-        # Creation of a df for the prediction
-        predictions_df = pd.DataFrame({'X1':self.dataset.X_test[:,0], 
-                      'X2':self.dataset.X_test[:,1], 
-                      'Z1':[1 if not np.isnan(x) else 0 for x in self.dataset.X_test[:,0]],
-                      'Z2': [1 if not np.isnan(x) else 0 for x in self.dataset.X_test[:,1]],
-                      'y_true': y_true, 
-                      'y_pred': y_pred, 
-                      'True Positive': [1 if y_true==1 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                      'True Negative': [1 if y_true==0 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                      'False Positive': [1 if y_true==0 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                      'False Negative': [1 if y_true==1 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                      })
+        if self.dataset.dataset_name in ['blobs', 'circles', 'moons']:
+            y_true = self.dataset.y_test.squeeze()
+            y_pred = self.dataset.y_pred
 
+            # Creation of a df for the prediction
+            predictions_df = pd.DataFrame({'X1':self.dataset.X_test[:,0], 
+                        'X2':self.dataset.X_test[:,1], 
+                        'Z1':[1 if not np.isnan(x) else 0 for x in self.dataset.X_test[:,0]],
+                        'Z2': [1 if not np.isnan(x) else 0 for x in self.dataset.X_test[:,1]],
+                        'y_true': y_true, 
+                        'y_pred': y_pred, 
+                        'True Positive': [1 if y_true==1 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                        'True Negative': [1 if y_true==0 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                        'False Positive': [1 if y_true==0 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                        'False Negative': [1 if y_true==1 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                        })
+        else:
+            
+            y_true = self.predictions_df['y_true'].to_numpy()
+            y_pred = self.predictions_df['y_pred'].to_numpy()
+            
+            # Creation of a df for the prediction
+            predictions_df = pd.DataFrame({'y_true': y_true, 
+                                            'y_pred': y_pred, 
+                                            'True Positive': [1 if y_true==1 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                            'True Negative': [1 if y_true==0 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                            'False Positive': [1 if y_true==0 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                            'False Negative': [1 if y_true==1 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
+                                            })
         self.predictions_df = predictions_df
 
-        #Compute metrics of interest  
+        #Compute metrics of interest 
+        #  
         tn, fp, fn, tp = confusion_matrix(y_true, y_pred > CLASSIFICATION_THRESHOLD if self.approach in['xgboost', 'ebm', 'LogisticRegression', 'DecisionTree'] else y_pred).ravel()
 
         acc = (tp + tn) / (tp + tn + fp +  fn)
@@ -915,6 +924,9 @@ class Experiments(object):
         performances_dict = {metric: np.mean(values) for metric, values in performances_dict.items()}
         self.performances_df = pd.DataFrame(performances_dict, index = [0])
         return
+
+
+    ################################ Plotting functions ###########################
 
     def _plot_estimation(self):
     
@@ -1184,7 +1196,12 @@ class Experiments(object):
         return 
 
     def _plot_ebm(self):
-        
+
+
+        if self.dataset.dataset_name not in ['blobs', 'circles', 'moons']:
+            return self._plot_ebm_autism()
+            
+
         # Create the pannel 
         fig_mosaic = """
                         ABC
@@ -1203,9 +1220,7 @@ class Experiments(object):
         cm = confusion_matrix(self.predictions_df['y_true'].to_numpy(), self.predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(cmap='Blues', ax=axes['C']);disp.im_.colorbar.remove()    
-                                                                                                    
-        # Plot the shapes functions
-        features = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.use_missing_indicator_variables else ['X_1', 'X_2']                                                                               
+                                                                                                                                                                
 
         # Plot the roc curves
         axes['D'] = plot_roc_curves_xgboost(self.predictions_df, ax=axes['D']) 
@@ -1283,10 +1298,37 @@ class Experiments(object):
 
         return show(ebm_global)
 
+    def _plot_ebm_autism(self):
 
-    def _plot_logistic_regression(self):
+        # Create the pannel 
+        fig_mosaic = """
+                        AB
+                    """
 
+        fig, axes = plt.subplot_mosaic(mosaic=fig_mosaic, figsize=(20,8))
         
+        fig.suptitle("({}) {}".format(int(self.experiment_number), self.description), y=1.1, weight='bold', fontsize=12)
+
+        # Plot the performances 
+        cm = confusion_matrix(self.predictions_df['y_true'].to_numpy(), self.predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+        disp.plot(cmap='Blues', ax=axes['B']);disp.im_.colorbar.remove()    
+
+        # Plot the roc curves
+        axes['A'] = plot_roc_curves_xgboost(self.predictions_df, ax=axes['A']) 
+
+        plt.tight_layout();plt.show()
+
+        ebm_global = self.model.explain_global()
+
+        return show(ebm_global)
+
+    def _plot_lr_decision_tree(self):
+
+        if self.dataset.dataset_name not in ['blobs', 'circles', 'moons']:
+            self._plot_lr_decision_tree_autism()
+            return
+
         # Create the pannel 
         fig_mosaic = """
                         ABC
@@ -1381,3 +1423,227 @@ class Experiments(object):
         plt.tight_layout();plt.show()
 
         return 
+
+    def _plot_lr_decision_tree_autism(self):
+    
+        # Create the pannel 
+        fig_mosaic = """
+                        AB
+                    """
+
+        fig, axes = plt.subplot_mosaic(mosaic=fig_mosaic, figsize=(18,6))
+
+        fig.suptitle("({}) {}".format(int(self.experiment_number), self.description), y=1.1, weight='bold', fontsize=12)
+
+        # Plot the roc curves
+        axes['A'] = plot_roc_curves_xgboost(self.predictions_df, ax=axes['A']) 
+        
+        
+        # Plot the performances 
+        cm = confusion_matrix(self.predictions_df['y_true'].to_numpy(), self.predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+        disp.plot(cmap='Blues', ax=axes['B']);disp.im_.colorbar.remove()    
+                                                                                                                                                                          
+        plt.tight_layout();plt.show()
+
+        return 
+
+    ################################  Experiments maintenance ################################ 
+
+    def _init_experiment_path(self, suffix=None):
+        """
+            This method create the experiment path and folders associated with experiments. 
+            It creates into the DATA_DIR location - usually "*/data/ - several objects (here is an exemple for the autism project):
+
+                data/
+                ├── experiments/
+                │   ├── README.md
+                │   └── 0
+                │   │   ├── experiments_log.json
+                │   │   ├── model
+                |   |   |     ├── model.gz
+                │   │   └── distributions
+                |   |   |     ├── hat_f.npy
+                |   |   |     ├── hat_f_1.npy
+                |   |   |     ├── hat_f_2.npy
+                └── *Whatever you have here*
+
+
+
+            You have to figure out: 
+                - The name of the different sub-folders contained in each experiments (model (as in the example), fisher_vectors, images, etc.)
+                - The attributes of this classes which cannot be simply saved/loaded in json files. Those will be handled separately.
+
+        """
+        
+        # Create experiment folder if not already created
+
+        if not os.path.isdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME)):
+            os.mkdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME))
+
+        if not os.path.isdir(os.path.join(DATA_DIR, 'tmp')):
+            os.mkdir(os.path.join(DATA_DIR, 'tmp'))  
+
+        # Create dataset experiment folder  if not already created
+        if not os.path.isdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name)):
+            os.mkdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name))
+
+        if not os.path.isdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, '0')):
+            os.mkdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, '0'))
+    
+        # Looking for the number of the new experiment number
+        experiment_number = np.max([int(os.path.basename(path)) for path in glob(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, '*'))])+1
+
+        experiment_path = os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, str(experiment_number))
+        print('Doing experiment {}!'.format(experiment_number))
+
+        # Create experiment folder 
+        os.mkdir(experiment_path)
+
+        # Create sub-folders associated to the project
+        #os.mkdir(os.path.join(experiment_path, 'dataset'))
+
+        # Create json path
+        json_path = os.path.join(experiment_path, 'experiment_log.json')
+
+        return experiment_number, experiment_path, json_path
+
+    def _init_features_name(self):
+
+        if self.use_missing_indicator_variables==True:
+
+            return self.dataset.features_name + ['Z_' + feat for feat in self.dataset.features_name]
+
+        elif self.use_missing_indicator_variables=='redundant':
+    
+            assert len(self.dataset.features_name)==2, "Only for toy dataset."
+
+            return ['X_1', 'X_2', 'X_1_bis', 'X_2_bis']
+
+        else:
+
+            return self.dataset.features_name
+   
+    def _init_model(self, **kwargs):
+    
+        """ 
+            This function fit the model and predict score.
+            It generates the `predictions_df` attribute, that predict score on all the dataset.
+
+        """
+
+        if self.approach in ['single_distribution', 'multi_distributions']:
+
+            if self.purpose == 'classification':
+                    #Estimation of the distributions for the positive and negative class
+                self.dist_pos = Distributions(dataset=self.dataset, 
+                                            class_used=1, 
+                                            approach=self.approach,
+                                            cmap='Blues',
+                                            debug=self.debug, 
+                                            verbosity=1)
+
+                self.dist_neg = Distributions(dataset=self.dataset, 
+                                            class_used=0, 
+                                            approach=self.approach,
+                                            cmap='Greens',
+                                            debug=self.debug, 
+                                            verbosity=1)
+
+            elif self.purpose == 'estimation':
+                #Estimation of the distribution
+                self.dist = Distributions(dataset=self.dataset, 
+                                        class_used=None, 
+                                        cmap='Oranges',
+                                        verbosity=1)
+
+        elif self.approach == 'nam':
+
+            pass
+
+        elif self.approach == 'xgboost':
+            
+            self.model = XGBClassifier(use_label_encoder=False, # TODO ADD PLAYING WITH PARAMETERS 
+                                      learning_rate=0.01,
+                                       n_estimators= 1000,
+                                      max_depth = 3,
+                                      verbosity=1,
+                                      objective='binary:logistic',
+                                      eval_metric='auc',
+                                      booster='gbtree',
+                                      tree_method='exact',
+                                      subsample=1,
+                                      colsample_bylevel=.8,
+                                      alpha=0)
+
+
+        elif self.approach == 'ebm':
+
+            self.model = ExplainableBoostingClassifier(feature_names=self.features_name, 
+                                                        max_bins=1024,
+                                                        max_interaction_bins=512,
+                                                        binning='quantile',
+                                                        mains='all',
+                                                        interactions=20,
+                                                        outer_bags=8,
+                                                        inner_bags=0,
+                                                        learning_rate=0.01,
+                                                        validation_size=0.15,
+                                                        early_stopping_rounds=50,
+                                                        early_stopping_tolerance=0.0001,
+                                                        max_rounds=1000,
+                                                        min_samples_leaf=2,
+                                                        max_leaves=3,
+                                                        n_jobs=-2,
+                                                        random_state=RANDOM_STATE)
+
+
+        elif self.approach == 'DecisionTree':
+                                                                                           
+            self.model = DecisionTreeClassifier(criterion='gini',
+                                splitter='best',
+                                max_depth=3,
+                                min_samples_split=2,
+                                min_samples_leaf=1,
+                                min_weight_fraction_leaf=0.0,
+                                max_features=None,
+                                random_state=None,
+                                max_leaf_nodes=None,
+                                min_impurity_decrease=0.0,
+                                min_impurity_split=None,
+                                class_weight=None,
+                                presort='deprecated',
+                                ccp_alpha=0.0)
+
+
+        elif self.approach == 'LogisticRegression':
+            self.model = LogisticRegression(random_state=0)
+
+        return 
+
+    def _init_train_test(self, train=[], test=[], return_y=True):
+
+        if self.use_missing_indicator_variables==True:
+
+            X_train, X_test = np.concatenate([self.dataset.X_train[train], (~np.isnan(self.dataset._X_train[train])).astype(int)], axis=1), np.concatenate([self.dataset.X_train[test], (~np.isnan(self.dataset._X_train[test])).astype(int)], axis=1)
+
+        else:
+
+            X_train, X_test = self.dataset.X_train[train], self.dataset.X_train[test]
+
+        if return_y:
+
+            y_train, y_test = self.dataset._y[train].squeeze(), self.dataset._y[test].squeeze()
+
+            return X_train, X_test, y_train, y_test
+
+        else:
+            return X_train, X_test
+    
+    def _load(self, data):
+
+        for key, value in data.items():
+            if isinstance(value, list):
+                setattr(self, key, np.array(value))
+            else: 
+                setattr(self, key, value)
