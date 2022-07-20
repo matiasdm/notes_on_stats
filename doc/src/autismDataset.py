@@ -11,8 +11,10 @@ import seaborn as sns
 from sklearn import datasets
 from sklearn.preprocessing import StandardScaler
 from sklearn.model_selection import train_test_split
-
 from sklearn.utils import shuffle
+
+from scipy.stats import mannwhitneyu
+from imblearn.over_sampling import SMOTE
 
 # add tools path and import our own tools
 sys.path.insert(0, '../src')
@@ -75,6 +77,8 @@ class Dataset(object):
                 features_name = DEFAULT_PREDICTORS,
                 missing_data_handling='encoding',
                 imputation_method='without',
+                scale_data=DEFAULT_SCALE_DATA,
+                sampling_method=DEFAULT_SAMPLING_METHOD,
                 proportion_train = PROPORTION_TRAIN,
                 use_missing_indicator_variables=DEFAULT_USE_INDICATOR_VARIABLE,
                 verbosity=4,
@@ -86,6 +90,9 @@ class Dataset(object):
         self.dataset_name = dataset_name
         self.outcome_column = outcome_column
         self.proportion_train = proportion_train
+        self.scale_data = scale_data
+        self.sampling_method = sampling_method
+
         self.use_missing_indicator_variables = use_missing_indicator_variables
         self._features_name = self._init_features_name(features_name)
         
@@ -154,7 +161,7 @@ class Dataset(object):
         display(self.df)
         return ''
 
-    def filter(self, administration=None, features=None, validity=None, clinical=None, demographics=None, other=None, verbose=False):
+    def filter(self, administration=None, features=None, validity=None, clinical=None, matching=None, demographics=None, other=None, verbose=True):
         """
             self.filter(administration={'order': 'first', 
                                         'complete': True}, 
@@ -166,6 +173,7 @@ class Dataset(object):
                         )
 
         """
+        self.reset()
 
         if administration is not None:
 
@@ -173,7 +181,7 @@ class Dataset(object):
 
                 indexes_to_drop = self.df[(self.df['validity_available']==1) & (self.df['completed']=='Incomplete (Readminister at next visit)') ].index
 
-                if self.verbosity>1 or verbose:
+                if self.verbosity>1 and verbose:
                     print("Removing {}/{} incomplete administrations.".format(len(indexes_to_drop), len(self.df)))
 
                 self.df.drop(index=indexes_to_drop, inplace=True)
@@ -183,7 +191,7 @@ class Dataset(object):
                 if administration['order'] == 'first':
 
                     indexes_to_drop = self.df[self.df.duplicated(subset=['id'], keep='first')].index
-                    if self.verbosity>1 or verbose:
+                    if self.verbosity>1 and verbose:
                         print("Removing {}/{} keeping first admin.".format(len(indexes_to_drop), len(self.df)))
 
                     self.df.drop(index=indexes_to_drop, inplace=True)
@@ -192,7 +200,7 @@ class Dataset(object):
 
                     indexes_to_drop = self.df[self.df.duplicated(subset=['id'], keep='last')].index
 
-                    if self.verbosity>1 or verbose:
+                    if self.verbosity>1 and verbose:
                         print("Removing {}/{} keeping last admin.".format(len(indexes_to_drop), len(self.df)))
 
                     self.df.drop(index=indexes_to_drop, inplace=True)
@@ -201,7 +209,7 @@ class Dataset(object):
                     
                     indexes_to_drop = df[~df.duplicated(subset=['id'], keep=False)].index
 
-                    if self.verbosity>1 or verbose:
+                    if self.verbosity>1 and verbose:
                         print("Removing {}/{} keeping only subject with multiple administrations.".format(len(indexes_to_drop), len(self.df)))
 
                     self.df.drop(index=indexes_to_drop, inplace=True)
@@ -211,17 +219,17 @@ class Dataset(object):
             if 'diagnosis' in clinical.keys():
                 indexes_to_drop = self.df[~self.df['diagnosis'].isin(clinical['diagnosis'])].index
 
-                if self.verbosity>1 or verbose:
+                if self.verbosity>1 and verbose:
                     print("Removing {}/{} keeping only subject with diagnosis: {}.".format(len(indexes_to_drop), len(self.df), clinical['diagnosis']))
-
-            self.df.drop(index=indexes_to_drop, inplace=True)
+                    
+                self.df.drop(index=indexes_to_drop, inplace=True)
 
         if demographics is not None:
 
             if 'age' in demographics.keys():
                 indexes_to_drop =  self.df[~((self.df['age'] >= demographics['age'][0]) & (self.df['age'] < demographics['age'][1]))].index
 
-                if self.verbosity>1 or verbose:
+                if self.verbosity>1 and verbose:
                     print("Removing {}/{} keeping only subject with age between {} and {} mo.".format(len(indexes_to_drop), len(self.df), demographics['age'][0], demographics['age'][1]))
 
                 self.df.drop(index=indexes_to_drop, inplace=True)
@@ -229,23 +237,35 @@ class Dataset(object):
             if 'sex' in demographics.keys():
                 indexes_to_drop =  self.df[~(self.df['sex'] != demographics['sex'])].index
 
-                if self.verbosity>1 or verbose:
+                if self.verbosity>1 and verbose:
                     print("Removing {}/{} keeping only subject with sex: {}.".format(len(indexes_to_drop), len(self.df), demographics['sex']))
                     
                 self.df.drop(index=indexes_to_drop, inplace=True)
-
+                
+        if matching is not None:
+            
+            if 'age' in matching.keys():
+                
+                assert len(self.df['diagnosis'].unique())==2, "Make sure there are only two diagnosis group left in the dataset."
+                
+                indexes_to_drop = self._match_age(other_group=0, target_group=1)
+                
+                if self.verbosity>1 and verbose:
+                    print("Removing {}/{} to match age. (removed diagnosis group : 0).".format(len(indexes_to_drop), len(self.df)))
+                    
+                self.df.drop(index=indexes_to_drop, inplace=True)
         if other is not None:
 
             for column, admissible_values in other.items():
 
                 indexes_to_drop =  self.df[~self.df[column].isin(admissible_values)].index
 
-                if self.verbosity>1 or verbose:
+                if self.verbosity>1 and verbose:
                     print("Removing {}/{} keeping only subject with column: {} in {}.".format(len(indexes_to_drop), len(self.df), column, admissible_values))
                     
                 self.df.drop(index=indexes_to_drop, inplace=True)
 
-        if self.verbosity > 1 or verbose:
+        if self.verbosity > 1 and verbose:
             print("{} administrations left.".format(len(self.df)))
             
             display(self.df.groupby(self.outcome_column)[['id']].count())
@@ -290,8 +310,11 @@ class Dataset(object):
 
         # We need to re-empute or encode data after this step, for model where several replicates of experiements are done and 
         # Who re-shuffle the data for each replicates. 
+
         self.impute_data()
         
+        self.X_train, self.y_train = self.upsample_minority()
+
         return
 
     def impute_data(self):
@@ -342,6 +365,38 @@ class Dataset(object):
             raise ValueError("Please use one of the following missing variables handling: imputation, encoding, or without")
 
         return 
+    
+    def upsample_minority(self):
+        
+        # Using smote:
+        if self.sampling_method=='smote':
+            
+            oversample = SMOTE()
+            X, y = oversample.fit_resample(self.X_train, self.y_train)
+
+        elif self.sampling_method=='vanilla':
+            # Or using simple instance replication:
+            # If balanced, upsamples the minority class to have a balanced training set. 
+            X0 = self.X_train[self.y_train==0]
+            y0 = self.y_train[self.y_train==0]
+            X1 = self.X_train[self.y_train==1]
+            y1 = self.y_train[self.y_train==1]
+
+            # Upsample the minority class
+            from sklearn import utils
+            X1_upsample = utils.resample(X1, replace=True, n_samples=X0.shape[0])
+            y1_upsample = utils.resample(y1, replace=True, n_samples=X0.shape[0])
+            X = np.vstack((X0, X1_upsample))
+            y = np.hstack((y0, y1_upsample))
+            
+        elif self.sampling_method=='without':
+            X, y = self.X_train, self.y_train
+        
+        else:
+            raise ValueError("Please use one of the following upsampling method: smote, vanilla, or without")
+
+        print("Upampling minority class. Imbalance ratio of: {:.2f} to {:.2f}".format(self.imbalance_ratio, np.sum(y==1)/np.sum(y==0))) if self.verbosity > 1 else None
+        return X,y
         
     def plot(self):
 
@@ -431,18 +486,33 @@ class Dataset(object):
         if self.use_missing_indicator_variables:
             
             features_name = self.features_name[:int(len(self.features_name)/2)]
-            X_raw = np.concatenate([self.df[features_name].to_numpy().astype(float), (~np.isnan(self.df[features_name].to_numpy().astype(float))).astype(int)], axis=1) 
+            X_raw = self.df[features_name].to_numpy().astype(float)
+            
+            if self.scale_data:
+        
+                scaler = StandardScaler()
+                scaler.fit(X_raw)  # fit scaler
+                X_raw = scaler.transform(X_raw)
+
+            X_raw = np.concatenate([X_raw, (~np.isnan(self.df[features_name].to_numpy().astype(float))).astype(int)], axis=1) 
 
         else:
             features_name = self.features_name
-            X_raw = self.df[self.features_name].to_numpy().astype(float)
-
-
+            
+            X_raw = self.df[features_name].to_numpy().astype(float)
+            
+            if self.scale_data:
+        
+                scaler = StandardScaler()
+                scaler.fit(X_raw)  # fit scaler
+                X_raw = scaler.transform(X_raw)
+            
         y = self.df[self.outcome_column].to_numpy().astype(float)
         
 
         if self.verbosity>1 and verbose != False:
             print("Predicting {} based on {} features".format(self.outcome_column, len(self.features_name)))
+            
         return X_raw, y
 
     def _retrieve_administration_timing(self, df):
@@ -473,7 +543,12 @@ class Dataset(object):
         NS_postural_sway = df[['DIGC_postural_sway', 'DIGRRL_postural_sway', 'FB_postural_sway', 'MP_postural_sway']].mean(axis=1)
         df['S_postural_sway'] = S_postural_sway
         df['NS_postural_sway'] = NS_postural_sway
-
+        
+        S_postural_sway_derivative = df[['ST_postural_sway_derivative', 'BB_postural_sway_derivative', 'RT_postural_sway_derivative', 'MML_postural_sway_derivative', 'FP_postural_sway_derivative']].mean(axis=1)
+        NS_postural_sway_derivative = df[['DIGC_postural_sway_derivative', 'DIGRRL_postural_sway_derivative', 'FB_postural_sway_derivative', 'MP_postural_sway_derivative']].mean(axis=1)
+        df['S_postural_sway_derivative'] = S_postural_sway_derivative
+        df['NS_postural_sway_derivative'] = NS_postural_sway_derivative
+        
         # Merge silhouette scores
         gaze_silhouette_score = df[['BB_gaze_silhouette_score','S_gaze_silhouette_score','FP_gaze_silhouette_score']].mean(axis=1)
         df['gaze_silhouette_score'] = gaze_silhouette_score
@@ -513,3 +588,24 @@ class Dataset(object):
 
             return features_name
         
+    def _match_age(self, other_group=0, target_group=1):
+        group_1_age = sorted(self.df.query(" `diagnosis` == @other_group").age.tolist())
+        group_2_age = self.df.query("`diagnosis` == @target_group").age.tolist()
+
+        if np.mean(group_2_age) < np.mean(group_1_age): # typically ASD older than TD; we need to remove young TD
+            to_drop = 'older'
+        else:
+            to_drop = 'younger'
+
+        drop = 0
+        _, p = mannwhitneyu(group_2_age, group_1_age)
+        while p < 0.05:
+            drop += 1
+            if to_drop=='younger':
+                u, p = mannwhitneyu(group_1_age[drop:], group_2_age)
+            elif to_drop=='older':
+                u, p = mannwhitneyu(group_1_age[:-drop], group_2_age)
+
+        drop_indices = self.df.query("`diagnosis` == @other_group").nsmallest(drop, 'age').index
+
+        return drop_indices

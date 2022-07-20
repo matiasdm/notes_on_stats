@@ -12,11 +12,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, roc_curve, plot_roc_curve, auc
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, roc_curve, plot_roc_curve, auc, precision_recall_curve
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold
-
 
 from xgboost import XGBClassifier, plot_importance, plot_tree
 from interpret.glassbox import ExplainableBoostingClassifier
@@ -53,6 +52,7 @@ class Experiments(object):
                 proportion_train=PROPORTION_TRAIN, 
                 resolution=RESOLUTION, 
                 bandwidth=BANDWIDTH, 
+                sampling_method=DEFAULT_SAMPLING_METHOD,
                 previous_experiment=None,        
                 save_experiment=True, 
                 verbosity=1, 
@@ -66,6 +66,7 @@ class Experiments(object):
 
         # Dataset 
         self.dataset = dataset
+        self.sampling_method = sampling_method
 
         # Context of the experiment
         self.purpose = purpose
@@ -787,32 +788,10 @@ class Experiments(object):
             y_true = self.dataset.y_test.squeeze()
             y_pred = self.dataset.y_pred
 
-            # Creation of a df for the prediction
-            predictions_df = pd.DataFrame({'X1':self.dataset.X_test[:,0], 
-                        'X2':self.dataset.X_test[:,1], 
-                        'Z1':[1 if not np.isnan(x) else 0 for x in self.dataset.X_test[:,0]],
-                        'Z2': [1 if not np.isnan(x) else 0 for x in self.dataset.X_test[:,1]],
-                        'y_true': y_true, 
-                        'y_pred': y_pred, 
-                        'True Positive': [1 if y_true==1 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                        'True Negative': [1 if y_true==0 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                        'False Positive': [1 if y_true==0 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                        'False Negative': [1 if y_true==1 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                        })
         else:
             
             y_true = self.predictions_df['y_true'].to_numpy()
             y_pred = self.predictions_df['y_pred'].to_numpy()
-            
-            # Creation of a df for the prediction
-            predictions_df = pd.DataFrame({'y_true': y_true, 
-                                            'y_pred': y_pred, 
-                                            'True Positive': [1 if y_true==1 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                                            'True Negative': [1 if y_true==0 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                                            'False Positive': [1 if y_true==0 and y_pred==1 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                                            'False Negative': [1 if y_true==1 and y_pred==0 else 0 for (y_true, y_pred) in zip(y_true, y_pred)], 
-                                            })
-        self.predictions_df = predictions_df
 
         #Compute metrics of interest 
         #  

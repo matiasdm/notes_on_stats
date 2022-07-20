@@ -68,6 +68,8 @@ CVA_COLUMNS = [# GAZE RELATED
                  'FP_postural_sway_derivative',
                  'S_postural_sway',  #aggregated
                  'NS_postural_sway',  #aggregated
+                 'S_postural_sway_derivative', #aggregated
+                 'NS_postural_sway_derivative', #aggregated
                 
                 # TOUCH RELATED
                  'number_of_touches',
@@ -102,6 +104,8 @@ DEFAULT_PREDICTORS = [# GAZE RELATED
                 # POSTURAL SWAY RELATED
                  'S_postural_sway',  #aggregated
                  'NS_postural_sway',  #aggregated
+                 'S_postural_sway_derivative',
+                 'NS_postural_sway_derivative',
                 
                 # TOUCH RELATED
                  'average_length',

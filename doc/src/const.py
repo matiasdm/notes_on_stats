@@ -8,13 +8,14 @@ import numpy as np
 ROOT_DIR = '/home01/sam/notes_on_stats/doc/'
 DATA_DIR = '/home01/sam/notes_on_stats/doc/src/data'
 
-EXPERIMENT_FOLDER_NAME = 'experiments_29_june_duke'
+EXPERIMENT_FOLDER_NAME = 'autism_all'
 
 
 # DATASET PARAMETERS
 DATASET_NAME = 'circles'
 NUM_SAMPLES = 5000
 IMBALANCE_RATIO = .5
+DEFAULT_SAMPLING_METHOD = 'without'
 
 # Missingness default parameters
 MISSINGNESS_PATTERN = 3
@@ -27,7 +28,7 @@ DEFAULT_USE_INDICATOR_VARIABLE = True
 MISSING_DATA_HANDLING = 'without'
 DEFAULT_IMPUTATION_METHOD = 'multi_dimensional_weighting'
 DEFAULT_MISSING_VALUE = -5
-
+DEFAULT_SCALE_DATA=True
 # pdf estimation default parameters
 RESOLUTION = 20
 BANDWIDTH = .2
@@ -43,7 +44,6 @@ RANDOM_STATE = 105
 
 # Neural Additive Model 
 NAM_DEFAULT_PARAMETERS = {'num_replicates': 10,
-                          'use_missing_indicator_variables': True, 
                         'model': {'num_features': None,
                                 'hidden_sizes': [64, 64, 32],
                                 'dropout_rate': 0.1,
@@ -51,7 +51,7 @@ NAM_DEFAULT_PARAMETERS = {'num_replicates': 10,
                                 'use_exu': False},
                         'training': {'regression': False,
                                     'batch_size': 16,
-                                    'max_epochs': 20,
+                                    'max_epochs': 20,#0,
                                     'learning_rate': 0.0002,
                                     'weight_decay': 0.0,
                                     'output_penalty': 0.2}

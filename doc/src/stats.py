@@ -266,9 +266,11 @@ def impute_missing_data(X_train, X_test, method='multi_dimensional_weighting', h
                     hat_X_ij /= Ws
 
                     imp_X_test[i, j] = hat_X_ij
+    elif method=='without':
+        imp_X_test = X_test
 
     elif method=='naive':
-            # Ignore missing values
+        # Ignore missing values
         imp_X_test = X_test[~np.isnan(X_test[:,0]),:]
         imp_X_test = imp_X_test[~np.isnan(imp_X_test[:,1]),:]        
                 
