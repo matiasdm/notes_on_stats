@@ -104,17 +104,6 @@ class Dataset(object):
         self.df = self._post_process_df(df)
         self._raw_df = deepcopy(self.df)
         self.num_samples = len(self.df)
-        self.scenario = self._init_scenario(scenario)
-
-
-        # Generate a dataset with samples from both classes - stored for internal use and for keeping track of changes etc...
-        self._X, self._y = self._init_data()
-        
-        self.imbalance_ratio = np.sum(self._y==1)/np.sum(self._y==0)
-        self.ratio_of_missing_values = np.isnan(self._X).sum()/(self._X.shape[0]*self._X.shape[1])
-        self.ratio_missing_per_class = [np.isnan(self._X[(self._y==0).squeeze()]).sum()/(self._X[(self._y==0).squeeze()].shape[0]*self._X.shape[1]), 
-                                        np.isnan(self._X[(self._y==1).squeeze()]).sum()/(self._X[(self._y==1).squeeze()].shape[0]*self._X.shape[1])]
-
 
         # Imputed data (depend on the experiences/settings). If state is training, it contains imputation of 
         # the train set, otherwise the test set.
@@ -128,7 +117,19 @@ class Dataset(object):
         self.y_test = None
 
         # Prediciton on the test set
-        self.y_pred = None
+        #self.y_pred = None # TODOREMOVE
+
+        self.scenario = self._init_scenario(scenario)
+
+
+        # Generate a dataset with samples from both classes - stored for internal use and for keeping track of changes etc...
+        self._X, self._y = self._init_data()
+        
+        self.imbalance_ratio = np.sum(self._y==1)/np.sum(self._y==0)
+        self.ratio_of_missing_values = np.isnan(self._X).sum()/(self._X.shape[0]*self._X.shape[1])
+        self.ratio_missing_per_class = [np.isnan(self._X[(self._y==0).squeeze()]).sum()/(self._X[(self._y==0).squeeze()].shape[0]*self._X.shape[1]), 
+                                        np.isnan(self._X[(self._y==1).squeeze()]).sum()/(self._X[(self._y==1).squeeze()].shape[0]*self._X.shape[1])]
+
 
         self.dataset_description = 'Number of samples: {}'.format(self.num_samples)
         self.cmap = sns.color_palette(plt.get_cmap('tab20')(np.arange(0,2)))
@@ -310,9 +311,7 @@ class Dataset(object):
 
         # We need to re-empute or encode data after this step, for model where several replicates of experiements are done and 
         # Who re-shuffle the data for each replicates. 
-        print(np.sum(np.isnan(self.X_train)))
         self.impute_data()
-        print(np.sum(np.isnan(self.X_train)))
         
         self.X_train, self.y_train = self.upsample_minority()
 
@@ -414,7 +413,10 @@ class Dataset(object):
         from stats import impute_missing_data
 
         _imp_X_train = impute_missing_data(X_train=self.X_train, X_test=self.X_train, method=self.imputation_method, h=bandwidth)
-        _imp_X_test = impute_missing_data(X_train=self.X_train, X_test=self.X_test, method=self.imputation_method, h=bandwidth)
+        if self.proportion_train <1:
+            _imp_X_test = impute_missing_data(X_train=self.X_train, X_test=self.X_test, method=self.imputation_method, h=bandwidth)
+        else:
+            _imp_X_test = None
 
         return _imp_X_train, _imp_X_test
     
@@ -611,7 +613,6 @@ class Dataset(object):
 
         return drop_indices
     
- 
     def _init_scenario(self, scenario):
         
         self.scenario = scenario
