@@ -76,6 +76,7 @@ class Experiments(object):
         # Beyesian-related attributes
         self.resolution = resolution
         self.bandwidth = bandwidth
+        self.num_cv = None
         self.estimation_time = None
         self.dist = None
         self.dist_pos = None
@@ -506,7 +507,7 @@ class Experiments(object):
             It generates the `predictions_df` attribute, that predict score on all the dataset.
         """
 
-        
+        self.num_cv = num_cv
         cv = StratifiedKFold(n_splits=num_cv, shuffle=True, random_state=0)
         print('Performing {} fold cross-validation.'.format(num_cv)) if self.verbosity > 1 else None
             
@@ -615,7 +616,8 @@ class Experiments(object):
             This function is a helper function to fit and predict score using loocv. 
             It generates the `predictions_df` attribute, that predict score on all the dataset.
 
-        """        
+        """    
+        self.num_cv = num_cv
         y_pred_score = -1*np.ones_like(self.dataset._y).astype('float32')  # init prediction scores 
 
         cv = StratifiedKFold(n_splits=num_cv, shuffle=True, random_state=0)

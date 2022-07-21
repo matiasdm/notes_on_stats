@@ -74,7 +74,8 @@ class Dataset(object):
                 df,
                 dataset_name='complete_autism',
                 outcome_column='diagnosis',
-                features_name = DEFAULT_PREDICTORS,
+                features_name = DEFAULT_PREDICTORS, 
+                scenario = None,
                 missing_data_handling='encoding',
                 imputation_method='without',
                 scale_data=DEFAULT_SCALE_DATA,
@@ -84,14 +85,15 @@ class Dataset(object):
                 verbosity=4,
                 debug=False, 
                 random_state=RANDOM_STATE):
-
-
-
+        
         self.dataset_name = dataset_name
         self.outcome_column = outcome_column
         self.proportion_train = proportion_train
         self.scale_data = scale_data
         self.sampling_method = sampling_method
+        
+        self.verbosity = verbosity    
+        self.debug = debug    
 
         self.use_missing_indicator_variables = use_missing_indicator_variables
         self._features_name = self._init_features_name(features_name)
@@ -102,8 +104,8 @@ class Dataset(object):
         self.df = self._post_process_df(df)
         self._raw_df = deepcopy(self.df)
         self.num_samples = len(self.df)
+        self.scenario = self._init_scenario(scenario)
 
-        self.verbosity = verbosity    
 
         # Generate a dataset with samples from both classes - stored for internal use and for keeping track of changes etc...
         self._X, self._y = self._init_data()
@@ -131,8 +133,6 @@ class Dataset(object):
         self.dataset_description = 'Number of samples: {}'.format(self.num_samples)
         self.cmap = sns.color_palette(plt.get_cmap('tab20')(np.arange(0,2)))
 
-
-        self.debug=debug
         self.random_state = random_state
         np.random.seed(random_state)
 
@@ -310,8 +310,9 @@ class Dataset(object):
 
         # We need to re-empute or encode data after this step, for model where several replicates of experiements are done and 
         # Who re-shuffle the data for each replicates. 
-
+        print(np.sum(np.isnan(self.X_train)))
         self.impute_data()
+        print(np.sum(np.isnan(self.X_train)))
         
         self.X_train, self.y_train = self.upsample_minority()
 
@@ -609,3 +610,34 @@ class Dataset(object):
         drop_indices = self.df.query("`diagnosis` == @other_group").nsmallest(drop, 'age').index
 
         return drop_indices
+    
+ 
+    def _init_scenario(self, scenario):
+        
+        self.scenario = scenario
+
+        if scenario == 'asd_td_age_matched_n_balanced':
+            
+            self.filter(administration={'order': 'first', 
+                                             'completed': True}, 
+                            clinical={'diagnosis': [0, 1]}, 
+                            demographics={'age':[10, 60]}, 
+                            matching={'age':[0, 1]}, verbose=True)
+
+
+        elif scenario == 'asd_td_age_matched_n_unbalanced':
+
+            self.filter(administration={'order': 'first', 
+                                     'completed': True}, 
+                    clinical={'diagnosis': [0, 1]}, 
+                    demographics={'age':[10, 30]}, 
+                    matching={'age':[0, 1]}, verbose=True)
+            
+        elif scenario is None:
+            pass
+        
+        else:
+            raise ValueError("Please use one of the following scenario: asd_td_age_matched_n_balanced or asd_td_age_matched_n_unbalanced or None")
+            
+        return scenario
+

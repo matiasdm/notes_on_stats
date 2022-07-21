@@ -1,6 +1,7 @@
 import os
 import numpy as np
 
+
 CLINICAL_COLUMNS = [# DIAGNOSIS RELATED
                     'diagnosis', 'asd_yn',
                     # MULLEN RELATED

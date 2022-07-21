@@ -37,11 +37,11 @@ def train_model(model, data, regression = False, max_epochs = 10, batch_size = 3
             err.backward()
             optimizer.step()
             
-            if verbosity >0 :
-                if i % verbosity == 0:
-                    print('Epoch: {0}/{1};\t Batch: {2}/{3};\t Err: {4:1.3f}'.format(epoch + 1, max_epochs, i + 1, no_batches, err.item()))
+            #if verbosity >0 :
+            #    if i % verbosity == 0:
+            #        print('Epoch: {0}/{1};\t Batch: {2}/{3};\t Err: {4:1.3f}'.format(epoch + 1, max_epochs, i + 1, no_batches, err.item()))
 
-        print('\n\t Epoch finished in {:1.2f} seconds!\n'.format(time.time() - start)) if verbosity > 0 else None 
+       # print('\n\t Epoch finished in {:1.2f} seconds!\n'.format(time.time() - start)) if verbosity > 0 else None 
 
 
 def eval_model(model, data):
