@@ -4,6 +4,7 @@ import sys
 import json
 from glob import glob
 from copy import deepcopy
+from tqdm import tqdm
 
 import numpy as np 
 import matplotlib.pyplot as plt
@@ -456,7 +457,7 @@ def create_autism_df(folder_names):
         experiments_paths.extend(glob(os.path.join(DATA_DIR, folder_name, "*", '*')))
 
 
-    for experiment_path in experiments_paths:
+    for experiment_path in tqdm(experiments_paths):
 
 
         exp_path = os.path.join(experiment_path, 'experiment_log.json')
