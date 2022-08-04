@@ -2,13 +2,13 @@ import os
 import numpy as np
 
 # Data settings
-#ROOT_DIR = '/Users/samperochon/Duke/work/notes_on_stats/doc/'
-#DATA_DIR = '/Users/samperochon/Duke/work/notes_on_stats/doc/src/data'
+ROOT_DIR = '/Users/samperochon/Duke/work/notes_on_stats/doc/'
+DATA_DIR = '/Users/samperochon/Duke/work/notes_on_stats/doc/src/data'
 
-ROOT_DIR = '/home01/sam/notes_on_stats/doc/'
-DATA_DIR = '/home01/sam/notes_on_stats/doc/src/data'
+#ROOT_DIR = '/home01/sam/notes_on_stats/doc/'
+#DATA_DIR = '/home01/sam/notes_on_stats/doc/src/data'
 
-EXPERIMENT_FOLDER_NAME = 'autism_all'
+EXPERIMENT_FOLDER_NAME = 'autism_f1_corrected'
 
 
 # DATASET PARAMETERS

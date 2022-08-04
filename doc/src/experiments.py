@@ -12,10 +12,12 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
-from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, roc_curve, plot_roc_curve, auc, precision_recall_curve
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, roc_curve, plot_roc_curve, auc, precision_recall_curve, roc_auc_score, average_precision_score
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold
+
+from prg import prg
 
 from xgboost import XGBClassifier, plot_importance, plot_tree
 from interpret.glassbox import ExplainableBoostingClassifier
@@ -28,7 +30,9 @@ import torch
 sys.path.insert(0, '../src')
 
 from const import *
+from const_autism import *
 from utils import fi, repr
+from metrics import f1score, average_precision, bestf1score, calc_auprg, create_prg_curve
 
 from generateToyDataset import DatasetGenerator
 from model.bayesian.distributions import Distributions
@@ -41,7 +45,6 @@ from model.neural_additive_models.dataset import TabularData
 from model.xgboost.visualization import plot_roc_curves_xgboost
 
 
-
 class Experiments(object):
 
     def __init__(self, 
@@ -49,7 +52,6 @@ class Experiments(object):
                 dataset=None, 
                 purpose='classification', 
                 approach='multi_distributions', 
-                proportion_train=PROPORTION_TRAIN, 
                 resolution=RESOLUTION, 
                 bandwidth=BANDWIDTH, 
                 sampling_method=DEFAULT_SAMPLING_METHOD,
@@ -364,9 +366,16 @@ class Experiments(object):
         else:
             print("/!\ No previous computed distribution found at '{}'".format(dist_neg_path)) if (self.debug or self.verbosity > 1)  else None
 
+        print(self.approach)
 
         if self.approach in ['single_distribution', 'multi_distributions']:
             self.predict()      
+
+        elif self.approach in ['DecisionTree', 'LogisticRegression']:
+            print("yo")
+            self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
+            self.performance_df = pd.DataFrame(self.performances_df, index=[0])
+            self._init_model()
 
         elif self.approach == 'nam':
             
@@ -416,11 +425,12 @@ class Experiments(object):
             
             self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
             self.performance_df = pd.DataFrame(self.performances_df, index=[0])
-            
-            features_name = ['X_1', 'X_2', 'Z_1', 'Z_2'] if self.dataset.use_missing_indicator_variables else ['X_1', 'X_2']                                                                                              
-            self.model = ExplainableBoostingClassifier(feature_names=features_name, n_jobs=-1, random_state=RANDOM_STATE)
+                                                                                                       
+            self.model = ExplainableBoostingClassifier(feature_names=self.features_name, n_jobs=-1, random_state=RANDOM_STATE)
                         
             self._fit_vanilla()
+
+    
 
         print("Experiment {} loaded successfully! :-)".format(previous_experiment))
         return  
@@ -629,6 +639,8 @@ class Experiments(object):
             X_train, X_test = self.dataset.X_train[train], self.dataset.X_train[test]
             y_train, y_test = self.dataset._y[train].squeeze(), self.dataset._y[test].squeeze()
 
+            X_train, y_train = self.dataset.upsample_minority(X_train, y_train)
+
             # Reset model 
             self._init_model()
             # Fit model 
@@ -795,12 +807,30 @@ class Experiments(object):
             y_true = self.predictions_df['y_true'].to_numpy()
             y_pred = self.predictions_df['y_pred'].to_numpy()
 
-        #Compute metrics of interest 
-        #  
-        tn, fp, fn, tp = confusion_matrix(y_true, y_pred > CLASSIFICATION_THRESHOLD if self.approach in['xgboost', 'ebm', 'LogisticRegression', 'DecisionTree'] else y_pred).ravel()
+        # Compute first AUROC
+        auroc = roc_auc_score(y_true, y_pred)
+
+        # Compute the AUC-PR
+        auc_pr = average_precision_score(y_true, y_pred)
+
+        # Compute the AUC-PR Corrected
+        auc_pr_corrected = average_precision(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO)
+
+        # Compute the AUC-PR Gain
+        auc_pr_g = prg.calc_auprg(prg.create_prg_curve(y_true, y_pred))
+
+        # Compute the AUC-PR Gain corrected
+        auc_pr_g_corrected = calc_auprg(create_prg_curve(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO))
+
+        # Compute the F1 score
+        f1, optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
+
+        # Compute the corrected F1 score
+        f1_corrected, _ = bestf1score(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO)
+
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred > optimal_threshold).ravel()
 
         acc = (tp + tn) / (tp + tn + fp +  fn)
-        f1 = 2*tp / (2*tp + fp + fn)
         mcc = (tp*tn - fp*fn) / np.sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))
         tpr =  tp / (tp+fn)
         tnr = tn / (tn+fp)
@@ -808,8 +838,14 @@ class Experiments(object):
         npv = tn / (tn+fn)
         fnr = fn / (tp+fn)
 
-        performances_dict = {'Accuracy' : round(acc, 3),
+        performances_dict = {'AUROC':round(auroc, 3),
+                            'AUC-PR': round(auc_pr, 3),
+                            'AUC-PR-Gain': round(auc_pr_g, 3),
+                            'AUC-PR-Corrected': round(auc_pr_corrected, 3),
+                            'AUC-PR-Gain-Corrected' :round(auc_pr_g_corrected, 3),
                             'F1 score (2 PPVxTPR/(PPV+TPR))': round(f1, 3),
+                            'F1 score Corrected': round(f1_corrected, 3),
+                            'Accuracy' : round(acc, 3),
                             'Matthews correlation coefficient (MCC)': round(mcc, 3),
                             'Sensitivity, recall, hit rate, or true positive rate (TPR)': round(tpr, 3),
                             'Specificity, selectivity or true negative rate (TNR)': round(tnr, 3),
@@ -828,8 +864,14 @@ class Experiments(object):
             Create the predictions_df and performances_df based on the dataframe that recap all the results for the replciates. 
         """
 
-        performances_dict = {'Accuracy' : [],
+        performances_dict = {'AUROC':[], 
+                            'AUC-PR': [],
+                            'AUC-PR-Gain': [],
+                            'AUC-PR-Corrected':[],
+                            'AUC-PR-Gain-Corrected' : [],
                             'F1 score (2 PPVxTPR/(PPV+TPR))': [],
+                            'F1 score Corrected': [],
+                            'Accuracy' : [],
                             'Matthews correlation coefficient (MCC)': [],
                             'Sensitivity, recall, hit rate, or true positive rate (TPR)': [],
                             'Specificity, selectivity or true negative rate (TNR)': [],
@@ -844,11 +886,34 @@ class Experiments(object):
         for _, res in self.predictions_df.groupby('replicate'):
             y_true = res['y_true'].to_numpy()
             y_pred = res['y_pred'].to_numpy()
+
+
+            # Compute first AUROC
+            auroc = roc_auc_score(y_true, y_pred)
+
+            # Compute the AUC-PR
+            auc_pr = average_precision_score(y_true, y_pred)
+
+            # Compute the AUC-PR Corrected
+            auc_pr_corrected = average_precision(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO)
+
+            # Compute the AUC-PR Gain
+            auc_pr_g = prg.calc_auprg(prg.create_prg_curve(y_true, y_pred))
+
+            # Compute the AUC-PR Gain corrected
+            auc_pr_g_corrected = calc_auprg(create_prg_curve(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO))
+
+            # Compute the F1 score
+            f1, optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
+
+            # Compute the corrected F1 score
+            f1_corrected, _ = bestf1score(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO)
+
             
-            tn, fp, fn, tp = confusion_matrix(y_true, y_pred > CLASSIFICATION_THRESHOLD).ravel()
+            
+            tn, fp, fn, tp = confusion_matrix(y_true, y_pred > optimal_threshold).ravel()
 
             acc = (tp + tn) / (tp + tn + fp +  fn)
-            f1 = 2*tp / (2*tp + fp + fn)
             mcc = (tp*tn - fp*fn) / np.sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))
             tpr =  tp / (tp+fn)
             tnr = tn / (tn+fp)
@@ -859,7 +924,13 @@ class Experiments(object):
             fpr_auc, tpr_auc, _ = roc_curve(y_true, y_pred)      
             roc_auc = auc(fpr_auc, tpr_auc)    
 
-
+            performances_dict['AUROC'].append(round(auroc, 3))
+            performances_dict['AUC-PR'].append(round(auc_pr, 3))
+            performances_dict['AUC-PR-Gain'].append(round(auc_pr_g, 3))
+            performances_dict['AUC-PR-Corrected'].append(round(auc_pr_corrected, 3))
+            performances_dict['AUC-PR-Gain-Corrected'].append(round(auc_pr_g_corrected, 3))
+            performances_dict['F1 score (2 PPVxTPR/(PPV+TPR))'].append(round(f1, 3))
+            performances_dict['F1 score Corrected'].append(round(f1_corrected, 3))
             performances_dict['Accuracy'].append(round(acc, 3))
             performances_dict['F1 score (2 PPVxTPR/(PPV+TPR))'].append(round(f1, 3))
             performances_dict['Matthews correlation coefficient (MCC)'].append(round(mcc, 3))
@@ -876,7 +947,6 @@ class Experiments(object):
         performances_dict = {metric: np.mean(values) for metric, values in performances_dict.items()}
         self.performances_df = pd.DataFrame(performances_dict, index = [0])
         return
-
 
     ################################ Plotting functions ###########################
 
@@ -1041,7 +1111,6 @@ class Experiments(object):
         
         return 
 
-    
     def _plot_nam_autism(self):
         
         #Select the best replicate as the predictions_df for plotting reasons. Note this is based on AUC.
@@ -1580,18 +1649,18 @@ class Experiments(object):
         elif self.approach == 'ebm':
 
             self.model = ExplainableBoostingClassifier(feature_names=self.features_name, 
-                                                        max_bins=1024,
-                                                        max_interaction_bins=512,
+                                                        max_bins=256,
+                                                        max_interaction_bins=256,
                                                         binning='quantile',
                                                         mains='all',
-                                                        interactions=20,
+                                                        interactions=40,
                                                         outer_bags=8,
                                                         inner_bags=0,
                                                         learning_rate=0.01,
                                                         validation_size=0.15,
                                                         early_stopping_rounds=50,
                                                         early_stopping_tolerance=0.0001,
-                                                        max_rounds=1000,
+                                                        max_rounds=10000,
                                                         min_samples_leaf=2,
                                                         max_leaves=3,
                                                         n_jobs=-2,
@@ -1610,9 +1679,7 @@ class Experiments(object):
                                 random_state=None,
                                 max_leaf_nodes=None,
                                 min_impurity_decrease=0.0,
-                                min_impurity_split=None,
                                 class_weight=None,
-                                presort='deprecated',
                                 ccp_alpha=0.0)
 
 

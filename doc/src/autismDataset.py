@@ -99,7 +99,7 @@ class Dataset(object):
         self._features_name = self._init_features_name(features_name)
         
         self.missing_data_handling = missing_data_handling
-        self.imputation_method = imputation_method
+        self.imputation_method = imputation_method if missing_data_handling!='encoding' else 'constant'
         
         self.df = self._post_process_df(df)
         self._raw_df = deepcopy(self.df)
@@ -121,11 +121,14 @@ class Dataset(object):
 
         self.scenario = self._init_scenario(scenario)
 
+        
+
 
         # Generate a dataset with samples from both classes - stored for internal use and for keeping track of changes etc...
         self._X, self._y = self._init_data()
+        self.split_test_train()
         
-        self.imbalance_ratio = np.sum(self._y==1)/np.sum(self._y==0)
+        self.imbalance_ratio = np.sum(self._y==1)/len(self._y)
         self.ratio_of_missing_values = np.isnan(self._X).sum()/(self._X.shape[0]*self._X.shape[1])
         self.ratio_missing_per_class = [np.isnan(self._X[(self._y==0).squeeze()]).sum()/(self._X[(self._y==0).squeeze()].shape[0]*self._X.shape[1]), 
                                         np.isnan(self._X[(self._y==1).squeeze()]).sum()/(self._X[(self._y==1).squeeze()].shape[0]*self._X.shape[1])]
@@ -154,6 +157,7 @@ class Dataset(object):
 
         self.split_test_train()
 
+
     def reset(self):
         self.df = deepcopy(self._raw_df)
         return 
@@ -178,9 +182,22 @@ class Dataset(object):
 
         if administration is not None:
 
-            if 'completed' in administration.keys():
+            if 'studies' in administration.keys():
 
-                indexes_to_drop = self.df[(self.df['validity_available']==1) & (self.df['completed']=='Incomplete (Readminister at next visit)') ].index
+                if not isinstance(administration['studies'], list):
+                    administration['studies'] = [administration['studies']]
+
+                indexes_to_drop = self.df[~self.df['study'].isin(administration['studies'])].index
+
+                if self.verbosity>1 and verbose:
+                    print("Removing {}/{} keeping only subject in studies: {}.".format(len(indexes_to_drop), len(self.df), str(administration['studies'])))
+                    
+                self.df.drop(index=indexes_to_drop, inplace=True)
+
+
+            if 'complete' in administration.keys():
+
+                indexes_to_drop = self.df[(self.df['validity_available']==1) & (self.df['completed']==2) ].index
 
                 if self.verbosity>1 and verbose:
                     print("Removing {}/{} incomplete administrations.".format(len(indexes_to_drop), len(self.df)))
@@ -269,7 +286,7 @@ class Dataset(object):
         if self.verbosity > 1 and verbose:
             print("{} administrations left.".format(len(self.df)))
             
-            display(self.df.groupby(self.outcome_column)[['id']].count())
+            display(self.df.groupby('diagnosis')[['id']].count())
 
         self.df.sort_values(by=['id', 'date'], inplace=True)
         self.df.reset_index(drop=True, inplace=True)
@@ -312,8 +329,6 @@ class Dataset(object):
         # We need to re-empute or encode data after this step, for model where several replicates of experiements are done and 
         # Who re-shuffle the data for each replicates. 
         self.impute_data()
-        
-        self.X_train, self.y_train = self.upsample_minority()
 
         return
 
@@ -366,21 +381,22 @@ class Dataset(object):
 
         return 
     
-    def upsample_minority(self):
+    def upsample_minority(self, X, y):
         
         # Using smote:
         if self.sampling_method=='smote':
             
             oversample = SMOTE()
-            X, y = oversample.fit_resample(self.X_train, self.y_train)
+            X, y = oversample.fit_resample(X, y)
+            print("Upampling minority class. Imbalance ratio of: {:.2f} to {:.2f}".format(self.imbalance_ratio, np.sum(y==1)/np.sum(y==0))) if self.verbosity > 1 else None
 
         elif self.sampling_method=='vanilla':
             # Or using simple instance replication:
             # If balanced, upsamples the minority class to have a balanced training set. 
-            X0 = self.X_train[self.y_train==0]
-            y0 = self.y_train[self.y_train==0]
-            X1 = self.X_train[self.y_train==1]
-            y1 = self.y_train[self.y_train==1]
+            X0 = X[y==0]
+            y0 = y[y==0]
+            X1 = y[y==1]
+            y1 = y[y==1]
 
             # Upsample the minority class
             from sklearn import utils
@@ -388,15 +404,17 @@ class Dataset(object):
             y1_upsample = utils.resample(y1, replace=True, n_samples=X0.shape[0])
             X = np.vstack((X0, X1_upsample))
             y = np.hstack((y0, y1_upsample))
-            
+
+            print("Upampling minority class. Imbalance ratio of: {:.2f} to {:.2f}".format(self.imbalance_ratio, np.sum(y==1)/np.sum(y==0))) if self.verbosity > 1 else None
+                  
         elif self.sampling_method=='without':
-            X, y = self.X_train, self.y_train
+            pass
         
         else:
             raise ValueError("Please use one of the following upsampling method: smote, vanilla, or without")
-
-        print("Upampling minority class. Imbalance ratio of: {:.2f} to {:.2f}".format(self.imbalance_ratio, np.sum(y==1)/np.sum(y==0))) if self.verbosity > 1 else None
+        
         return X,y
+
         
     def plot(self):
 
@@ -445,11 +463,21 @@ class Dataset(object):
 
     def _post_process_df(self, df):
 
+        if self.verbosity > 1:
+            print("Post-processing inital df (removing columns with no cva features, encoding srings, compute administrations order, compute condensed S/NS variables)... ")
+
+        df.dropna(subset=CVA_COLUMNS, how='all', inplace=True)
+
+        df['study'] = df['path'].apply(lambda x: x.split('/')[-3] if x.split('/')[-3] in S2K_STUDIES else x.split('/')[-4])
+        df.loc[df['study']=='IMPACT', 'diagnosis'] = 'ASD'
+
         # encode categorical variables
         df['diagnosis'].replace({'TD':0., 
                                 'ASD':1., 
                                 'DDLD':2., 
-                                'ADHD':3.}, inplace = True)
+                                'ADHD':3.,
+                                 'Other':4., 
+                                 np.nan: -1}, inplace = True)
 
         df['ethnicity'].replace({'Not Hispanic/Latino':0, 
                                 'Hispanic/Latino':1, 
@@ -467,10 +495,15 @@ class Dataset(object):
                    }, inplace = True)
 
         df['sex'].replace({'M':0, 'F':1}, inplace=True)
+        df['completed'].replace({'Complete (Do not readminister)':0, 'Partial (Do not readminister)':1, 'Incomplete (Readminister at next visit)':2}, inplace = True)
+
+        df['StateOfTheChild'].replace({'In a calm and/or good mood':1, 'Slightly irritable':2, 'Somewhat distressed':3, 'Crying and/or tantrum':4}, inplace = True)
+
         df.replace('N.A', np.nan, inplace=True)
         df.loc[df['SiblingsInTheRoom']==9, 'SiblingsInTheRoom'] = np.nan
 
-        df['StateOfTheChild'].replace({'In a calm and/or good mood':1, 'Slightly irritable':2, 'Somewhat distressed':3, 'Crying and/or tantrum':4}, inplace = True)
+        df.loc[~df['Comments'].isnull(), 'Comments'] = 1
+        df.loc[~df['AppTeamComment'].isnull(), 'AppTeamComment'] = 1
 
 
         # Merge time information and create `administration_number` column
@@ -510,7 +543,11 @@ class Dataset(object):
                 scaler.fit(X_raw)  # fit scaler
                 X_raw = scaler.transform(X_raw)
             
-        y = self.df[self.outcome_column].to_numpy().astype(float)
+        if self.outcome_column in list(self.df.keys()):
+            y = self.df[self.outcome_column].to_numpy().astype(float)
+        elif self.outcome_column[:2] == 'Z_':
+            y = (~np.isnan(self.df[self.outcome_column[2:]].to_numpy().astype(float))).astype(int)
+
         
 
         if self.verbosity>1 and verbose != False:
@@ -631,9 +668,32 @@ class Dataset(object):
             self.filter(administration={'order': 'first', 
                                      'completed': True}, 
                     clinical={'diagnosis': [0, 1]}, 
-                    demographics={'age':[10, 30]}, 
+                    demographics={'age':[10, 36]}, 
                     matching={'age':[0, 1]}, verbose=True)
-            
+
+        elif scenario=='papers':
+
+            self.filter(administration={'studies': ['ARC', 'P1'],
+                            'order': 'first', 
+                             'completed': True}, 
+                            clinical={'diagnosis': [0, 1]}, 
+                            matching={'age':[0, 1]}, verbose=True)
+
+        elif scenario=='young':
+            self.filter(administration={'studies': ['ARC', 'P1','SenseToKnowStudy'],
+                            'order': 'first', 
+                             'completed': True}, 
+                            clinical={'diagnosis': [0, 1]}, 
+                        matching={'age':[0, 1]}, verbose=True)  
+
+        elif scenario=='all':
+            self.filter(administration={
+                            'order': 'first', 
+                             'completed': True}, 
+                            clinical={'diagnosis': [0, 1]},
+                             verbose=True)      
+
+              
         elif scenario is None:
             pass
         

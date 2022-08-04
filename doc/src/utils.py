@@ -551,6 +551,8 @@ def create_autism_df(folder_names):
 
     df.drop_duplicates(inplace=True)
     df = df.astype({"experiment_number": int})
+    df.loc[(df['missing_data_handling']=='encoding'), 'imputation_method'] = 'constant'
+    
     return df
 def repr(object_, indent=0):
 
