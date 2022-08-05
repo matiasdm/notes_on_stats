@@ -366,13 +366,11 @@ class Experiments(object):
         else:
             print("/!\ No previous computed distribution found at '{}'".format(dist_neg_path)) if (self.debug or self.verbosity > 1)  else None
 
-        print(self.approach)
 
         if self.approach in ['single_distribution', 'multi_distributions']:
             self.predict()      
 
         elif self.approach in ['DecisionTree', 'LogisticRegression']:
-            print("yo")
             self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
             self.performance_df = pd.DataFrame(self.performances_df, index=[0])
             self._init_model()
