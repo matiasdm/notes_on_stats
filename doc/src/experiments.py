@@ -17,7 +17,7 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, LeaveOneOut
 
-from prg import prg
+import prg
 
 from xgboost import XGBClassifier, plot_importance, plot_tree
 from interpret.glassbox import ExplainableBoostingClassifier
