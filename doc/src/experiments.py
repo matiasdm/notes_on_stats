@@ -15,7 +15,7 @@ import seaborn as sns
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, roc_curve, plot_roc_curve, auc, precision_recall_curve, roc_auc_score, average_precision_score
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
-from sklearn.model_selection import StratifiedKFold
+from sklearn.model_selection import StratifiedKFold, LeaveOneOut
 
 from prg import prg
 
@@ -120,7 +120,7 @@ class Experiments(object):
     def features_name(self, features_name):
         self.dataset.features_name = features_name
     
-    def fit_predict(self, **kwargs):
+    def fit_predict(self, num_cv=16, **kwargs):
 
         """ 
             This function fit the model and predict score.
@@ -132,7 +132,7 @@ class Experiments(object):
 
         if self.verbosity >1:
             print("Predicting {} based on {} features using {} approach.".format(self.dataset.outcome_column, len(self.dataset.features_name), self.approach))
-            print(*self.dataset.features_name, sep='\n')
+            #print(*self.dataset.features_name, sep='\n')
             
         t0 = time()
 
@@ -158,23 +158,23 @@ class Experiments(object):
             # Be careful this one is containing all the replicates, if you want to access results on a test set 
             # with the best model, you should call `self.predict` and y_pred and proper coordinates will be accessible
             # Through self.dataset.y_pred. Note also this is called when plotting! 
-            self.predictions_df = self._train_nam(**kwargs)
+            self.predictions_df = self._train_nam(num_cv=num_cv, **kwargs)
 
         elif self.approach == 'xgboost':
 
-            self.predictions_df = self._fit_predict_vanilla(**kwargs)
+            self.predictions_df = self._fit_predict_vanilla(num_cv=num_cv, **kwargs)
 
         elif self.approach == 'ebm':
 
-            self.predictions_df = self._fit_predict_vanilla(**kwargs)
+            self.predictions_df = self._fit_predict_vanilla(num_cv=num_cv, **kwargs)
 
         elif self.approach == 'DecisionTree':
 
-            self.predictions_df = self._fit_predict_vanilla(**kwargs)
+            self.predictions_df = self._fit_predict_vanilla(num_cv=num_cv, **kwargs)
 
         elif self.approach == 'LogisticRegression':
 
-            self.predictions_df = self._fit_predict_vanilla(**kwargs)
+            self.predictions_df = self._fit_predict_vanilla(num_cv=num_cv, **kwargs)
             
         self.estimation_time = time() - t0
 
@@ -509,14 +509,18 @@ class Experiments(object):
         
         return  pd.concat(replicates_results)
 
-    def _train_predict_nam_cv(self, num_cv, **kwargs):
+    def _train_predict_nam_cv(self, num_cv=None, **kwargs):
         """
             This function is a helper function to fit and predict score using loocv. 
             It generates the `predictions_df` attribute, that predict score on all the dataset.
         """
 
         self.num_cv = num_cv
-        cv = StratifiedKFold(n_splits=num_cv, shuffle=True, random_state=0)
+
+        if num_cv=='loocv':
+            cv = LeaveOneOut()
+        else:
+            cv = StratifiedKFold(n_splits=num_cv, shuffle=True, random_state=0)
         print('Performing {} fold cross-validation.'.format(num_cv)) if self.verbosity > 1 else None
             
         replicates_results = []
@@ -596,10 +600,10 @@ class Experiments(object):
             It generates the `predictions_df` attribute, that predict score on all the dataset.
 
         """
-
         if num_cv is not None:
             return self._fit_predict_vanilla_cv(num_cv)
-             
+        print("Not doing Cross Validation. ") if self.verbosity > 1 else None
+        
         # Init data
         X_train, X_test = self.dataset.X_train, self.dataset.X_train
         y_train, y_test = self.dataset._y.squeeze(), self.dataset._y.squeeze()
@@ -628,14 +632,24 @@ class Experiments(object):
         self.num_cv = num_cv
         y_pred_score = -1*np.ones_like(self.dataset._y).astype('float32')  # init prediction scores 
 
-        cv = StratifiedKFold(n_splits=num_cv, shuffle=True, random_state=0)
+        if num_cv =='loocv':
+            cv = LeaveOneOut()
+        else:
+            cv = StratifiedKFold(n_splits=num_cv, shuffle=True, random_state=0)
         print('Performing {} fold cross-validation.'.format(num_cv)) if self.verbosity > 1 else None
         
-        for _, (train, test) in enumerate(cv.split(self.dataset._X, self.dataset._y)):
+        for i, (train, test) in enumerate(cv.split(self.dataset._X, self.dataset._y)):
+
+
     
             # Init data
             X_train, X_test = self.dataset.X_train[train], self.dataset.X_train[test]
             y_train, y_test = self.dataset._y[train].squeeze(), self.dataset._y[test].squeeze()
+
+            if i==0 and self.verbosity > 1:
+                print("{}-fold Cross-Validation.\nSize Train: {} ({} NT {} ASD) Test: {} ({} NT {} ASD)".format(num_cv, 
+                                                                                                            X_train.shape[0], np.sum(y_train==0), np.sum(y_train==1),
+                                                                                                            X_test.shape[0], np.sum(y_test==0), np.sum(y_test==1)))
 
             X_train, y_train = self.dataset.upsample_minority(X_train, y_train)
 
@@ -1381,8 +1395,12 @@ class Experiments(object):
 
 
         ebm_global = self.model.explain_global()
+        ebm_local = self.model.explain_local(self.dataset.X_train, self.dataset.y_train)
+        show(ebm_global)
+        show(ebm_local)
 
-        return show(ebm_global)
+        return 
+
 
     def _plot_ebm_autism(self):
 

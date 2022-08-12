@@ -676,9 +676,16 @@ class Dataset(object):
             self.filter(administration={'studies': ['ARC', 'P1'],
                             'order': 'first', 
                              'completed': True}, 
+                            clinical={'diagnosis': [0, 1]},
+                            verbose=True)
+
+        elif scenario=='papers_matched':
+    
+            self.filter(administration={'studies': ['ARC', 'P1'],
+                            'order': 'first', 
+                             'completed': True}, 
                             clinical={'diagnosis': [0, 1]}, 
                             matching={'age':[0, 1]}, verbose=True)
-
         elif scenario=='young':
             self.filter(administration={'studies': ['ARC', 'P1','SenseToKnowStudy'],
                             'order': 'first', 
