@@ -686,12 +686,13 @@ class Dataset(object):
                              'completed': True}, 
                             clinical={'diagnosis': [0, 1]}, 
                             matching={'age':[0, 1]}, verbose=True)
-        elif scenario=='young':
+        elif scenario=='young_17_39':
             self.filter(administration={'studies': ['ARC', 'P1','SenseToKnowStudy'],
                             'order': 'first', 
                              'completed': True}, 
                             clinical={'diagnosis': [0, 1]}, 
-                        matching={'age':[0, 1]}, verbose=True)  
+                            demographics = {'age': [17, 39]}, 
+                             verbose=True)  
 
         elif scenario=='all':
             self.filter(administration={
