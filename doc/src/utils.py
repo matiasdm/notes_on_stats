@@ -12,7 +12,42 @@ import pandas as pd
 
 # Import local packages
 from const import *
+from const_autism import *
+
 sys.path.insert(0, '../../src')
+
+
+def corrected_f1_sklearn(clf, X, y):
+    
+    y_pred = clf.predict_proba(X)[:,1]
+    
+    from metrics import f1score, average_precision, bestf1score, calc_auprg, create_prg_curve
+    
+     # Compute the F1 score
+    f1, optimal_threshold = bestf1score(y, y_pred, pi0=None)
+
+    # Compute the corrected F1 score
+    f1_corrected, _ = bestf1score(y, y_pred, pi0=REFERENCE_IMBALANCE_RATIO)
+
+    return f1_corrected
+
+
+def corrected_f1_xgboost(preds, dtrain):
+    res = _corrected_f1_sklearn(preds, dtrain.get_label())
+    return 'f1_corrected', 1-res
+
+
+def _corrected_f1_sklearn(y_pred, y):
+        
+    from metrics import f1score, average_precision, bestf1score, calc_auprg, create_prg_curve
+    
+     # Compute the F1 score
+    f1, optimal_threshold = bestf1score(y, y_pred, pi0=None)
+
+    # Compute the corrected F1 score
+    f1_corrected, _ = bestf1score(y, y_pred, pi0=REFERENCE_IMBALANCE_RATIO)
+
+    return f1_corrected
 
 
 def fi(x=12, y=12):
@@ -441,15 +476,16 @@ def create_df(folder_names=EXPERIMENT_FOLDER_NAME):
 
 folder_names = ['autism_all']
 
-
+  
       
 def create_autism_df(folder_names):  
     
     if not isinstance(folder_names, list):
         folder_names = list(folder_names)
     df = pd.DataFrame(columns = ['dataset_name','experiment_number', 'approach', 'missing_data_handling','imputation_method', 'features_name', 'n_features', 'use_missing_indicator_variables', 'scale_data', 'sampling_method','scenario',
-                                'num_samples', 'imbalance_ratio', 'ratio_of_missing_values','ratio_missing_per_class_0', 'ratio_missing_per_class_1', 'resolution', 'bandwidth', 'estimation_time', 'num_cv', 'auc',
-                                'Accuracy', 'F1', 'MCC', 'Sensitivity', 'Specificity', 'Precision', 'PPV', 'NPV', 'FNR', 'FDR', 'FOR'])
+                                'num_samples', 'imbalance_ratio', 'ratio_of_missing_values','ratio_missing_per_class_0', 'ratio_missing_per_class_1', 'resolution', 'bandwidth', 'estimation_time', 'num_cv', 'AUROC',
+                                'AUC-PR', 'AUC-PR-Gain', 'AUC-PR-Corrected', 'AUC-PR-Gain-Corrected', 'F1', 'F1 score Corrected',
+                                'Accuracy', 'MCC', 'Sensitivity', 'Specificity', 'Precision', 'PPV', 'NPV', 'FNR', 'FDR', 'FOR'])
 
 
     experiments_paths = []
@@ -508,7 +544,7 @@ def create_autism_df(folder_names):
                 dist_0_data = json.load(dist_json)
 
         # append rows to an empty DataFrame
-        df = df.append({'dataset_name' : experiment_data['dataset_name'], 
+        df = df.append({'dataset_name' : experiment_path.split('/')[-3], 
                         'experiment_number' : experiment_data['experiment_number'],  
                         'approach' : experiment_data['approach'],  
                         'missing_data_handling' : dataset_data['missing_data_handling'],  
@@ -528,9 +564,13 @@ def create_autism_df(folder_names):
                         'bandwidth' : experiment_data['bandwidth'],
                         'estimation_time': experiment_data['estimation_time'],
                         'num_cv': experiment_data['num_cv'],
-                        'auc' : experiment_data['performances_df']['Area Under the Curve (AUC)'][0] if 'Area Under the Curve (AUC)' in experiment_data['performances_df'].keys() else np.nan,
-                        'Accuracy' : experiment_data['performances_df']['Accuracy'][0],  
+                        'AUROC' : experiment_data['performances_df']['Area Under the Curve (AUC)'][0] if 'Area Under the Curve (AUC)' in experiment_data['performances_df'].keys() else experiment_data['performances_df']['AUROC'][0] if 'AUROC' in experiment_data['performances_df'].keys() else np.nan,
+                        'AUC-PR' : experiment_data['performances_df']['AUC-PR'][0],  
+                        'AUC-PR-Gain' : experiment_data['performances_df']['AUC-PR-Gain'][0],  
+                        'AUC-PR-Corrected' : experiment_data['performances_df']['AUC-PR-Corrected'][0],  
+                        'AUC-PR-Gain-Corrected' : experiment_data['performances_df']['AUC-PR-Gain-Corrected'][0],  
                         'F1' : experiment_data['performances_df']['F1 score (2 PPVxTPR/(PPV+TPR))'][0],  
+                        'F1 score Corrected' : experiment_data['performances_df']['F1 score Corrected'][0],   
                         'MCC' : experiment_data['performances_df']['Matthews correlation coefficient (MCC)'][0],  
                         'Sensitivity' : experiment_data['performances_df']['Sensitivity, recall, hit rate, or true positive rate (TPR)'][0],  
                         'Specificity' : experiment_data['performances_df']['Specificity, selectivity or true negative rate (TNR)'][0],  
@@ -542,7 +582,6 @@ def create_autism_df(folder_names):
                         'FOR' : experiment_data['performances_df']['False omission rate (FOR=1-NPV)'][0],  
                         }, 
                         ignore_index = True)
-
 
     #df['ratio_missing_per_class_0'] = df['ratio_missing_per_class_0'].astype(float).round(2)
     #df['ratio_missing_per_class_1'] = df['ratio_missing_per_class_1'].astype(float).round(2)

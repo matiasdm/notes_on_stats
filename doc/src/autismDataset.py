@@ -306,10 +306,15 @@ class Dataset(object):
         """
         Split the dataset given some proportions, taking as input the see-able dataset with potentially missing data, having them either encoded of imputed.
         """
-        if self.proportion_train!=1:
-            self.train_index, self.test_index = train_test_split(np.arange(self.num_samples), test_size = (1-self.proportion_train))
-        else:
+        if self.proportion_train not in [0, 1]:
+            self.train_index, self.test_index = train_test_split(np.arange(self.num_samples), test_size = 1-self.proportion_train)
+
+        elif self.proportion_train == 0:
+            self.train_index, self.test_index = [], np.arange(self.num_samples)
+            
+        elif self.proportion_train == 1:
             self.train_index, self.test_index = np.arange(self.num_samples), []
+
 
         self._X_train = deepcopy(self._X[self.train_index])
         self._X_test = deepcopy(self._X[self.test_index])
@@ -328,6 +333,7 @@ class Dataset(object):
 
         # We need to re-empute or encode data after this step, for model where several replicates of experiements are done and 
         # Who re-shuffle the data for each replicates. 
+
         self.impute_data()
 
         return
@@ -345,8 +351,7 @@ class Dataset(object):
     
         if self.missing_data_handling == 'imputation':
 
-            if self._imp_X_train is None and self._imp_X_test is None:
-                self._imp_X_train, self._imp_X_test  = self._impute_missing_data()
+            self._imp_X_train, self._imp_X_test  = self._impute_missing_data()
 
             # Create X and y used for experiments
             self.X_train = deepcopy(self._imp_X_train)
@@ -355,7 +360,7 @@ class Dataset(object):
             self.X_test = deepcopy(self._imp_X_test)
             self.y_test = deepcopy(self._y_test)
             
-            print("Imputed {} values (train) and {} (test) using method {}.".format(len(np.isnan(self.X_train)), len(np.isnan(self.X_test)), self.imputation_method)) if (self.debug or self.verbosity > 2)  else None                
+            #print("Imputed {} values (train) and {} (test) using method {}.".format(len(np.isnan(self.X_train)), len(np.isnan(self.X_test)), self.imputation_method)) if (self.debug or self.verbosity > 2)  else None                
 
         elif self.missing_data_handling == 'encoding':
 
@@ -395,7 +400,7 @@ class Dataset(object):
             # If balanced, upsamples the minority class to have a balanced training set. 
             X0 = X[y==0]
             y0 = y[y==0]
-            X1 = y[y==1]
+            X1 = X[y==1]
             y1 = y[y==1]
 
             # Upsample the minority class
@@ -430,11 +435,15 @@ class Dataset(object):
         """
         from stats import impute_missing_data
 
-        _imp_X_train = impute_missing_data(X_train=self.X_train, X_test=self.X_train, method=self.imputation_method, h=bandwidth)
+        if self.proportion_train >0:
+            _imp_X_train = impute_missing_data(X_train=self.X_train, X_test=self.X_train, method=self.imputation_method, h=bandwidth)
+        else:
+            _imp_X_train = np.array([])
+
         if self.proportion_train <1:
             _imp_X_test = impute_missing_data(X_train=self.X_train, X_test=self.X_test, method=self.imputation_method, h=bandwidth)
         else:
-            _imp_X_test = None
+            _imp_X_test = np.array([])
 
         return _imp_X_train, _imp_X_test
     
@@ -466,7 +475,7 @@ class Dataset(object):
         if self.verbosity > 1:
             print("Post-processing inital df (removing columns with no cva features, encoding srings, compute administrations order, compute condensed S/NS variables)... ")
 
-        df.dropna(subset=CVA_COLUMNS, how='all', inplace=True)
+        #df.dropna(subset=CVA_COLUMNS, how='all', inplace=True)
 
         df['study'] = df['path'].apply(lambda x: x.split('/')[-3] if x.split('/')[-3] in S2K_STUDIES else x.split('/')[-4])
         df.loc[df['study']=='IMPACT', 'diagnosis'] = 'ASD'
@@ -694,6 +703,13 @@ class Dataset(object):
                             demographics = {'age': [17, 39]}, 
                              verbose=True)  
 
+        elif scenario=='papers_remote':
+            self.filter(administration={'studies': ['SenseToKnowStudy'],
+                            'order': 'first', 
+                             'completed': True}, 
+                            clinical={'diagnosis': [0, 1]}, 
+                            demographics = {'age': [17, 39]}, 
+                             verbose=True)  
         elif scenario=='all':
             self.filter(administration={
                             'order': 'first', 

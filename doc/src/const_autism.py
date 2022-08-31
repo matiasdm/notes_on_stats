@@ -39,9 +39,9 @@ CVA_COLUMNS = [# GAZE RELATED
                  'S_gaze_silhouette_score',
                  'FP_gaze_speech_correlation',
                  'FP_gaze_silhouette_score',
-                 #'inv_S_gaze_percent_right',#aggregated
-                 #'mean_gaze_percent_right', #aggregated
-                 #'gaze_silhouette_score', #aggregated
+                 'inv_S_gaze_percent_right',#aggregated
+                 'mean_gaze_percent_right', #aggregated
+                 'gaze_silhouette_score', #aggregated
    
                 # NAME CALL RELATED
                  'proportion_of_name_call_responses',
@@ -71,10 +71,10 @@ CVA_COLUMNS = [# GAZE RELATED
                  'PWB_postural_sway_derivative',
                  'FP_postural_sway',
                  'FP_postural_sway_derivative',
-                 #'S_postural_sway',  #aggregated
-                 #'NS_postural_sway',  #aggregated
-                 #'S_postural_sway_derivative', #aggregated
-                 #'NS_postural_sway_derivative', #aggregated
+                 'S_postural_sway',  #aggregated
+                 'NS_postural_sway',  #aggregated
+                 'S_postural_sway_derivative', #aggregated
+                 'NS_postural_sway_derivative', #aggregated
                 
                 # TOUCH RELATED
                  'number_of_touches',

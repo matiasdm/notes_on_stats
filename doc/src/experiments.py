@@ -16,6 +16,7 @@ from sklearn.metrics import classification_report, confusion_matrix, ConfusionMa
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, LeaveOneOut
+from sklearn.naive_bayes import GaussianNB
 
 import prg
 
@@ -31,7 +32,7 @@ sys.path.insert(0, '../src')
 
 from const import *
 from const_autism import *
-from utils import fi, repr
+from utils import fi, repr, corrected_f1_xgboost
 from metrics import f1score, average_precision, bestf1score, calc_auprg, create_prg_curve
 
 from generateToyDataset import DatasetGenerator
@@ -57,12 +58,14 @@ class Experiments(object):
                 sampling_method=DEFAULT_SAMPLING_METHOD,
                 previous_experiment=None,        
                 save_experiment=True, 
+                experiment_folder_name=EXPERIMENT_FOLDER_NAME,
                 verbosity=1, 
                 debug=False, 
                 random_state=RANDOM_STATE):
 
         # Set definitions attributes (also used for log purposes)
         self.dataset_name = dataset_name
+        self.experiment_folder_name = experiment_folder_name
         self.debug=debug
         self.verbosity=verbosity
 
@@ -91,6 +94,8 @@ class Experiments(object):
         # Interesting byproducts
         self.predictions_df = None
         self.performances_df = None
+        
+        
 
         if previous_experiment is not None:
             self.load(previous_experiment)
@@ -119,8 +124,73 @@ class Experiments(object):
     @features_name.setter  
     def features_name(self, features_name):
         self.dataset.features_name = features_name
+
+    def fit(self, **kwargs):
+
+        if self.approach == 'nam':
+            self.predictions_df = self._train_nam(num_cv=None)
+            return
+        
+        # Init data
+        X_train, X_test = self.dataset.X_train, self.dataset.X_test
+        y_train, y_test = self.dataset._y_train.squeeze(), self.dataset._y_test.squeeze()
+
+        # Fit model 
+        if self.approach == 'xgboost':
+            self.model.fit(X_train, y_train, eval_metric=corrected_f1_xgboost)
+            self.model.get_booster().feature_names = self.features_name
+
+        else:
+            self.model.fit(X_train, y_train)
+
+        return 
+
+    def predict(self):
+
+        if self.approach == 'nam':
+
+            # Init data
+            X_test, y_test = self.dataset.X_test, self.dataset.y_test.squeeze()
+
+            # Create the df associated to the test sample 
+            test_dict = {i:X_test[:,i] for i in range(X_test.shape[1])}
+            test_dict['y_true'] = y_test
+            test_df = pd.DataFrame.from_dict(test_dict);test_df.columns = self.features_name + ["y_true"]
+
+            # Create the PyTorch Datasets
+            data_test = TabularData(X=X_test, y=y_test) 
+
+            y_, p_ = eval_model(self.model, data_test)
+
+            self.predictions_df = (pd.DataFrame(p_, columns = self.features_name, index=test_df.index)
+                                                .add_suffix('_partial')
+                                                .join(test_df)
+                                                .assign(y_pred = y_)
+                                                 .assign(replicate = 0))
+
+        
+
+        else:
+            # Init data
+            X_train, X_test = self.dataset.X_train, self.dataset.X_test
+            y_train, y_test = self.dataset._y_train.squeeze(), self.dataset._y_test.squeeze()
+
+            print("Size of train: {}, asd: {}".format(X_train.shape, np.sum(y_train[y_train==1]))) if self.verbosity > 1 else None
+            print("Size of test: {}, asd: {}".format(X_test.shape, np.sum(y_test[y_test==1]))) if self.verbosity > 1 else None
+
+            # Create the df associated to the test sample 
+            test_dict = {i:X_test[:,i] for i in range(X_test.shape[1])}
+            test_dict['y_true'] = y_test
+            test_dict['y_pred'] = self.model.predict_proba(X_test)[:,1]
+
+            self.predictions_df = pd.DataFrame.from_dict(test_dict);self.predictions_df.columns = self.features_name + ["y_true", "y_pred"]
+
+        self._performances()
+
+        return
+        
     
-    def fit_predict(self, num_cv=16, **kwargs):
+    def fit_predict(self, num_cv=None, **kwargs):
 
         """ 
             This function fit the model and predict score.
@@ -160,27 +230,18 @@ class Experiments(object):
             # Through self.dataset.y_pred. Note also this is called when plotting! 
             self.predictions_df = self._train_nam(num_cv=num_cv, **kwargs)
 
-        elif self.approach == 'xgboost':
+        elif self.approach in ['xgboost', 'NaiveBayes', 'ebm', 'DecisionTree', 'LogisticRegression']:
 
             self.predictions_df = self._fit_predict_vanilla(num_cv=num_cv, **kwargs)
 
-        elif self.approach == 'ebm':
-
-            self.predictions_df = self._fit_predict_vanilla(num_cv=num_cv, **kwargs)
-
-        elif self.approach == 'DecisionTree':
-
-            self.predictions_df = self._fit_predict_vanilla(num_cv=num_cv, **kwargs)
-
-        elif self.approach == 'LogisticRegression':
-
-            self.predictions_df = self._fit_predict_vanilla(num_cv=num_cv, **kwargs)
-            
         self.estimation_time = time() - t0
 
         self._performances()
             
-        self.fitted = True
+        self.fitted = True        
+        
+        if self.approach == 'xgboost':
+            self.model.get_booster().feature_names = self.features_name
 
         return 
 
@@ -209,7 +270,7 @@ class Experiments(object):
         elif self.approach == 'ebm':
             self._plot_ebm()   
 
-        elif self.approach in ['DecisionTree', 'LogisticRegression']:
+        elif self.approach in ['DecisionTree', 'LogisticRegression', 'LogisticRegression']:
             self._plot_lr_decision_tree()
             print("Not implemented yet.")
 
@@ -268,12 +329,12 @@ class Experiments(object):
             /!\ Not implemented yet  
         """
 
-        experiment_path = os.path.join(DATA_DIR,  EXPERIMENT_FOLDER_NAME, self.dataset_name, str(previous_experiment), 'experiment_log.json')
-        dataset_path = os.path.join(DATA_DIR,  EXPERIMENT_FOLDER_NAME, self.dataset_name, str(previous_experiment), 'dataset_log.json')
-        dist_None_path = os.path.join(DATA_DIR,  EXPERIMENT_FOLDER_NAME, self.dataset_name, str(previous_experiment), 'distributions_None_log.json')
-        dist_pos_path = os.path.join(DATA_DIR,  EXPERIMENT_FOLDER_NAME, self.dataset_name, str(previous_experiment), 'distributions_1_log.json')
-        dist_neg_path = os.path.join(DATA_DIR,  EXPERIMENT_FOLDER_NAME, self.dataset_name, str(previous_experiment), 'distributions_0_log.json')
-        model_path = os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, str(previous_experiment), 'best_model.pt')
+        experiment_path = os.path.join(DATA_DIR,  self.experiment_folder_name, self.dataset_name, str(previous_experiment), 'experiment_log.json')
+        dataset_path = os.path.join(DATA_DIR,  self.experiment_folder_name, self.dataset_name, str(previous_experiment), 'dataset_log.json')
+        dist_None_path = os.path.join(DATA_DIR,  self.experiment_folder_name, self.dataset_name, str(previous_experiment), 'distributions_None_log.json')
+        dist_pos_path = os.path.join(DATA_DIR,  self.experiment_folder_name, self.dataset_name, str(previous_experiment), 'distributions_1_log.json')
+        dist_neg_path = os.path.join(DATA_DIR,  self.experiment_folder_name, self.dataset_name, str(previous_experiment), 'distributions_0_log.json')
+        model_path = os.path.join(DATA_DIR, self.experiment_folder_name, self.dataset_name, str(previous_experiment), 'best_model.pt')
 
 
         #---------------- Loading Experiment  ----------------#
@@ -370,7 +431,7 @@ class Experiments(object):
         if self.approach in ['single_distribution', 'multi_distributions']:
             self.predict()      
 
-        elif self.approach in ['DecisionTree', 'LogisticRegression']:
+        elif self.approach in ['DecisionTree', 'LogisticRegression', 'NaiveBayes']:
             self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
             self.performance_df = pd.DataFrame(self.performances_df, index=[0])
             self._init_model()
@@ -456,8 +517,8 @@ class Experiments(object):
             self.dataset.split_test_train()
 
             # Init data
-            X_train, X_test = self.dataset.X_train, self.dataset.X_train
-            y_train, y_test = self.dataset._y.squeeze(), self.dataset._y.squeeze()
+            X_train, X_test = self.dataset.X_train, self.dataset.X_test
+            y_train, y_test = self.dataset.y_train.squeeze(), self.dataset.y_test.squeeze()
                 
             # Create the df associated to the test sample 
             test_dict = {i:X_test[:,i] for i in range(X_test.shape[1])}
@@ -601,15 +662,18 @@ class Experiments(object):
 
         """
         if num_cv is not None:
-            return self._fit_predict_vanilla_cv(num_cv)
+            return self._fit_predict_vanilla_cv(num_cv,  **kwargs)
         print("Not doing Cross Validation. ") if self.verbosity > 1 else None
         
         # Init data
-        X_train, X_test = self.dataset.X_train, self.dataset.X_train
-        y_train, y_test = self.dataset._y.squeeze(), self.dataset._y.squeeze()
+        X_train, X_test = self.dataset.X_train, self.dataset.X_test
+        y_train, y_test = self.dataset._y_train.squeeze(), self.dataset._y_test.squeeze()
 
         # Fit model 
-        self.model.fit(X_train, y_train)
+        if self.approach == 'xgboost':
+            self.model.fit(X_train, y_train, eval_metric=corrected_f1_xgboost)
+        else:
+            self.model.fit(X_train, y_train)
 
         # Create the df associated to the test sample 
         test_dict = {i:X_test[:,i] for i in range(X_test.shape[1])}
@@ -640,8 +704,6 @@ class Experiments(object):
         
         for i, (train, test) in enumerate(cv.split(self.dataset._X, self.dataset._y)):
 
-
-    
             # Init data
             X_train, X_test = self.dataset.X_train[train], self.dataset.X_train[test]
             y_train, y_test = self.dataset._y[train].squeeze(), self.dataset._y[test].squeeze()
@@ -652,12 +714,15 @@ class Experiments(object):
                                                                                                             X_test.shape[0], np.sum(y_test==0), np.sum(y_test==1)))
 
             X_train, y_train = self.dataset.upsample_minority(X_train, y_train)
-
             # Reset model 
             self._init_model()
-            # Fit model 
-            self.model.fit(X_train, y_train)
 
+            # Fit model 
+            if self.approach == 'xgboost':
+                self.model.fit(X_train, y_train, eval_metric=corrected_f1_xgboost)
+            else:
+                self.model.fit(X_train, y_train)
+                
             # Predict samples on the test set
             y_pred_score[test] = self.model.predict_proba(X_test)[:,1]
         
@@ -795,7 +860,7 @@ class Experiments(object):
             # Compute perf.
             self._performances_nam()
             
-        elif self.approach in ['multi_distributions', 'single_distribution', 'xgboost', 'ebm', 'DecisionTree', 'LogisticRegression']:
+        elif self.approach in ['multi_distributions', 'single_distribution', 'xgboost', 'ebm', 'DecisionTree', 'LogisticRegression', 'NaiveBayes']:
             
             # Compute perf.
             self._performances_vanilla()
@@ -921,8 +986,7 @@ class Experiments(object):
             # Compute the corrected F1 score
             f1_corrected, _ = bestf1score(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO)
 
-            
-            
+        
             tn, fp, fn, tp = confusion_matrix(y_true, y_pred > optimal_threshold).ravel()
 
             acc = (tp + tn) / (tp + tn + fp +  fn)
@@ -1264,6 +1328,28 @@ class Experiments(object):
         return 
 
     def _plot_xgboost_autism(self):
+
+        if self.predictions_df is None:
+            # Create the pannel 
+            fig_mosaic = """
+                            CCCC
+                            FFFF
+                            FFFF
+                        """
+
+            fig, axes = plt.subplot_mosaic(mosaic=fig_mosaic, figsize=(25,18))
+            
+            # Plot features importance
+            self.model.get_booster().feature_names = self.features_name
+            axes['C'] = plot_importance(self.model.get_booster(),  height=0.5, ax = axes['C'])
+            
+            # Plot Tree
+            axes['F'] = plot_tree(self.model.get_booster(), num_trees=self.model.best_iteration, ax=axes['F'])
+
+            plt.tight_layout();plt.show()
+            return
+            
+
         
         # Create the pannel 
         fig_mosaic = """
@@ -1404,24 +1490,26 @@ class Experiments(object):
 
     def _plot_ebm_autism(self):
 
-        # Create the pannel 
-        fig_mosaic = """
-                        AB
-                    """
+        if self.predictions_df is not None:
 
-        fig, axes = plt.subplot_mosaic(mosaic=fig_mosaic, figsize=(20,8))
-        
-        fig.suptitle("({}) {}".format(int(self.experiment_number), self.description), y=1.1, weight='bold', fontsize=12)
+            # Create the pannel 
+            fig_mosaic = """
+                            AB
+                        """
 
-        # Plot the performances 
-        cm = confusion_matrix(self.predictions_df['y_true'].to_numpy(), self.predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
-        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-        disp.plot(cmap='Blues', ax=axes['B']);disp.im_.colorbar.remove()    
+            fig, axes = plt.subplot_mosaic(mosaic=fig_mosaic, figsize=(20,8))
+            
+            fig.suptitle("({}) {}".format(int(self.experiment_number), self.description), y=1.1, weight='bold', fontsize=12)
 
-        # Plot the roc curves
-        axes['A'] = plot_roc_curves_xgboost(self.predictions_df, ax=axes['A']) 
+            # Plot the performances 
+            cm = confusion_matrix(self.predictions_df['y_true'].to_numpy(), self.predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
+            disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+            disp.plot(cmap='Blues', ax=axes['B']);disp.im_.colorbar.remove()    
 
-        plt.tight_layout();plt.show()
+            # Plot the roc curves
+            axes['A'] = plot_roc_curves_xgboost(self.predictions_df, ax=axes['A']) 
+
+            plt.tight_layout();plt.show()
 
         ebm_global = self.model.explain_global()
 
@@ -1579,24 +1667,25 @@ class Experiments(object):
         
         # Create experiment folder if not already created
 
-        if not os.path.isdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME)):
-            os.mkdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME))
+        if not os.path.isdir(os.path.join(DATA_DIR, self.experiment_folder_name)):
+            os.mkdir(os.path.join(DATA_DIR, self.experiment_folder_name))
 
         if not os.path.isdir(os.path.join(DATA_DIR, 'tmp')):
             os.mkdir(os.path.join(DATA_DIR, 'tmp'))  
 
         # Create dataset experiment folder  if not already created
-        if not os.path.isdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name)):
-            os.mkdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name))
+        if not os.path.isdir(os.path.join(DATA_DIR, self.experiment_folder_name, self.dataset_name)):
+            os.mkdir(os.path.join(DATA_DIR, self.experiment_folder_name, self.dataset_name))
 
-        if not os.path.isdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, '0')):
-            os.mkdir(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, '0'))
+        if not os.path.isdir(os.path.join(DATA_DIR, self.experiment_folder_name, self.dataset_name, '0')):
+            os.mkdir(os.path.join(DATA_DIR, self.experiment_folder_name, self.dataset_name, '0'))
     
         # Looking for the number of the new experiment number
-        experiment_number = np.max([int(os.path.basename(path)) for path in glob(os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, '*'))])+1
+        experiment_number = np.max([int(os.path.basename(path)) for path in glob(os.path.join(DATA_DIR, self.experiment_folder_name, self.dataset_name, '*'))])+1
 
-        experiment_path = os.path.join(DATA_DIR, EXPERIMENT_FOLDER_NAME, self.dataset_name, str(experiment_number))
-        print('Doing experiment {}!'.format(experiment_number))
+        experiment_path = os.path.join(DATA_DIR, self.experiment_folder_name, self.dataset_name, str(experiment_number))
+        print('Saving experiment in folder {}.\nDoing experiment {}!'.format(self.experiment_folder_name, experiment_number)) if self.verbosity > 0 else None
+        
 
         # Create experiment folder 
         os.mkdir(experiment_path)
@@ -1650,36 +1739,36 @@ class Experiments(object):
             
             self.model = XGBClassifier(use_label_encoder=False, # TODO ADD PLAYING WITH PARAMETERS 
                                       learning_rate=0.01,
-                                       n_estimators= 1000,
+                                       n_estimators= 200,
                                       max_depth = 3,
                                       verbosity=1,
                                       objective='binary:logistic',
                                       eval_metric='auc',
                                       booster='gbtree',
+                                      #enable_categorical=True, 
                                       tree_method='exact',
-                                      subsample=1,
+                                      subsample=.8,
                                       colsample_bylevel=.8,
                                       alpha=0)
-
 
         elif self.approach == 'ebm':
 
             self.model = ExplainableBoostingClassifier(feature_names=self.features_name, 
                                                         max_bins=256,
-                                                        max_interaction_bins=256,
+                                                        max_interaction_bins=32,
                                                         binning='quantile',
                                                         mains='all',
-                                                        interactions=40,
+                                                        interactions=10,
                                                         outer_bags=8,
                                                         inner_bags=0,
                                                         learning_rate=0.01,
                                                         validation_size=0.15,
                                                         early_stopping_rounds=50,
                                                         early_stopping_tolerance=0.0001,
-                                                        max_rounds=10000,
+                                                        max_rounds=5000,
                                                         min_samples_leaf=2,
                                                         max_leaves=3,
-                                                        n_jobs=-2,
+                                                        n_jobs=4,
                                                         random_state=RANDOM_STATE)
 
 
@@ -1700,7 +1789,10 @@ class Experiments(object):
 
 
         elif self.approach == 'LogisticRegression':
-            self.model = LogisticRegression(random_state=0)
+            self.model = LogisticRegression()
+
+        elif self.approach == 'NaiveBayes':
+            self.model = GaussianNB()
 
         return 
     
