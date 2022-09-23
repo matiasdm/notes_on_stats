@@ -94,10 +94,11 @@ class Dataset(object):
         
         self.verbosity = verbosity    
         self.debug = debug    
+        features_name=deepcopy(features_name)
 
         self.use_missing_indicator_variables = use_missing_indicator_variables
+        self.raw_features_name = deepcopy(features_name)
         self._features_name = self._init_features_name(features_name)
-        
         self.missing_data_handling = missing_data_handling
         self.imputation_method = imputation_method if missing_data_handling!='encoding' else 'constant'
         
@@ -118,7 +119,7 @@ class Dataset(object):
 
         # Prediciton on the test set
         #self.y_pred = None # TODOREMOVE
-
+        
         self.scenario = self._init_scenario(scenario)
 
         
@@ -286,7 +287,7 @@ class Dataset(object):
         if self.verbosity > 1 and verbose:
             print("{} administrations left.".format(len(self.df)))
             
-            display(self.df.groupby('diagnosis')[['id']].count())
+            display(self.df.groupby(self.outcome_column)[['id']].count())
 
         self.df.sort_values(by=['id', 'date'], inplace=True)
         self.df.reset_index(drop=True, inplace=True)
@@ -478,7 +479,9 @@ class Dataset(object):
         #df.dropna(subset=CVA_COLUMNS, how='all', inplace=True)
 
         df['study'] = df['path'].apply(lambda x: x.split('/')[-3] if x.split('/')[-3] in S2K_STUDIES else x.split('/')[-4])
-        df.loc[df['study']=='IMPACT', 'diagnosis'] = 'ASD'
+        df.loc[df['study'].isin(['SAESDM', 'IMPACT', 'P3R']), 'diagnosis'] = 'ASD'
+
+        
 
         # encode categorical variables
         df['diagnosis'].replace({'TD':0., 
@@ -491,6 +494,19 @@ class Dataset(object):
         df['ethnicity'].replace({'Not Hispanic/Latino':0, 
                                 'Hispanic/Latino':1, 
                                  'Unknown or not reported':np.nan}, inplace = True)
+        
+        df['remote'] = df['study']
+        df['remote'].replace({'SenseToKnowStudy':1, 
+                    'P1':0,
+                    'P2':0, 
+                    'P3':0,
+                    'IMPACT':0,
+                    'SAESDM':0,
+                    'ARC':1,
+                    'P3R':1, 
+                    'S2KP':0,
+                              
+                    'P1R':1}, inplace = True)
 
         df['race'].replace({'White':0., 
                     'White/Caucasian':0.,
@@ -527,10 +543,27 @@ class Dataset(object):
         return df 
        
     def _init_data(self, verbose=None):
+
+        features_name = deepcopy(self.raw_features_name)
         
-        if self.use_missing_indicator_variables:
+        if isinstance(self.use_missing_indicator_variables, dict):
             
-            features_name = self.features_name[:int(len(self.features_name)/2)]
+            X_raw = self.df[features_name].to_numpy().astype(float)
+            
+            if self.scale_data:
+        
+                scaler = StandardScaler()
+                scaler.fit(X_raw)  # fit scaler
+                X_raw = scaler.transform(X_raw)
+                
+                
+            for feature_name_grouped, feats in self.use_missing_indicator_variables.items():
+                self.df['Z_{}'.format(feature_name_grouped)] = 0
+                self.df.loc[self.df.drop(index=self.df.dropna(subset=feats, how='all').index).index, 'Z_{}'.format(feature_name_grouped)] = 1
+                X_raw = np.concatenate([X_raw, self.df["Z_{}".format(feature_name_grouped)].to_numpy().astype(int)[:, np.newaxis]], axis=1)  
+        
+        elif self.use_missing_indicator_variables:
+            
             X_raw = self.df[features_name].to_numpy().astype(float)
             
             if self.scale_data:
@@ -542,7 +575,6 @@ class Dataset(object):
             X_raw = np.concatenate([X_raw, (~np.isnan(self.df[features_name].to_numpy().astype(float))).astype(int)], axis=1) 
 
         else:
-            features_name = self.features_name
             
             X_raw = self.df[features_name].to_numpy().astype(float)
             
@@ -622,8 +654,18 @@ class Dataset(object):
             print('No NAs found')
             
     def _init_features_name(self, features_name):
+        
+        self.raw_features_name = deepcopy(features_name)
+                
+        if isinstance(self.use_missing_indicator_variables, dict):
+                            
+            for feature_name_grouped, feats in self.use_missing_indicator_variables.items():
+                features_name.append("Z_{}".format(feature_name_grouped))
+                
+            return features_name
+            
 
-        if self.use_missing_indicator_variables==True:
+        elif self.use_missing_indicator_variables==True:
 
             return features_name + ['Z_' + feat for feat in features_name]
 

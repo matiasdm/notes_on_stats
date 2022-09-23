@@ -589,7 +589,7 @@ def create_autism_df(folder_names):
     df.loc[df['use_missing_indicator_variables'].isna(), 'use_missing_indicator_variables'] = False
     df.loc[df['use_missing_indicator_variables'].isnull(), 'use_missing_indicator_variables'] = False
 
-    df.drop_duplicates(inplace=True)
+    #df.drop_duplicates(inplace=True)
     df = df.astype({"experiment_number": int})
     df.loc[(df['missing_data_handling']=='encoding'), 'imputation_method'] = 'constant'
     

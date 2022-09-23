@@ -68,6 +68,7 @@ class Experiments(object):
         self.experiment_folder_name = experiment_folder_name
         self.debug=debug
         self.verbosity=verbosity
+        self.random_state = random_state
 
         # Dataset 
         self.dataset = dataset
@@ -112,7 +113,6 @@ class Experiments(object):
         # Define colors, level of verbosity, and random_state
         self.verbosity = verbosity 
         self.debug=debug
-        self.random_state = random_state
 
     def __call__(self):
         return repr(self)       
@@ -1241,7 +1241,15 @@ class Experiments(object):
         axes['A'].set_title("Training set ({})".format(self.dataset.X_train.shape[0])); axes['B'].set_title("Test set ({})".format(self.dataset.X_test.shape[0]))
 
         # Plot the performances 
-        cm = confusion_matrix(self.predictions_df['y_true'].to_numpy(), self.predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
+
+
+        y_true = self.predictions_df['y_true'].to_numpy()
+        y_pred = self.predictions_df['y_pred'].to_numpy()
+
+        # Compute the F1 score
+        _, optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
+
+        cm = confusion_matrix(y_true, y_pred> optimal_threshold)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(cmap='Blues', ax=axes['C']);disp.im_.colorbar.remove()    
                                                                                                     
@@ -1258,7 +1266,7 @@ class Experiments(object):
         
 
         y_true = self.dataset.y_test.squeeze()
-        y_pred = (self.dataset.y_pred > CLASSIFICATION_THRESHOLD).astype(int)
+        y_pred = (self.dataset.y_pred > optimal_threshold).astype(int)
 
         # Creation of a df for the prediction
         predictions_df = pd.DataFrame({'X1':self.dataset._X_raw[self.dataset.test_index][:,0], 
@@ -1363,7 +1371,14 @@ class Experiments(object):
         fig.suptitle("({}) {}".format(int(self.experiment_number), self.description), y=1.1, weight='bold', fontsize=12)
 
         # Plot the performances 
-        cm = confusion_matrix(self.predictions_df['y_true'].to_numpy(), self.predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
+
+        y_true = self.predictions_df['y_true'].to_numpy()
+        y_pred = self.predictions_df['y_pred'].to_numpy()
+
+        # Compute the F1 score
+        _, optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
+
+        cm = confusion_matrix(y_true, y_pred> optimal_threshold)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(cmap='Blues', ax=axes['B']);disp.im_.colorbar.remove()    
                                                                                                     
@@ -1403,7 +1418,14 @@ class Experiments(object):
         axes['A'].set_title("Training set ({})".format(self.dataset.X_train.shape[0])); axes['B'].set_title("Test set ({})".format(self.dataset.X_test.shape[0]))
 
         # Plot the performances 
-        cm = confusion_matrix(self.predictions_df['y_true'].to_numpy(), self.predictions_df['y_pred'].to_numpy()> CLASSIFICATION_THRESHOLD)
+
+        y_true = self.predictions_df['y_true'].to_numpy()
+        y_pred = self.predictions_df['y_pred'].to_numpy()
+
+        # Compute the F1 score
+        _, optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
+
+        cm = confusion_matrix(y_true, y_pred> optimal_threshold)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(cmap='Blues', ax=axes['C']);disp.im_.colorbar.remove()    
                                                                                                                                                                 
@@ -1486,7 +1508,6 @@ class Experiments(object):
         show(ebm_local)
 
         return 
-
 
     def _plot_ebm_autism(self):
 
@@ -1769,7 +1790,7 @@ class Experiments(object):
                                                         min_samples_leaf=2,
                                                         max_leaves=3,
                                                         n_jobs=4,
-                                                        random_state=RANDOM_STATE)
+                                                        random_state=self.random_state)
 
 
         elif self.approach == 'DecisionTree':

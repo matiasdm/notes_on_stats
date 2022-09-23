@@ -115,26 +115,12 @@ DEFAULT_PREDICTORS = [# GAZE RELATED
                  'NS_postural_sway_derivative',
                 
                 # TOUCH RELATED
-                 'number_of_touches',
                  'average_length',
                  'std_length',
                  'average_error',
-                 'std_error',
-                 'number_of_target',
                  'pop_rate',
-                 'average_touch_duration',
-                 'std_touch_duration',
                  'average_delay_to_pop',
-                 'std_delay_to_pop',
-                 'average_force_applied',
-                 'std_force_applied',
-                 'average_accuracy_variation',
-                 'accuracy_consistency',
-                 'average_touches_per_target',
-                 'std_touches_per_target',
-                 'average_time_spent',
-                 'std_time_spent',
-                 'exploratory_percentage']
+                 'average_time_spent']
 
 
 VALIDITY_COLUMNS = ['validity_available',
