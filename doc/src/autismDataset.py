@@ -196,9 +196,9 @@ class Dataset(object):
                 self.df.drop(index=indexes_to_drop, inplace=True)
 
 
-            if 'complete' in administration.keys():
+            if 'complete' in administration.keys() or 'completed' in administration.keys():
 
-                indexes_to_drop = self.df[(self.df['validity_available']==1) & (self.df['completed']==2) ].index
+                indexes_to_drop = self.df[(self.df['validity_available']==1) & (self.df['completed']==1) ].index
 
                 if self.verbosity>1 and verbose:
                     print("Removing {}/{} incomplete administrations.".format(len(indexes_to_drop), len(self.df)))
@@ -246,7 +246,7 @@ class Dataset(object):
         if demographics is not None:
 
             if 'age' in demographics.keys():
-                indexes_to_drop =  self.df[~((self.df['age'] >= demographics['age'][0]) & (self.df['age'] < demographics['age'][1]))].index
+                indexes_to_drop =  self.df[~((self.df['age'] >= demographics['age'][0]) & (self.df['age'] <= demographics['age'][1]))].index
 
                 if self.verbosity>1 and verbose:
                     print("Removing {}/{} keeping only subject with age between {} and {} mo.".format(len(indexes_to_drop), len(self.df), demographics['age'][0], demographics['age'][1]))
@@ -284,7 +284,7 @@ class Dataset(object):
                     
                 self.df.drop(index=indexes_to_drop, inplace=True)
 
-        if self.verbosity > 1 and verbose:
+        if self.verbosity > 1 or verbose:
             print("{} administrations left.".format(len(self.df)))
             
             display(self.df.groupby(self.outcome_column)[['id']].count())
@@ -708,7 +708,7 @@ class Dataset(object):
         if scenario == 'asd_td_age_matched_n_balanced':
             
             self.filter(administration={'order': 'first', 
-                                             'completed': True}, 
+                                             'complete': True}, 
                             clinical={'diagnosis': [0, 1]}, 
                             demographics={'age':[10, 60]}, 
                             matching={'age':[0, 1]}, verbose=True)
@@ -717,16 +717,17 @@ class Dataset(object):
         elif scenario == 'asd_td_age_matched_n_unbalanced':
 
             self.filter(administration={'order': 'first', 
-                                     'completed': True}, 
+                                     'complete': True}, 
                     clinical={'diagnosis': [0, 1]}, 
                     demographics={'age':[10, 36]}, 
                     matching={'age':[0, 1]}, verbose=True)
 
         elif scenario=='papers':
 
-            self.filter(administration={'studies': ['ARC', 'P1'],
-                            'order': 'first', 
-                             'completed': True}, 
+            self.filter(administration={'studies':  ['ARC', 'P1', 'P2', 'P3'],
+                                        'order': 'first',
+                                        'completed': True}, 
+                           demographics={'age':[16, 46]},
                             clinical={'diagnosis': [0, 1]},
                             verbose=True)
 
@@ -734,13 +735,13 @@ class Dataset(object):
     
             self.filter(administration={'studies': ['ARC', 'P1'],
                             'order': 'first', 
-                             'completed': True}, 
+                             'complete': True}, 
                             clinical={'diagnosis': [0, 1]}, 
                             matching={'age':[0, 1]}, verbose=True)
         elif scenario=='young_17_39':
             self.filter(administration={'studies': ['ARC', 'P1','SenseToKnowStudy'],
                             'order': 'first', 
-                             'completed': True}, 
+                             'complete': True}, 
                             clinical={'diagnosis': [0, 1]}, 
                             demographics = {'age': [17, 39]}, 
                              verbose=True)  
@@ -748,14 +749,14 @@ class Dataset(object):
         elif scenario=='papers_remote':
             self.filter(administration={'studies': ['SenseToKnowStudy'],
                             'order': 'first', 
-                             'completed': True}, 
+                             'complete': True}, 
                             clinical={'diagnosis': [0, 1]}, 
                             demographics = {'age': [17, 39]}, 
                              verbose=True)  
         elif scenario=='all':
             self.filter(administration={
                             'order': 'first', 
-                             'completed': True}, 
+                             'complete': True}, 
                             clinical={'diagnosis': [0, 1]},
                              verbose=True)      
 

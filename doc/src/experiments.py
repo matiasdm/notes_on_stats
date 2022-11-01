@@ -12,6 +12,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
 
+
 from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, roc_curve, plot_roc_curve, auc, precision_recall_curve, roc_auc_score, average_precision_score
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
@@ -25,6 +26,7 @@ from interpret.glassbox import ExplainableBoostingClassifier
 from interpret import show
 
 import torch
+import shap
 
 
 # add tools path and import our own tools
@@ -95,7 +97,10 @@ class Experiments(object):
         # Interesting byproducts
         self.predictions_df = None
         self.performances_df = None
-        
+
+        # Init SHAP values
+        self.shap_values = np.zeros((self.dataset.X_train.shape[0],len(self.features_name)))
+        self.models_expected_value = np.zeros(self.dataset.X_train.shape[0])
         
 
         if previous_experiment is not None:
@@ -725,7 +730,13 @@ class Experiments(object):
                 
             # Predict samples on the test set
             y_pred_score[test] = self.model.predict_proba(X_test)[:,1]
-        
+
+            # Add shap value of this sample:
+
+            explainer = shap.TreeExplainer(self.model)
+            self.shap_values[test] = explainer.shap_values(X_test)
+            self.models_expected_value[test] = explainer.expected_value
+            
 
         # Create the df associated to the test sample 
         n_features = self.dataset.X_train.shape[1]
@@ -900,12 +911,12 @@ class Experiments(object):
         auc_pr_g_corrected = calc_auprg(create_prg_curve(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO))
 
         # Compute the F1 score
-        f1, optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
+        f1, self.optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
 
         # Compute the corrected F1 score
         f1_corrected, _ = bestf1score(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO)
 
-        tn, fp, fn, tp = confusion_matrix(y_true, y_pred > optimal_threshold).ravel()
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred >= self.optimal_threshold).ravel()
 
         acc = (tp + tn) / (tp + tn + fp +  fn)
         mcc = (tp*tn - fp*fn) / np.sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))
@@ -933,6 +944,13 @@ class Experiments(object):
                             'False omission rate (FOR=1-NPV)': round(1-npv, 3)}
 
         self.performances_df = pd.DataFrame(performances_dict, index=['0'])  
+
+
+        self.predictions_df['TN'] = ((self.predictions_df['y_true']==0) & (self.predictions_df['y_pred']<self.optimal_threshold)).astype(int)
+        self.predictions_df['TP'] = ((self.predictions_df['y_true']==1) & (self.predictions_df['y_pred']>=self.optimal_threshold)).astype(int)
+        self.predictions_df['FP'] = ((self.predictions_df['y_true']==0) & (self.predictions_df['y_pred']>=self.optimal_threshold)).astype(int)
+        self.predictions_df['FN'] = ((self.predictions_df['y_true']==1) & (self.predictions_df['y_pred']<self.optimal_threshold)).astype(int)
+
 
         return 
 
@@ -981,13 +999,13 @@ class Experiments(object):
             auc_pr_g_corrected = calc_auprg(create_prg_curve(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO))
 
             # Compute the F1 score
-            f1, optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
+            f1, self.optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
 
             # Compute the corrected F1 score
             f1_corrected, _ = bestf1score(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO)
 
         
-            tn, fp, fn, tp = confusion_matrix(y_true, y_pred > optimal_threshold).ravel()
+            tn, fp, fn, tp = confusion_matrix(y_true, y_pred >= self.optimal_threshold).ravel()
 
             acc = (tp + tn) / (tp + tn + fp +  fn)
             mcc = (tp*tn - fp*fn) / np.sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))
@@ -1022,6 +1040,13 @@ class Experiments(object):
         # Create the performace df
         performances_dict = {metric: np.mean(values) for metric, values in performances_dict.items()}
         self.performances_df = pd.DataFrame(performances_dict, index = [0])
+
+        self.predictions_df['TN'] = ((self.predictions_df['y_true']==0) & (self.predictions_df['y_pred']<self.optimal_threshold)).astype(int)
+        self.predictions_df['TP'] = ((self.predictions_df['y_true']==1) & (self.predictions_df['y_pred']>=self.optimal_threshold)).astype(int)
+        self.predictions_df['FP'] = ((self.predictions_df['y_true']==0) & (self.predictions_df['y_pred']>=self.optimal_threshold)).astype(int)
+        self.predictions_df['FN'] = ((self.predictions_df['y_true']==1) & (self.predictions_df['y_pred']<self.optimal_threshold)).astype(int)
+
+
         return
 
     ################################ Plotting functions ###########################
@@ -1246,10 +1271,8 @@ class Experiments(object):
         y_true = self.predictions_df['y_true'].to_numpy()
         y_pred = self.predictions_df['y_pred'].to_numpy()
 
-        # Compute the F1 score
-        _, optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
 
-        cm = confusion_matrix(y_true, y_pred> optimal_threshold)
+        cm = confusion_matrix(y_true, y_pred >= self.optimal_threshold)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(cmap='Blues', ax=axes['C']);disp.im_.colorbar.remove()    
                                                                                                     
@@ -1266,7 +1289,7 @@ class Experiments(object):
         
 
         y_true = self.dataset.y_test.squeeze()
-        y_pred = (self.dataset.y_pred > optimal_threshold).astype(int)
+        y_pred = (self.dataset.y_pred >= self.optimal_threshold).astype(int)
 
         # Creation of a df for the prediction
         predictions_df = pd.DataFrame({'X1':self.dataset._X_raw[self.dataset.test_index][:,0], 
@@ -1345,7 +1368,7 @@ class Experiments(object):
                             FFFF
                         """
 
-            fig, axes = plt.subplot_mosaic(mosaic=fig_mosaic, figsize=(25,18))
+            fig, axes = plt.subplot_mosaic(mosaic=fig_mosaic, figsize=(25,15))
             
             # Plot features importance
             self.model.get_booster().feature_names = self.features_name
@@ -1366,7 +1389,7 @@ class Experiments(object):
                         FFFF
                     """
 
-        fig, axes = plt.subplot_mosaic(mosaic=fig_mosaic, figsize=(25,18))
+        fig, axes = plt.subplot_mosaic(mosaic=fig_mosaic, figsize=(25,12))
         
         fig.suptitle("({}) {}".format(int(self.experiment_number), self.description), y=1.1, weight='bold', fontsize=12)
 
@@ -1375,10 +1398,7 @@ class Experiments(object):
         y_true = self.predictions_df['y_true'].to_numpy()
         y_pred = self.predictions_df['y_pred'].to_numpy()
 
-        # Compute the F1 score
-        _, optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
-
-        cm = confusion_matrix(y_true, y_pred> optimal_threshold)
+        cm = confusion_matrix(y_true, y_pred>= self.optimal_threshold)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(cmap='Blues', ax=axes['B']);disp.im_.colorbar.remove()    
                                                                                                     
@@ -1423,9 +1443,9 @@ class Experiments(object):
         y_pred = self.predictions_df['y_pred'].to_numpy()
 
         # Compute the F1 score
-        _, optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
+        _, self.optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
 
-        cm = confusion_matrix(y_true, y_pred> optimal_threshold)
+        cm = confusion_matrix(y_true, y_pred> self.optimal_threshold)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
         disp.plot(cmap='Blues', ax=axes['C']);disp.im_.colorbar.remove()    
                                                                                                                                                                 
@@ -1760,14 +1780,16 @@ class Experiments(object):
             
             self.model = XGBClassifier(use_label_encoder=False, # TODO ADD PLAYING WITH PARAMETERS 
                                       learning_rate=0.01,
-                                       n_estimators= 200,
-                                      max_depth = 3,
+                                       n_estimators= 100,
+                                      max_depth = 5,
                                       verbosity=1,
                                       objective='binary:logistic',
                                       eval_metric='auc',
                                       booster='gbtree',
-                                      #enable_categorical=True, 
-                                      tree_method='exact',
+                                      enable_categorical=True, 
+                                      scale_pos_weight=413/45,
+                                      tree_method='gpu_hist',
+                                      colsample_bytree=.8,
                                       subsample=.8,
                                       colsample_bylevel=.8,
                                       alpha=0)
