@@ -35,6 +35,7 @@ MISSING_DATA_HANDLING = 'without'
 DEFAULT_IMPUTATION_METHOD = 'multi_dimensional_weighting'
 DEFAULT_MISSING_VALUE = -5
 DEFAULT_SCALE_DATA=True
+
 # pdf estimation default parameters
 RESOLUTION = 20
 BANDWIDTH = .2

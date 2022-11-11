@@ -26,47 +26,20 @@ from utils import repr
 
 class Dataset(object):
     """
-    TODO.
-    A class used to generate toy datasets with potential missing data. 
+    This class aims at handle the S2K dataset. 
 
-    It is understand in this work as the percentage of single number information that is missing in the dataset.
-    E.g. if X is of shape 1000 x 3 (1000 subjects and 3 possible featurs per subjects), then a ratio of missing data of 20% mean there is .2x1000x3 = 600 numbers that are missing.
-    This view of missing data is number-wise, although it could be subject-wise, group-wise, class-wise, or a mix! 
 
-    Note on the feature management processing:
-        - self._X_raw contains the features originally created from sklearn, WITHOUT missing values. 
-        - self._X contains the features originally created from sklear, WITH missing values. Call `generate_missing_coordinates` to create.  
-        - self._X_train contains the training set, and self._X_test the testing set.
-        - self.X_train contains the training set with the missing data potentially encoded or imputed. 
-
-        The data without _ before their name are visible from the outside of this class (ditributions estimation or model training). The other are necessary for internal use. 
-        TODOREMOVE self.imp_X contains _X (so with missing values), but with the missing data imputed. Call `impute_missing_data` to create.  
-
-        The methods: 
-            - subset(class_used, imputation_mode) allows to change the face of X, (for training, selecting the correct class, or for prediction to allow using imputation, or to encode the NaNs with the DEFAULT_MISSING_VALUE.)
-
-            - reset() reset the self.X features to the _X ones. 
-    
-    1) Missing Completely at Random (MCAR). 
-    
-    kwargs:
-    ----------
-        TODO: bool, default=False
-            TODO
-        
-    ...
-
-    Attributes
-    ----------
-    says_str : str
-        a formatted string to print out what the animal says
-
-    Methods
-    -------
-    says(sound=None)
-        Prints the animals name and what sound it makes
-
-    TODO: think of removing self._Z as useless it seems
+    Initialization step:
+        1) Post process the dataframe.
+            1) Add a study, remote (bool) field
+            2) Add ASD diagnosis to SAESDM IMPACT and P3R
+            3) Encode diagnosis, ethnicity, race, sex, StateOfTHeChild, Comments. 
+            4) Add norder of the administration by using adm timing. 
+            5) Compute the Aggregated CVA biomarkers (S/NS gaze, postural sway, etc.)
+        2) Filter the dataframe using a pre-defined scenario (based on age, study, remote or not, etc.)
+        3) Create the X and y array. Optional scaling and addition of missing indicator variabels are performed.
+        4) Split the dataset into train and test sets. 
+        5) Impute or encode the missing variables.
     """
 
     
@@ -74,13 +47,13 @@ class Dataset(object):
                 df,
                 dataset_name='complete_autism',
                 outcome_column='diagnosis',
-                features_name = DEFAULT_PREDICTORS, 
-                scenario = None,
+                features_name=DEFAULT_PREDICTORS, 
+                scenario=None,
                 missing_data_handling='encoding',
                 imputation_method='without',
                 scale_data=DEFAULT_SCALE_DATA,
                 sampling_method=DEFAULT_SAMPLING_METHOD,
-                proportion_train = PROPORTION_TRAIN,
+                proportion_train=PROPORTION_TRAIN,
                 use_missing_indicator_variables=DEFAULT_USE_INDICATOR_VARIABLE,
                 verbosity=4,
                 debug=False, 
@@ -94,40 +67,65 @@ class Dataset(object):
         
         self.verbosity = verbosity    
         self.debug = debug    
-        features_name=deepcopy(features_name)
-
-        self.use_missing_indicator_variables = use_missing_indicator_variables
-        self.raw_features_name = deepcopy(features_name)
-        self._features_name = self._init_features_name(features_name)
-        self.missing_data_handling = missing_data_handling
-        self.imputation_method = imputation_method if missing_data_handling!='encoding' else 'constant'
         
-        self.df = self._post_process_df(df)
-        self._raw_df = deepcopy(self.df)
-        self.num_samples = len(self.df)
-
         # Imputed data (depend on the experiences/settings). If state is training, it contains imputation of 
         # the train set, otherwise the test set.
         self._imp_X_train, self._imp_X_test = None, None 
-
-        # Data used by the other classes splitted.
         self.train_index, self.test_index = None, None 
         self.X_train = None
         self.X_test = None
         self.y_train = None
         self.y_test = None
-
-        # Prediciton on the test set
-        #self.y_pred = None # TODOREMOVE
         
+        
+        
+
+        #`self.use_indicator_variable` can be a True or False, 
+        #True: double the number of features by adding all missing variables
+        #False: None are used
+        #Dict: {high-level name of the missingness: [feat_1, feat2]}
+        self.use_missing_indicator_variables = use_missing_indicator_variables
+        
+        # Init features name
+        self.raw_features_name = deepcopy(features_name)
+        self._features_name = self._init_features_name(features_name)
+        
+        # Init handling of missing data values
+        self.missing_data_handling = missing_data_handling
+        self.imputation_method = imputation_method if missing_data_handling!='encoding' else 'constant'
+        
+        #
+        # 1) Post-process the dataset
+        # 
+        self.df = self._post_process_df(df)
+        self._raw_df = deepcopy(self.df)
+        self.num_samples = len(self.df)
+        
+        #
+        # 2) Filter the dataset according to pre-defined scenario
+        # 
         self.scenario = self._init_scenario(scenario)
-
         
 
-
-        # Generate a dataset with samples from both classes - stored for internal use and for keeping track of changes etc...
+        #
+        # 3) Initialize the raw X and y data.
+        #         
         self._X, self._y = self._init_data()
+        
+        
+        #
+        # 4) Split the dataset into train and test set.
+        #     
         self.split_test_train()
+        
+        #
+        # 5) Impute or encode missing data. 
+        #     
+        self.impute_data()
+        
+        
+        # Derive statistics etc. 
+        
         
         self.imbalance_ratio = np.sum(self._y==1)/len(self._y)
         self.ratio_of_missing_values = np.isnan(self._X).sum()/(self._X.shape[0]*self._X.shape[1])
@@ -159,27 +157,30 @@ class Dataset(object):
         self.split_test_train()
 
 
-    def reset(self):
+    def _reset(self):
+        """
+            Reset the df to the ost-processed df. 
+        """
         self.df = deepcopy(self._raw_df)
         return 
 
-    def __repr__(self):
-        display(self.df)
-        return ''
-
     def filter(self, administration=None, features=None, validity=None, clinical=None, matching=None, demographics=None, other=None, verbose=True):
         """
-            self.filter(administration={'order': 'first', 
-                                        'complete': True}, 
-                        clinical={'diagnosis': [0, 1]}, 
-                        demographics={'age':[18, 36], 
-                                    'sex': 'Male'},
-                        features={'having':['gaze', 'touch']},
-                        other={'StateOfTheChild':['Slightly irritable', 'In a calm and/or good mood']}
-                        )
+            1) Reset the df to the post-processed one. 
+            2) Filter based on age, demographics, clinical etc. 
+
+            Example:
+                self.filter(administration={'order': 'first', 
+                                            'complete': True}, 
+                            clinical={'diagnosis': [0, 1]}, 
+                            demographics={'age':[18, 36], 
+                                        'sex': 'Male'},
+                            features={'having':['gaze', 'touch']},
+                            other={'StateOfTheChild':['Slightly irritable', 'In a calm and/or good mood']}
+                            )
 
         """
-        self.reset()
+        self._reset()
 
         if administration is not None:
 
@@ -291,21 +292,21 @@ class Dataset(object):
 
         self.df.sort_values(by=['id', 'date'], inplace=True)
         self.df.reset_index(drop=True, inplace=True)
-
         self.num_samples = len(self.df)
-        self._X, self._y  = self._init_data(verbose=False)
-        self.imbalance_ratio = np.sum(self._y==1)/np.sum(self._y==0)
-        self.ratio_of_missing_values = np.isnan(self._X).sum()/(self._X.shape[0]*self._X.shape[1])
-        self.ratio_missing_per_class = [np.isnan(self._X[(self._y==0).squeeze()]).sum()/(self._X[(self._y==0).squeeze()].shape[0]*self._X.shape[1]), 
-                                        np.isnan(self._X[(self._y==1).squeeze()]).sum()/(self._X[(self._y==1).squeeze()].shape[0]*self._X.shape[1])]
-
-        self.split_test_train()
+        
+        # Reset all variables.
+        self._X, self._y   = None, None
+        self.imbalance_ratio = None 
+        self.ratio_of_missing_values = None
+        self.ratio_missing_per_class =None
 
         return
 
     def split_test_train(self):
+        
         """
-        Split the dataset given some proportions, taking as input the see-able dataset with potentially missing data, having them either encoded of imputed.
+            Create the x_train, X_test, y_train, y_test 
+            Split the dataset given some proportions, taking as input the see-able dataset with potentially missing data, having them either encoded of imputed.
         """
         if self.proportion_train not in [0, 1]:
             self.train_index, self.test_index = train_test_split(np.arange(self.num_samples), test_size = 1-self.proportion_train)
@@ -332,19 +333,14 @@ class Dataset(object):
 
         print("Splitting dataset into test and train set.") if (self.debug or self.verbosity > 1) else None
 
-        # We need to re-empute or encode data after this step, for model where several replicates of experiements are done and 
-        # Who re-shuffle the data for each replicates. 
-
-        self.impute_data()
-
         return
 
     def impute_data(self):
         """
-            Must be called after the `split_test_train` method.
+            Must be called just after the `split_test_train` method.
             Change the visible variable self.X_, depending on the class, and handling of missing data.
 
-            If the approach are `bayesian` (omputing distributions), at training time (state=='training'), self.X_train will contain 
+            If the approach are `bayesian` (computing distributions), at training time (state=='training'), self.X_train will contain 
             the the data from the training set, with potential missing value, for a certain class. 
             At inference time it will contain the test set, with potential missing data, for all classes of course. 
         """
@@ -421,7 +417,6 @@ class Dataset(object):
         
         return X,y
 
-        
     def plot(self):
 
         self._plot_missing()
@@ -472,6 +467,14 @@ class Dataset(object):
         return self.X, self.Z, self.y
 
     def _post_process_df(self, df):
+        """
+            Post-process the raw dataframe. Note that some of these steps could be done at the API level when building the dataframe.
+            1) Add a study, remote (bool) field
+            2) Add ASD diagnosis to SAESDM IMPACT and P3R
+            3) Encode diagnosis, ethnicity, race, sex, StateOfTHeChild, Comments. 
+            4) Add norder of the administration by using adm timing. 
+            5) Compute the Aggregated CVA biomarkers (S/NS gaze, postural sway, etc.)
+        """
 
         if self.verbosity > 1:
             print("Post-processing inital df (removing columns with no cva features, encoding srings, compute administrations order, compute condensed S/NS variables)... ")
@@ -480,8 +483,17 @@ class Dataset(object):
 
         df['study'] = df['path'].apply(lambda x: x.split('/')[-3] if x.split('/')[-3] in S2K_STUDIES else x.split('/')[-4])
         df.loc[df['study'].isin(['SAESDM', 'IMPACT', 'P3R']), 'diagnosis'] = 'ASD'
-
-        
+        df['remote'] = df['study']
+        df['remote'].replace({'SenseToKnowStudy':1, 
+                    'P1':0,
+                    'P2':0, 
+                    'P3':0,
+                    'IMPACT':0,
+                    'SAESDM':0,
+                    'ARC':1,
+                    'P3R':1, 
+                    'S2KP':0,
+                    'P1R':1}, inplace = True)        
 
         # encode categorical variables
         df['diagnosis'].replace({'TD':0., 
@@ -495,18 +507,6 @@ class Dataset(object):
                                 'Hispanic/Latino':1, 
                                  'Unknown or not reported':np.nan}, inplace = True)
         
-        df['remote'] = df['study']
-        df['remote'].replace({'SenseToKnowStudy':1, 
-                    'P1':0,
-                    'P2':0, 
-                    'P3':0,
-                    'IMPACT':0,
-                    'SAESDM':0,
-                    'ARC':1,
-                    'P3R':1, 
-                    'S2KP':0,
-                              
-                    'P1R':1}, inplace = True)
 
         df['race'].replace({'White':0., 
                     'White/Caucasian':0.,
@@ -543,10 +543,21 @@ class Dataset(object):
         return df 
        
     def _init_data(self, verbose=None):
+        """
+            Initialize the X and y arrays. 
+            
+            1) Take from the df the original cva columns. 
+            2) Scale the array (optional).
+            3) Add potential indicator variable depending on the value of `self.use_indicator_variables`
+        
+        """
 
+        # Init. the X array. 
         features_name = deepcopy(self.raw_features_name)
         
         if isinstance(self.use_missing_indicator_variables, dict):
+            
+            # Grab data
             
             X_raw = self.df[features_name].to_numpy().astype(float)
             
@@ -584,6 +595,8 @@ class Dataset(object):
                 scaler.fit(X_raw)  # fit scaler
                 X_raw = scaler.transform(X_raw)
             
+            
+        # Init the y.
         if self.outcome_column in list(self.df.keys()):
             y = self.df[self.outcome_column].to_numpy().astype(float)
         elif self.outcome_column[:2] == 'Z_':
@@ -654,6 +667,15 @@ class Dataset(object):
             print('No NAs found')
             
     def _init_features_name(self, features_name):
+        """
+            This function initialize the features name, so that it is composed of:
+                1) The name of the raw features used 
+                2) The possible missing indicator variables.
+                    `self.use_indicator_variable` can be a True or False, 
+                    True: double the number of features by adding all missing variables
+                    False: None are used
+                    Dict: {high-level name of the missingness: [feat_1, feat2]}
+        """
         
         self.raw_features_name = deepcopy(features_name)
                 
@@ -704,8 +726,18 @@ class Dataset(object):
     def _init_scenario(self, scenario):
         
         self.scenario = scenario
+    
+        if scenario == 'multimodal_2023':
+            
+            self.filter(administration={'studies':  ['ARC', 'P1', 'P2', 'P3'],
+                                        'order': 'first',
+                                        'completed': True}, 
+                           demographics={'age':[17, 50]},
+                            clinical={'diagnosis': [0, 1]},
+                            verbose=True)
+            
 
-        if scenario == 'asd_td_age_matched_n_balanced':
+        elif scenario == 'asd_td_age_matched_n_balanced':
             
             self.filter(administration={'order': 'first', 
                                              'complete': True}, 

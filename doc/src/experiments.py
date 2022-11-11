@@ -49,6 +49,20 @@ from model.xgboost.visualization import plot_roc_curves_xgboost
 
 
 class Experiments(object):
+    
+    """
+        This class aims at trying experiments on the data. It handles different models, fit and predict functionality, derive performances and plotting functions. An additional layer of functionality aims at storing and loading models or experiments. 
+        
+        Notes:
+            - Interactions with the dataset class: 
+                (i) It sees from the dataset only the X and y arrays (of both train and test).
+        
+        Key parameters:
+            - `sampling_method`: How do we handle sampling (up/down sampling, SMOTE).
+            - `approach` used: Bayesian, CART, Logistic regression, NAM, XGBOOST, EBM.
+    
+    
+    """
 
     def __init__(self, 
                 dataset_name, 
@@ -131,18 +145,21 @@ class Experiments(object):
         self.dataset.features_name = features_name
 
     def fit(self, **kwargs):
+        """
+            Fit with the training data. 
+        """
 
         if self.approach == 'nam':
             self.predictions_df = self._train_nam(num_cv=None)
             return
         
         # Init data
-        X_train, X_test = self.dataset.X_train, self.dataset.X_test
-        y_train, y_test = self.dataset._y_train.squeeze(), self.dataset._y_test.squeeze()
+        X_train = self.dataset.X_train
+        y_train = self.dataset._y_train.squeeze()
 
         # Fit model 
         if self.approach == 'xgboost':
-            self.model.fit(X_train, y_train, eval_metric=corrected_f1_xgboost)
+            self.model.fit(X_train, y_train, eval_metric='auc')#corrected_f1_xgboost)
             self.model.get_booster().feature_names = self.features_name
 
         else:
@@ -203,7 +220,7 @@ class Experiments(object):
 
         """
 
-        self.dataset.impute_data()
+        #self.dataset.impute_data()
 
         if self.verbosity >1:
             print("Predicting {} based on {} features using {} approach.".format(self.dataset.outcome_column, len(self.dataset.features_name), self.approach))
@@ -474,7 +491,7 @@ class Experiments(object):
                                       learning_rate=0.01,
                                       verbosity=1,
                                       objective='binary:logistic',
-                                      eval_metric='auc',
+                                      eval_metric='auc',#corrected_f1_xgboost
                                       booster='gbtree',
                                       tree_method='exact',
                                       subsample=1,
@@ -676,7 +693,7 @@ class Experiments(object):
 
         # Fit model 
         if self.approach == 'xgboost':
-            self.model.fit(X_train, y_train, eval_metric=corrected_f1_xgboost)
+            self.model.fit(X_train, y_train, eval_metric='auc')#corrected_f1_xgboost)
         else:
             self.model.fit(X_train, y_train)
 
@@ -724,7 +741,7 @@ class Experiments(object):
 
             # Fit model 
             if self.approach == 'xgboost':
-                self.model.fit(X_train, y_train, eval_metric=corrected_f1_xgboost)
+                self.model.fit(X_train, y_train, eval_metric='auc')#corrected_f1_xgboost)
             else:
                 self.model.fit(X_train, y_train)
                 
