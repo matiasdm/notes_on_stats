@@ -7,12 +7,13 @@ import numpy as np
 
 ROOT_DIR = '/home01/sam/notes_on_stats/doc/'
 DATA_DIR = '/home01/sam/notes_on_stats/doc/src/data'
+AUTISM_DATA_PATH = "/home01/sam/notes_on_stats/data/df_all.csv"    # "/home01/sam/df_all.csv"   # "/Users/samperochon/Duke/work/notes_on_stats/df_all.csv"
 
 
 
-ROOT_DIR = '/home/Sam/notes_on_stats/doc/'
-DATA_DIR = '/home/Sam/notes_on_stats/data'
-AUTISM_DATA_PATH = "/home/Sam/notes_on_stats/data/df_all.csv"    # "/home01/sam/df_all.csv"   # "/Users/samperochon/Duke/work/notes_on_stats/df_all.csv"
+#ROOT_DIR = '/home/Sam/notes_on_stats/doc/'
+#DATA_DIR = '/home/Sam/notes_on_stats/data'
+#AUTISM_DATA_PATH = "/home/Sam/notes_on_stats/data/df_all.csv"    # "/home01/sam/df_all.csv"   # "/Users/samperochon/Duke/work/notes_on_stats/df_all.csv"
 
 EXPERIMENT_FOLDER_NAME = 'autism'
 

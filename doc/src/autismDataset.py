@@ -45,7 +45,7 @@ class Dataset(object):
     
     def __init__(self, 
                 df,
-                dataset_name='complete_autism',
+                dataset_name='SenseToKnow',
                 outcome_column='diagnosis',
                 features_name=DEFAULT_PREDICTORS, 
                 scenario=None,
@@ -88,11 +88,11 @@ class Dataset(object):
         
         # Init features name
         self.raw_features_name = deepcopy(features_name)
-        self._features_name = self._init_features_name(features_name)
+        self._features_name = self._init_features_name(deepcopy(features_name))
         
         # Init handling of missing data values
         self.missing_data_handling = missing_data_handling
-        self.imputation_method = imputation_method if missing_data_handling!='encoding' else 'constant'
+        self.imputation_method = imputation_method 
         
         #
         # 1) Post-process the dataset
@@ -347,29 +347,30 @@ class Dataset(object):
 
     
         if self.missing_data_handling == 'imputation':
-
-            self._imp_X_train, self._imp_X_test  = self._impute_missing_data()
-
-            # Create X and y used for experiments
-            self.X_train = deepcopy(self._imp_X_train)
-            self.y_train = deepcopy(self._y_train)
-
-            self.X_test = deepcopy(self._imp_X_test)
-            self.y_test = deepcopy(self._y_test)
             
-            #print("Imputed {} values (train) and {} (test) using method {}.".format(len(np.isnan(self.X_train)), len(np.isnan(self.X_test)), self.imputation_method)) if (self.debug or self.verbosity > 2)  else None                
+            if self.imputation_method != 'constant':
 
-        elif self.missing_data_handling == 'encoding':
+                self._imp_X_train, self._imp_X_test  = self._impute_missing_data()
 
-            self.X_train = deepcopy(self._X_train)
-            self.X_train[np.isnan(self.X_train)] = DEFAULT_MISSING_VALUE
-            self.y_train = deepcopy(self._y_train)
+                # Create X and y used for experiments
+                self.X_train = deepcopy(self._imp_X_train)
+                self.y_train = deepcopy(self._y_train)
 
-            self.X_test = deepcopy(self._X_test)
-            self.X_test[np.isnan(self.X_test)] = DEFAULT_MISSING_VALUE
-            self.y_test = deepcopy(self._y_test)
+                self.X_test = deepcopy(self._imp_X_test)
+                self.y_test = deepcopy(self._y_test)
+                
+                #print("Imputed {} values (train) and {} (test) using method {}.".format(len(np.isnan(self.X_train)), len(np.isnan(self.X_test)), self.imputation_method)) if (self.debug or self.verbosity > 2)  else None   
+            else:
+                                
+                self.X_train = deepcopy(self._X_train)
+                self.X_train[np.isnan(self.X_train)] = DEFAULT_MISSING_VALUE
+                self.y_train = deepcopy(self._y_train)
 
-            print("Encoding {} (train) and {} (test) missing values with {}.".format(len(np.isnan(self._X_train)), len(np.isnan(self._X_test)), DEFAULT_MISSING_VALUE)) if (self.debug or self.verbosity > 2)  else None
+                self.X_test = deepcopy(self._X_test)
+                self.X_test[np.isnan(self.X_test)] = DEFAULT_MISSING_VALUE
+                self.y_test = deepcopy(self._y_test)
+
+                print("Encoding {} (train) and {} (test) missing values with {}.".format(len(np.isnan(self._X_train)), len(np.isnan(self._X_test)), DEFAULT_MISSING_VALUE)) if (self.debug or self.verbosity > 2)  else None
 
         elif self.missing_data_handling == 'without':
 
@@ -462,7 +463,10 @@ class Dataset(object):
                 setattr(self, key, np.array(value))
             else: 
                 setattr(self, key, value)
-
+        #self.features_name =  list(np.array(self.features_name).astype(str))
+        #print(self.features_name)
+        print('yo')
+        
     def get_data(self):
         return self.X, self.Z, self.y
 
@@ -512,9 +516,9 @@ class Dataset(object):
                     'White/Caucasian':0.,
                     'Black/African American':1., 
                     'More than one race':2.,
-                    'American Indian/Alaskan Native':3.,
-                    'Other':np.nan,
-                    'Asian':np.nan,
+                    'American Indian/Alaskan Native':2.,
+                    'Other':2.,
+                    'Asian':2.,
                     'Unknown or not reported':np.nan,
                     'Unknown/Declined':np.nan,
                    }, inplace = True)
@@ -570,7 +574,7 @@ class Dataset(object):
                 
             for feature_name_grouped, feats in self.use_missing_indicator_variables.items():
                 self.df['Z_{}'.format(feature_name_grouped)] = 0
-                self.df.loc[self.df.drop(index=self.df.dropna(subset=feats, how='all').index).index, 'Z_{}'.format(feature_name_grouped)] = 1
+                self.df.loc[self.df.drop(index=self.df.dropna(subset=feats, how='any').index).index, 'Z_{}'.format(feature_name_grouped)] = 1
                 X_raw = np.concatenate([X_raw, self.df["Z_{}".format(feature_name_grouped)].to_numpy().astype(int)[:, np.newaxis]], axis=1)  
         
         elif self.use_missing_indicator_variables:
@@ -730,6 +734,15 @@ class Dataset(object):
         if scenario == 'multimodal_2023':
             
             self.filter(administration={'studies':  ['ARC', 'P1', 'P2', 'P3'],
+                                        'order': 'first',
+                                        'completed': True}, 
+                           demographics={'age':[17, 50]},
+                            clinical={'diagnosis': [0, 1]},
+                            verbose=True)
+            
+        elif scenario == 'multimodal_2023_all':
+            
+            self.filter(administration={'studies':  ['ARC', 'P1', 'P2', 'P3', 'SenseToKnowStudy'],
                                         'order': 'first',
                                         'completed': True}, 
                            demographics={'age':[17, 50]},

@@ -38,6 +38,7 @@ from utils import fi, repr, corrected_f1_xgboost
 from metrics import f1score, average_precision, bestf1score, calc_auprg, create_prg_curve
 
 from generateToyDataset import DatasetGenerator
+from autismDataset import Dataset
 from model.bayesian.distributions import Distributions
 
 from model.neural_additive_models.nam import NAM
@@ -75,9 +76,11 @@ class Experiments(object):
                 previous_experiment=None,        
                 save_experiment=True, 
                 experiment_folder_name=EXPERIMENT_FOLDER_NAME,
+                experiment_name='None',
                 verbosity=1, 
                 debug=False, 
-                random_state=RANDOM_STATE):
+                random_state=RANDOM_STATE, 
+                **kwargs):
 
         # Set definitions attributes (also used for log purposes)
         self.dataset_name = dataset_name
@@ -105,7 +108,7 @@ class Experiments(object):
         self.dist_neg = None
 
         # NAMs and XGboost related attributs
-        self._init_model()
+        self._init_model(**kwargs)
         self.fitted = False
 
         # Interesting byproducts
@@ -128,6 +131,7 @@ class Experiments(object):
             self.experiment_number, self.experiment_path, self.json_path = -1, None, None
 
         self.description = '({}) Dataset name {}\nApproach:{} Imputation technics: {}'.format(self.experiment_number, self.dataset_name, self.approach, self.dataset.imputation_method)
+        self.experiment_name = experiment_name
 
         # Define colors, level of verbosity, and random_state
         self.verbosity = verbosity 
@@ -142,7 +146,7 @@ class Experiments(object):
 
     @features_name.setter  
     def features_name(self, features_name):
-        self.dataset.features_name = features_name
+        self.dataset._features_name = features_name
 
     def fit(self, **kwargs):
         """
@@ -159,7 +163,7 @@ class Experiments(object):
 
         # Fit model 
         if self.approach == 'xgboost':
-            self.model.fit(X_train, y_train, eval_metric='auc')#corrected_f1_xgboost)
+            self.model.fit(X_train, y_train, eval_metric=corrected_f1_xgboost)#corrected_f1_xgboost)
             self.model.get_booster().feature_names = self.features_name
 
         else:
@@ -331,7 +335,7 @@ class Experiments(object):
         self.performances_df = self.performances_df.to_dict(orient='list') if self.performances_df is not None else None
 
         with open(self.json_path, 'w') as outfile:
-            json.dump(self, outfile, default=lambda o: o.astype(float) if type(o) == np.int64 else o.tolist() if type(o) == np.ndarray else o.to_json(orient='records') if type(o) == pd.core.frame.DataFrame else o.__dict__) 
+            json.dump(self, outfile, default=lambda o: o.astype(float) if type(o) == np.int64 else o.tolist() if type(o) == np.ndarray else o.to_json(orient='records') if type(o) == pd.core.frame.DataFrame else o.astype(float) if type(o) == np.float32 else o.__dict__) 
 
         # Reload the object that were unsaved 
         self.dataset = dataset
@@ -385,11 +389,17 @@ class Experiments(object):
                 # Load experiment data
                 dataset_data = json.load(data_json)
 
-                self.dataset = DatasetGenerator(dataset_name=dataset_data['dataset_name'], loading=True)
+                if dataset_data['dataset_name'] == 'SenseToKnow':
+                    
+                    pass 
+                    
+                else:
+                    
+                    self.dataset = DatasetGenerator(dataset_name=dataset_data['dataset_name'], loading=True)
                 
-                # Load experiment attributes
-                self.dataset.load(dataset_data)
-            print("Loaded dataset at '{}'".format(dataset_path)) if (self.debug or self.verbosity > 1)  else None
+                    # Load experiment attributes
+                    self.dataset.load(dataset_data)
+                    print("Loaded dataset at '{}'".format(dataset_path)) if (self.debug or self.verbosity > 1)  else None
         else:
             print("/!\ No previous dataset found at '{}'".format(dataset_path)) if (self.debug or self.verbosity > 1)  else None
 
@@ -455,13 +465,13 @@ class Experiments(object):
 
         elif self.approach in ['DecisionTree', 'LogisticRegression', 'NaiveBayes']:
             self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
-            self.performance_df = pd.DataFrame(self.performances_df, index=[0])
+            self.performances_df = pd.DataFrame(self.performances_df, index=[0])
             self._init_model()
 
         elif self.approach == 'nam':
             
             self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
-            self.performance_df = pd.DataFrame(self.performances_df, index=[0])
+            self.performances_df = pd.DataFrame(self.performances_df, index=[0])
 
             if os.path.isfile(model_path):
                 
@@ -485,13 +495,13 @@ class Experiments(object):
         elif self.approach == 'xgboost':
             
             self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
-            self.performance_df = pd.DataFrame(self.performances_df, index=[0])
+            self.performances_df = pd.DataFrame(self.performances_df, index=[0])
             
             self.model = XGBClassifier(use_label_encoder=False, # TODO ADD PLAYING WITH PARAMETERS 
                                       learning_rate=0.01,
                                       verbosity=1,
                                       objective='binary:logistic',
-                                      eval_metric='auc',#corrected_f1_xgboost
+                                      eval_metric=corrected_f1_xgboost,#'auc',#corrected_f1_xgboost
                                       booster='gbtree',
                                       tree_method='exact',
                                       subsample=1,
@@ -499,13 +509,14 @@ class Experiments(object):
                                       alpha=0)    
             
             if os.path.isfile(model_path):
-                
+                                
                 self.model = pickle.load(open(model_path, "rb"))
+                #self.model.get_booster().feature_names = self.features_name
                 
         elif self.approach == 'ebm':
             
             self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
-            self.performance_df = pd.DataFrame(self.performances_df, index=[0])
+            self.performances_df = pd.DataFrame(self.performances_df, index=[0])
                                                                                                        
             self.model = ExplainableBoostingClassifier(feature_names=self.features_name, n_jobs=-1, random_state=RANDOM_STATE)
                         
@@ -693,7 +704,7 @@ class Experiments(object):
 
         # Fit model 
         if self.approach == 'xgboost':
-            self.model.fit(X_train, y_train, eval_metric='auc')#corrected_f1_xgboost)
+            self.model.fit(X_train, y_train, eval_metric=corrected_f1_xgboost)#'auc')#corrected_f1_xgboost)
         else:
             self.model.fit(X_train, y_train)
 
@@ -741,7 +752,7 @@ class Experiments(object):
 
             # Fit model 
             if self.approach == 'xgboost':
-                self.model.fit(X_train, y_train, eval_metric='auc')#corrected_f1_xgboost)
+                self.model.fit(X_train, y_train, eval_metric=corrected_f1_xgboost)#'auc')#corrected_f1_xgboost)
             else:
                 self.model.fit(X_train, y_train)
                 
@@ -911,6 +922,10 @@ class Experiments(object):
             
             y_true = self.predictions_df['y_true'].to_numpy()
             y_pred = self.predictions_df['y_pred'].to_numpy()
+            
+        # Compute imbalance_ratio of our sample
+        pi = y_true.mean()
+        correction_factor = (pi*(1-REFERENCE_IMBALANCE_RATIO))/(REFERENCE_IMBALANCE_RATIO*(1-pi))
 
         # Compute first AUROC
         auroc = roc_auc_score(y_true, y_pred)
@@ -934,6 +949,10 @@ class Experiments(object):
         f1_corrected, _ = bestf1score(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO)
 
         tn, fp, fn, tp = confusion_matrix(y_true, y_pred >= self.optimal_threshold).ravel()
+        
+        
+        # Compute corrected precision (ppv)
+        ppv_corr = tp/(tp+correction_factor*fp)
 
         acc = (tp + tn) / (tp + tn + fp +  fn)
         mcc = (tp*tn - fp*fn) / np.sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))
@@ -943,7 +962,8 @@ class Experiments(object):
         npv = tn / (tn+fn)
         fnr = fn / (tp+fn)
 
-        performances_dict = {'AUROC':round(auroc, 3),
+        performances_dict = {'experiment_name':self.experiment_name,
+                             'AUROC':round(auroc, 3),
                             'AUC-PR': round(auc_pr, 3),
                             'AUC-PR-Gain': round(auc_pr_g, 3),
                             'AUC-PR-Corrected': round(auc_pr_corrected, 3),
@@ -955,10 +975,16 @@ class Experiments(object):
                             'Sensitivity, recall, hit rate, or true positive rate (TPR)': round(tpr, 3),
                             'Specificity, selectivity or true negative rate (TNR)': round(tnr, 3),
                             'Precision or positive predictive value (PPV)': round(ppv, 3),
+                            'Corrected Precision or positive predictive value (PPV)': round(ppv_corr, 3),
                             'Negative predictive value (NPV)': round(npv, 3),
                             'Miss rate or false negative rate (FNR)': round(fnr, 3),
                             'False discovery rate (FDR=1-PPV)': round(1-ppv, 3),
-                            'False omission rate (FOR=1-NPV)': round(1-npv, 3)}
+                            'False omission rate (FOR=1-NPV)': round(1-npv, 3),
+                            'TP': tp,
+                            'TN': tn,
+                            'FP': fp,
+                            'FN': fn,
+                            }
 
         self.performances_df = pd.DataFrame(performances_dict, index=['0'])  
 
@@ -1298,7 +1324,7 @@ class Experiments(object):
         
         # Plot features importance
         self.model.get_booster().feature_names = self.features_name
-        axes['E'] = plot_importance(self.model.get_booster(),  height=0.5, ax = axes['E'])
+        axes['E'] = plot_importance(self.model.get_booster(),  height=0.5, ax = axes['E'], importance_type='gain')
         
         # Plot Tree
         axes['F'] = plot_tree(self.model.get_booster(), num_trees=self.model.best_iteration, ax=axes['F'])
@@ -1804,7 +1830,7 @@ class Experiments(object):
                                       eval_metric='auc',
                                       booster='gbtree',
                                       enable_categorical=True, 
-                                      scale_pos_weight=413/45,
+                                      scale_pos_weight=417/50,
                                       tree_method='gpu_hist',
                                       colsample_bytree=.8,
                                       subsample=.8,
@@ -1859,7 +1885,10 @@ class Experiments(object):
     def _load(self, data):
 
         for key, value in data.items():
+            if key == 'dataset':
+                continue
             if isinstance(value, list):
                 setattr(self, key, np.array(value))
             else: 
                 setattr(self, key, value)
+        

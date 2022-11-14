@@ -105,7 +105,6 @@ DEFAULT_PREDICTORS = [# GAZE RELATED
                 # NAME CALL RELATED
                  'proportion_of_name_call_responses',
                  'average_response_to_name_delay',
-                  'name_call_response_binary',
 
     
                 # POSTURAL SWAY RELATED
@@ -114,13 +113,111 @@ DEFAULT_PREDICTORS = [# GAZE RELATED
                  'S_postural_sway_derivative',
                  'NS_postural_sway_derivative',
                 
+    
                 # TOUCH RELATED
-                 'average_length',
-                 'std_length',
-                 'average_error',
-                 'pop_rate',
-                 'average_delay_to_pop',
-                 'average_time_spent']
+                'std_error','number_of_touches','number_of_target','average_error']
+                #'std_force_applied','average_delay_to_pop','std_length','number_of_target', 'average_error']
+
+#                 'average_length',
+#                 'std_length',
+#                 'average_error',
+#                 'pop_rate',
+#                 'average_delay_to_pop',
+#                 'average_time_spent']
+
+
+
+USE_MISSING_INDICATOR_PREDICTORS = {'PlayingWithBlocks': ['PWB_postural_sway', 'PWB_postural_sway_derivative'],
+                                     'FunAtThePark': ['FP_postural_sway',
+                                      'FP_postural_sway_derivative',
+                                      'FP_gaze_speech_correlation',
+                                      'FP_gaze_silhouette_score'],
+                                     'BlowingBubbles': ['BB_gaze_percent_right',
+                                      'BB_gaze_percent_right',
+                                      'BB_postural_sway',
+                                      'BB_postural_sway_derivative'],
+                                     'RhymesAndToys': ['RT_postural_sway', 'RT_postural_sway_derivative']
+                                  }
+
+
+DEFAULT_PREDICTORS_BY_TYPES = {'Gaze':['mean_gaze_percent_right', 'gaze_silhouette_score'],
+                               'RTN':['proportion_of_name_call_responses', 'average_response_to_name_delay'],
+                               'PosturalSway':['S_postural_sway', 'NS_postural_sway', 'S_postural_sway_derivative', 'NS_postural_sway_derivative'],
+                               'Touch': ['std_error','number_of_touches','number_of_target','average_error'],
+                               'All': DEFAULT_PREDICTORS,
+                               'All - Gaze': ['proportion_of_name_call_responses','average_response_to_name_delay',
+                                              'S_postural_sway','NS_postural_sway', 'S_postural_sway_derivative', 'NS_postural_sway_derivative',
+                                               'std_error','number_of_touches','number_of_target','average_error'],
+                               'All - RTN': ['mean_gaze_percent_right', 'gaze_silhouette_score', 
+                                              'S_postural_sway','NS_postural_sway', 'S_postural_sway_derivative', 'NS_postural_sway_derivative',
+                                               'std_error','number_of_touches','number_of_target','average_error'],
+                               'All - PosturalSway': ['mean_gaze_percent_right', 'gaze_silhouette_score', 
+                                              'proportion_of_name_call_responses','average_response_to_name_delay',
+                                               'std_error','number_of_touches','number_of_target','average_error'],
+                               'All - Touch': ['mean_gaze_percent_right', 'gaze_silhouette_score', 
+                                              'proportion_of_name_call_responses','average_response_to_name_delay',
+                                              'S_postural_sway','NS_postural_sway', 'S_postural_sway_derivative', 'NS_postural_sway_derivative'],                                                  }
+                                    
+USE_MISSING_INDICATOR_PREDICTORS_BY_TYPES = {'Gaze':{'FunAtThePark': ['FP_gaze_speech_correlation','FP_gaze_silhouette_score'],
+                                                     'BlowingBubbles': ['BB_gaze_percent_right', 'BB_gaze_percent_right']},
+                                             
+                                             'RTN':False,
+                                             'PosturalSway':{'PlayingWithBlocks': ['PWB_postural_sway', 'PWB_postural_sway_derivative'],
+                                                             'FunAtThePark': ['FP_postural_sway','FP_postural_sway_derivative'],
+                                                     'BlowingBubbles': ['BB_postural_sway','BB_postural_sway_derivative'],
+                                                     'RhymesAndToys': ['RT_postural_sway', 'RT_postural_sway_derivative']},
+                                             
+                                            'Touch':False,
+                                             'All': USE_MISSING_INDICATOR_PREDICTORS,
+                                             'All - Gaze': {'PlayingWithBlocks': ['PWB_postural_sway', 'PWB_postural_sway_derivative'],
+                                                             'FunAtThePark': ['FP_postural_sway',
+                                                              'FP_postural_sway_derivative'],
+                                                             'BlowingBubbles': ['BB_postural_sway', 'BB_postural_sway_derivative'],
+                                                             'RhymesAndToys': ['RT_postural_sway', 'RT_postural_sway_derivative']
+                                                          },
+                                             'All - RTN': {'PlayingWithBlocks': ['PWB_postural_sway', 'PWB_postural_sway_derivative'],
+                                                             'FunAtThePark': ['FP_postural_sway',
+                                                              'FP_postural_sway_derivative',
+                                                              'FP_gaze_speech_correlation',
+                                                              'FP_gaze_silhouette_score'],
+                                                             'BlowingBubbles': ['BB_gaze_percent_right',
+                                                              'BB_gaze_percent_right',
+                                                              'BB_postural_sway',
+                                                              'BB_postural_sway_derivative'],
+                                                             'RhymesAndToys': ['RT_postural_sway', 'RT_postural_sway_derivative']
+                                                          },
+                                             'All - PosturalSway': {'FunAtThePark': ['FP_gaze_speech_correlation', 'FP_gaze_silhouette_score'],
+                                                             'BlowingBubbles': ['BB_gaze_percent_right', 'BB_gaze_percent_right'],
+                                                                  },
+                                             'All - Touch': {'PlayingWithBlocks': ['PWB_postural_sway', 'PWB_postural_sway_derivative'],
+                                                             'FunAtThePark': ['FP_postural_sway',
+                                                              'FP_postural_sway_derivative',
+                                                              'FP_gaze_speech_correlation',
+                                                              'FP_gaze_silhouette_score'],
+                                                             'BlowingBubbles': ['BB_gaze_percent_right',
+                                                              'BB_gaze_percent_right',
+                                                              'BB_postural_sway',
+                                                              'BB_postural_sway_derivative'],
+                                                             'RhymesAndToys': ['RT_postural_sway', 'RT_postural_sway_derivative']
+                                                          }                                             
+                                             
+                                            }
+
+
+grouped_missing_features = {'Gaze': ['mean_gaze_percent_right', 'gaze_silhouette_score'],
+                            'Social' : ['S_postural_sway', 'S_postural_sway_derivative'],
+                            'Non Social' : ['NS_postural_sway', 'NS_postural_sway_derivative'],
+                             #'gaze_silhouette_score': ['gaze_silhouette_score'],
+                             #'proportion_of_name_call_responses': ['proportion_of_name_call_responses'],
+                             'average_response_to_name_delay': ['average_response_to_name_delay'],
+                             #'S_postural_sway': ['S_postural_sway'],
+                             #'NS_postural_sway': ['NS_postural_sway'],
+                             #'S_postural_sway': ['S_postural_sway'],
+                             #'S_postural_sway_derivative': ['S_postural_sway_derivative'],
+                             #'NS_postural_sway_derivative': ['NS_postural_sway_derivative'],
+                             'Game': ['average_length','std_length','average_error', 'pop_rate','average_delay_to_pop','average_time_spent']}
+
+
 
 
 VALIDITY_COLUMNS = ['validity_available',

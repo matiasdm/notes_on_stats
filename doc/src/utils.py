@@ -34,6 +34,7 @@ def corrected_f1_sklearn(clf, X, y):
 
 def corrected_f1_xgboost(preds, dtrain):
     res = _corrected_f1_sklearn(preds, dtrain.get_label())
+    print('yo')
     return 'f1_corrected', 1-res
 
 
@@ -482,10 +483,7 @@ def create_autism_df(folder_names):
     
     if not isinstance(folder_names, list):
         folder_names = list(folder_names)
-    df = pd.DataFrame(columns = ['dataset_name','experiment_number', 'approach', 'missing_data_handling','imputation_method', 'features_name', 'n_features', 'use_missing_indicator_variables', 'scale_data', 'sampling_method','scenario',
-                                'num_samples', 'imbalance_ratio', 'ratio_of_missing_values','ratio_missing_per_class_0', 'ratio_missing_per_class_1', 'resolution', 'bandwidth', 'estimation_time', 'num_cv', 'AUROC',
-                                'AUC-PR', 'AUC-PR-Gain', 'AUC-PR-Corrected', 'AUC-PR-Gain-Corrected', 'F1', 'F1 score Corrected',
-                                'Accuracy', 'MCC', 'Sensitivity', 'Specificity', 'Precision', 'PPV', 'NPV', 'FNR', 'FDR', 'FOR'])
+    df = pd.DataFrame(columns = ['dataset_name','experiment_number', 'experiment_name', 'approach', 'missing_data_handling','imputation_method', 'features_name', 'n_features', 'use_missing_indicator_variables', 'scale_data', 'sampling_method','scenario','num_samples', 'imbalance_ratio', 'ratio_of_missing_values','ratio_missing_per_class_0', 'ratio_missing_per_class_1', 'resolution', 'bandwidth', 'estimation_time', 'num_cv', 'AUROC','AUC-PR', 'AUC-PR-Gain', 'AUC-PR-Corrected', 'AUC-PR-Gain-Corrected', 'F1', 'F1 score Corrected', 'Accuracy', 'MCC', 'Sensitivity', 'Specificity', 'Precision', 'Precision Corrected', 'PPV', 'NPV', 'FNR', 'FDR', 'FOR', 'TP', 'TN', 'FP', 'FN'])
 
 
     experiments_paths = []
@@ -546,11 +544,12 @@ def create_autism_df(folder_names):
         # append rows to an empty DataFrame
         df = df.append({'dataset_name' : experiment_path.split('/')[-3], 
                         'experiment_number' : experiment_data['experiment_number'],  
+                        'experiment_name' : experiment_data['experiment_name'],  
                         'approach' : experiment_data['approach'],  
                         'missing_data_handling' : dataset_data['missing_data_handling'],  
                         'imputation_method' : dataset_data['imputation_method'],  
-                        'features_name': str(dataset_data['_features_name']) if not dataset_data['use_missing_indicator_variables'] else str(dataset_data['_features_name'][:int(len(dataset_data['_features_name'])//2)]),
-                        'n_features': len(dataset_data['_features_name']) if not dataset_data['use_missing_indicator_variables'] else len(dataset_data['_features_name'][:int(len(dataset_data['_features_name'])//2)]),
+                        'features_name': str(dataset_data['_features_name']),
+                        'n_features': len(dataset_data['_features_name']),
                         'use_missing_indicator_variables': dataset_data['use_missing_indicator_variables'],
                         'scale_data': dataset_data['scale_data'], 
                         'sampling_method': dataset_data['sampling_method'], 
@@ -571,16 +570,21 @@ def create_autism_df(folder_names):
                         'AUC-PR-Gain-Corrected' : experiment_data['performances_df']['AUC-PR-Gain-Corrected'][0],  
                         'F1' : experiment_data['performances_df']['F1 score (2 PPVxTPR/(PPV+TPR))'][0],  
                         'F1 score Corrected' : experiment_data['performances_df']['F1 score Corrected'][0],   
+                        'Accuracy': experiment_data['performances_df']['Accuracy'][0],   
                         'MCC' : experiment_data['performances_df']['Matthews correlation coefficient (MCC)'][0],  
                         'Sensitivity' : experiment_data['performances_df']['Sensitivity, recall, hit rate, or true positive rate (TPR)'][0],  
                         'Specificity' : experiment_data['performances_df']['Specificity, selectivity or true negative rate (TNR)'][0],  
                         'Precision' : experiment_data['performances_df']['Precision or positive predictive value (PPV)'][0],  
+                        'Precision Corrected': experiment_data['performances_df']['Corrected Precision or positive predictive value (PPV)'][0],
                         'PPV' : experiment_data['performances_df']['Precision or positive predictive value (PPV)'][0],  
                         'NPV' : experiment_data['performances_df']['Negative predictive value (NPV)'][0],  
                         'FNR' : experiment_data['performances_df']['Miss rate or false negative rate (FNR)'][0],  
                         'FDR' : experiment_data['performances_df']['False discovery rate (FDR=1-PPV)'][0],  
                         'FOR' : experiment_data['performances_df']['False omission rate (FOR=1-NPV)'][0],  
-                        }, 
+                        'TP' :  experiment_data['performances_df']['TP'][0], 
+                        'TN' :  experiment_data['performances_df']['TN'][0], 
+                        'FP' :  experiment_data['performances_df']['FP'][0], 
+                        'FN' :  experiment_data['performances_df']['FN'][0]}, 
                         ignore_index = True)
 
     #df['ratio_missing_per_class_0'] = df['ratio_missing_per_class_0'].astype(float).round(2)
