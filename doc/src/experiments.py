@@ -993,8 +993,7 @@ class Experiments(object):
         self.predictions_df['TP'] = ((self.predictions_df['y_true']==1) & (self.predictions_df['y_pred']>=self.optimal_threshold)).astype(int)
         self.predictions_df['FP'] = ((self.predictions_df['y_true']==0) & (self.predictions_df['y_pred']>=self.optimal_threshold)).astype(int)
         self.predictions_df['FN'] = ((self.predictions_df['y_true']==1) & (self.predictions_df['y_pred']<self.optimal_threshold)).astype(int)
-
-
+        self.predictions_df['pred_class'] = np.array(['TP', 'TN', 'FP', 'FN'])[np.argwhere(self.predictions_df[['TP', 'TN', 'FP', 'FN']].to_numpy()==1)[:,1]]
         return 
 
     def _performances_nam(self):

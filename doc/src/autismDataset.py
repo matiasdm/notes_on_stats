@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+from ast import literal_eval
 
 from sklearn import datasets
 from sklearn.preprocessing import StandardScaler
@@ -209,8 +210,10 @@ class Dataset(object):
             if 'order' in administration.keys():
 
                 if administration['order'] == 'first':
+                    
+                    
 
-                    indexes_to_drop = self.df[self.df.duplicated(subset=['id'], keep='first')].index
+                    indexes_to_drop = self.df[self.df['administration_number'] != 1].index
                     if self.verbosity>1 and verbose:
                         print("Removing {}/{} keeping first admin.".format(len(indexes_to_drop), len(self.df)))
 
@@ -483,8 +486,9 @@ class Dataset(object):
         if self.verbosity > 1:
             print("Post-processing inital df (removing columns with no cva features, encoding srings, compute administrations order, compute condensed S/NS variables)... ")
 
-        #df.dropna(subset=CVA_COLUMNS, how='all', inplace=True)
-
+        # Delete rows wthout any features
+        df.dropna(subset=MINIMAL_SET_OF_FEATURES, how='all', inplace=True)
+        
         df['study'] = df['path'].apply(lambda x: x.split('/')[-3] if x.split('/')[-3] in S2K_STUDIES else x.split('/')[-4])
         df.loc[df['study'].isin(['SAESDM', 'IMPACT', 'P3R']), 'diagnosis'] = 'ASD'
         df['remote'] = df['study']
@@ -533,7 +537,8 @@ class Dataset(object):
 
         df.loc[~df['Comments'].isnull(), 'Comments'] = 1
         df.loc[~df['AppTeamComment'].isnull(), 'AppTeamComment'] = 1
-
+        
+        df['valid_name_calls'] = df['valid_name_calls'].apply(literal_eval)
 
         # Merge time information and create `administration_number` column
         df = self._retrieve_administration_timing(df)
@@ -618,7 +623,7 @@ class Dataset(object):
         df.loc[df['time'].isna(), 'time'] = '00:00'
         df['date'] = pd.to_datetime(df["date"]+' '+df['time'])
 
-        del df['time']
+        #del df['time']
 
         df['administration_number'] = np.nan
 

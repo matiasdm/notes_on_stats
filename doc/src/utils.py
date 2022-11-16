@@ -575,7 +575,7 @@ def create_autism_df(folder_names):
                         'Sensitivity' : experiment_data['performances_df']['Sensitivity, recall, hit rate, or true positive rate (TPR)'][0],  
                         'Specificity' : experiment_data['performances_df']['Specificity, selectivity or true negative rate (TNR)'][0],  
                         'Precision' : experiment_data['performances_df']['Precision or positive predictive value (PPV)'][0],  
-                        'Precision Corrected': experiment_data['performances_df']['Corrected Precision or positive predictive value (PPV)'][0],
+                        'PPV-Corr': experiment_data['performances_df']['Corrected Precision or positive predictive value (PPV)'][0],
                         'PPV' : experiment_data['performances_df']['Precision or positive predictive value (PPV)'][0],  
                         'NPV' : experiment_data['performances_df']['Negative predictive value (NPV)'][0],  
                         'FNR' : experiment_data['performances_df']['Miss rate or false negative rate (FNR)'][0],  
