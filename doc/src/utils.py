@@ -10,11 +10,58 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from sklearn.metrics import  (confusion_matrix, roc_curve, fbeta_score)
+
+
 # Import local packages
 from const import *
 from const_autism import *
 
 sys.path.insert(0, '../../src')
+def compute_SD(AUC, N1, N2):
+    Q1=AUC/(2-AUC)
+    Q2 = 2*AUC*AUC/(1+AUC)
+    return(np.sqrt((AUC*(1-AUC)+(N1-1)*(Q1-AUC*AUC) + (N2-1)*(Q2-AUC*AUC))/(N1*N2)))
+
+def find_optimal_threshold(y_true, y_pred):
+
+    pi = y_true.mean()
+    correction_factor = (pi*(1-REFERENCE_IMBALANCE_RATIO))/(REFERENCE_IMBALANCE_RATIO*(1-pi))
+
+
+    # Compute all the possible threshold
+    _, _ , thresholds = roc_curve(y_true, y_pred)
+
+
+    f1_c = []
+    f2_c = []
+    for th in thresholds[1:]:
+        # For each threshold, compute the confusion matrix elements to be able to compute recall and precision 
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred >= th).ravel()    
+
+        # Compute corrected precision (ppv)
+        precision_corr = tp/(tp+correction_factor*fp)
+
+        # Compute recall 
+        recall =  tp / (tp+fn)
+
+        f1_c.append(2*(precision_corr*recall)/(precision_corr+recall))
+
+        beta = 2
+
+        f2_c.append((1+beta**2)*(precision_corr*recall)/(beta**2 * precision_corr + recall))
+
+    f2 = [fbeta_score(y_true, y_pred >= th, beta=2) for th in thresholds]
+    best_f2, threshold_optimal_f2 = np.max(f2), thresholds[np.argmax(f2)-1]
+
+    f1 = [fbeta_score(y_true, y_pred >= th, beta=1) for th in thresholds]
+    best_f1, threshold_optimal_f1 = np.max(f2), thresholds[np.argmax(f1)-1]
+    
+    index_optimal_f1 = np.argmax(f1)-1
+    index_optimal_f2 = np.argmax(f2)-1
+
+    # Also return the f1c and f2c for the optimal f2 measure
+    return best_f1, best_f2, f1_c[np.argmax(f2)-1], f2_c[np.argmax(f2)-1], index_optimal_f1, index_optimal_f2, threshold_optimal_f2
 
 
 def corrected_f1_sklearn(clf, X, y):
@@ -37,6 +84,9 @@ def corrected_f1_xgboost(preds, dtrain):
     print('yo')
     return 'f1_corrected', 1-res
 
+
+def select(df, feat, value):
+    return df[df[feat]==value]
 
 def _corrected_f1_sklearn(y_pred, y):
         
@@ -483,7 +533,8 @@ def create_autism_df(folder_names):
     
     if not isinstance(folder_names, list):
         folder_names = list(folder_names)
-    df = pd.DataFrame(columns = ['dataset_name','experiment_number', 'experiment_name', 'approach', 'missing_data_handling','imputation_method', 'features_name', 'n_features', 'use_missing_indicator_variables', 'scale_data', 'sampling_method','scenario','num_samples', 'imbalance_ratio', 'ratio_of_missing_values','ratio_missing_per_class_0', 'ratio_missing_per_class_1', 'resolution', 'bandwidth', 'estimation_time', 'num_cv', 'AUROC','AUC-PR', 'AUC-PR-Gain', 'AUC-PR-Corrected', 'AUC-PR-Gain-Corrected', 'F1', 'F1 score Corrected', 'Accuracy', 'MCC', 'Sensitivity', 'Specificity', 'Precision', 'Precision Corrected', 'PPV', 'NPV', 'FNR', 'FDR', 'FOR', 'TP', 'TN', 'FP', 'FN'])
+    df = pd.DataFrame(columns = ['dataset_name','experiment_number', 'experiment_name', 'approach', 'y_true', 'y_pred', 'missing_data_handling','imputation_method', 'features_name', 'n_features', 'use_missing_indicator_variables', 'scale_data', 'sampling_method','scenario','num_samples', 
+    'max_depth', 'reg_lambda', 'gamma', 'learning_rate', 'n_estimators', 'imbalance_ratio', 'optimal_threshold', 'ratio_of_missing_values','ratio_missing_per_class_0', 'ratio_missing_per_class_1', 'resolution', 'bandwidth', 'estimation_time', 'num_cv', 'AUROC','AUC-PR', 'AUC-PR-Gain', 'AUC-PR-Corrected', 'AUC-PR-Gain-Corrected', 'F1', 'F1 score Corrected', 'F2', 'F2 score Corrected', 'Accuracy', 'MCC', 'Sensitivity', 'Specificity', 'Precision', 'PPV', 'PPV-Corr', 'NPV', 'FNR', 'FDR', 'FOR', 'TP', 'TN', 'FP', 'FN', 'tree_usage'])
 
 
     experiments_paths = []
@@ -492,8 +543,7 @@ def create_autism_df(folder_names):
 
 
     for experiment_path in tqdm(experiments_paths):
-
-
+        
         exp_path = os.path.join(experiment_path, 'experiment_log.json')
         dataset_path = os.path.join(experiment_path, 'dataset_log.json')
 
@@ -546,6 +596,8 @@ def create_autism_df(folder_names):
                         'experiment_number' : experiment_data['experiment_number'],  
                         'experiment_name' : experiment_data['experiment_name'],  
                         'approach' : experiment_data['approach'],  
+                        'y_true' : [pd.DataFrame(json.loads(experiment_data['predictions_df']))['y_true'].to_numpy()],  
+                        'y_pred' : [pd.DataFrame(json.loads(experiment_data['predictions_df']))['y_pred'].to_numpy()],  
                         'missing_data_handling' : dataset_data['missing_data_handling'],  
                         'imputation_method' : dataset_data['imputation_method'],  
                         'features_name': str(dataset_data['_features_name']),
@@ -555,12 +607,19 @@ def create_autism_df(folder_names):
                         'sampling_method': dataset_data['sampling_method'], 
                         'scenario':  dataset_data['scenario'], 
                         'num_samples' : dataset_data['num_samples'],  
+                        'max_depth' : experiment_data['model_hyperparameters']['max_depth'],
+                        'reg_lambda' : experiment_data['model_hyperparameters']['reg_lambda'],
+                        'gamma' : experiment_data['model_hyperparameters']['gamma'],
+                        'learning_rate': experiment_data['model_hyperparameters']['learning_rate'],
+                        'n_estimators': experiment_data['model_hyperparameters']['n_estimators'] if 'n_estimators'
+                         in experiment_data['model_hyperparameters'].keys() else 100,
                         'imbalance_ratio' : dataset_data['imbalance_ratio'],  
                         'ratio_of_missing_values' : dataset_data['ratio_of_missing_values'],  
                         'ratio_missing_per_class_0' : dataset_data['ratio_missing_per_class'][0],
                         'ratio_missing_per_class_1' : dataset_data['ratio_missing_per_class'][1],
                         'resolution' : experiment_data['resolution'],
                         'bandwidth' : experiment_data['bandwidth'],
+                        'optimal_threshold': experiment_data['optimal_threshold'],
                         'estimation_time': experiment_data['estimation_time'],
                         'num_cv': experiment_data['num_cv'],
                         'AUROC' : experiment_data['performances_df']['Area Under the Curve (AUC)'][0] if 'Area Under the Curve (AUC)' in experiment_data['performances_df'].keys() else experiment_data['performances_df']['AUROC'][0] if 'AUROC' in experiment_data['performances_df'].keys() else np.nan,
@@ -570,6 +629,8 @@ def create_autism_df(folder_names):
                         'AUC-PR-Gain-Corrected' : experiment_data['performances_df']['AUC-PR-Gain-Corrected'][0],  
                         'F1' : experiment_data['performances_df']['F1 score (2 PPVxTPR/(PPV+TPR))'][0],  
                         'F1 score Corrected' : experiment_data['performances_df']['F1 score Corrected'][0],   
+                        'F2' : experiment_data['performances_df']['F2'][0],  
+                        'F2 score Corrected' : experiment_data['performances_df']['F2 Corrected'][0],   
                         'Accuracy': experiment_data['performances_df']['Accuracy'][0],   
                         'MCC' : experiment_data['performances_df']['Matthews correlation coefficient (MCC)'][0],  
                         'Sensitivity' : experiment_data['performances_df']['Sensitivity, recall, hit rate, or true positive rate (TPR)'][0],  
@@ -584,7 +645,8 @@ def create_autism_df(folder_names):
                         'TP' :  experiment_data['performances_df']['TP'][0], 
                         'TN' :  experiment_data['performances_df']['TN'][0], 
                         'FP' :  experiment_data['performances_df']['FP'][0], 
-                        'FN' :  experiment_data['performances_df']['FN'][0]}, 
+                        'FN' :  experiment_data['performances_df']['FN'][0], 
+                        'tree_usage': experiment_data['tree_usage'] if 'tree_usage' in experiment_data.keys() else np.nan}, 
                         ignore_index = True)
 
     #df['ratio_missing_per_class_0'] = df['ratio_missing_per_class_0'].astype(float).round(2)

@@ -13,7 +13,7 @@ import pandas as pd
 import seaborn as sns
 
 
-from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, roc_curve, plot_roc_curve, auc, precision_recall_curve, roc_auc_score, average_precision_score
+from sklearn.metrics import classification_report, confusion_matrix, ConfusionMatrixDisplay, roc_curve, plot_roc_curve, auc, precision_recall_curve, roc_auc_score, average_precision_score, fbeta_score
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import StratifiedKFold, LeaveOneOut
@@ -34,9 +34,8 @@ sys.path.insert(0, '../src')
 
 from const import *
 from const_autism import *
-from utils import fi, repr, corrected_f1_xgboost
+from utils import fi, repr, corrected_f1_xgboost, find_optimal_threshold,compute_SD
 from metrics import f1score, average_precision, bestf1score, calc_auprg, create_prg_curve
-
 from generateToyDataset import DatasetGenerator
 from autismDataset import Dataset
 from model.bayesian.distributions import Distributions
@@ -49,6 +48,8 @@ from model.neural_additive_models.dataset import TabularData
 from model.xgboost.visualization import plot_roc_curves_xgboost
 
 
+# To fold all: Command K and then Command 0 
+# to unfold all: Command K and then Command J 
 class Experiments(object):
     
     """
@@ -80,7 +81,8 @@ class Experiments(object):
                 verbosity=1, 
                 debug=False, 
                 random_state=RANDOM_STATE, 
-                **kwargs):
+                model_hyperparameters = {}
+                ):
 
         # Set definitions attributes (also used for log purposes)
         self.dataset_name = dataset_name
@@ -108,34 +110,40 @@ class Experiments(object):
         self.dist_neg = None
 
         # NAMs and XGboost related attributs
-        self._init_model(**kwargs)
+        self.model_hyperparameters = model_hyperparameters
+        self._init_model()
+        self.tree_usage = []
         self.fitted = False
 
         # Interesting byproducts
         self.predictions_df = None
         self.performances_df = None
+        self.index_threshold_f2, self.index_threshold_f1, self.optimal_threshold = None, None, None
 
         # Init SHAP values
         self.shap_values = np.zeros((self.dataset.X_train.shape[0],len(self.features_name)))
         self.models_expected_value = np.zeros(self.dataset.X_train.shape[0])
         
-
+        # Features confidence and weight
+        self.shap_attributions_present = None
+        self.X_conf = None
+        self.sample_weight = None
+        
         if previous_experiment is not None:
             self.load(previous_experiment)
             return
 
         # Create experiment folder
-        if self.save_experiment:
-            self.experiment_number, self.experiment_path, self.json_path = self._init_experiment_path()
-        else:
-            self.experiment_number, self.experiment_path, self.json_path = -1, None, None
-
+        self.experiment_number, self.experiment_path, self.json_path = -1, None, None
+        
         self.description = '({}) Dataset name {}\nApproach:{} Imputation technics: {}'.format(self.experiment_number, self.dataset_name, self.approach, self.dataset.imputation_method)
         self.experiment_name = experiment_name
 
         # Define colors, level of verbosity, and random_state
         self.verbosity = verbosity 
         self.debug=debug
+                
+        assert not (('scale_pos_weight' in self.model_hyperparameters.keys()) and  (self.model_hyperparameters['scale_pos_weight']) and (len(np.unique(self.dataset.y_train))>2))
 
     def __call__(self):
         return repr(self)       
@@ -163,7 +171,7 @@ class Experiments(object):
 
         # Fit model 
         if self.approach == 'xgboost':
-            self.model.fit(X_train, y_train, eval_metric=corrected_f1_xgboost)#corrected_f1_xgboost)
+            self.model.fit(X_train, y_train)
             self.model.get_booster().feature_names = self.features_name
 
         else:
@@ -215,7 +223,6 @@ class Experiments(object):
 
         return
         
-    
     def fit_predict(self, num_cv=None, **kwargs):
 
         """ 
@@ -272,6 +279,10 @@ class Experiments(object):
         return 
 
     def plot(self,  *args, **kwargs):
+
+        if len(self.predictions_df['y_true'].unique()) > 2:
+            self._plot_multiclass()
+            return
 
         display(self.performances_df)
 
@@ -501,7 +512,6 @@ class Experiments(object):
                                       learning_rate=0.01,
                                       verbosity=1,
                                       objective='binary:logistic',
-                                      eval_metric=corrected_f1_xgboost,#'auc',#corrected_f1_xgboost
                                       booster='gbtree',
                                       tree_method='exact',
                                       subsample=1,
@@ -704,7 +714,7 @@ class Experiments(object):
 
         # Fit model 
         if self.approach == 'xgboost':
-            self.model.fit(X_train, y_train, eval_metric=corrected_f1_xgboost)#'auc')#corrected_f1_xgboost)
+            self.model.fit(X_train, y_train)
         else:
             self.model.fit(X_train, y_train)
 
@@ -726,17 +736,33 @@ class Experiments(object):
             It generates the `predictions_df` attribute, that predict score on all the dataset.
 
         """    
+        
+        if 'sample_weight' in kwargs.keys():
+            self.sample_weight = kwargs['sample_weight']
+            
+
         self.num_cv = num_cv
         y_pred_score = -1*np.ones_like(self.dataset._y).astype('float32')  # init prediction scores 
 
+        # For the interaction SHap since there are heavy we store only the ones corresponding to when the sample is among the test! 
+        # Contrary to the shap velue that we store for each models
+        self.shap_interaction_value = np.zeros((self.dataset.X_train.shape[0], len(self.features_name), len(self.features_name)))
         if num_cv =='loocv':
             cv = LeaveOneOut()
+            
+            # Init SHAP values
+            self.shap_values = np.zeros((self.dataset.X_train.shape[0], self.dataset.X_train.shape[0], len(self.features_name)))
+            self.models_expected_value = np.zeros(self.dataset.X_train.shape[0])
+                        
         else:
-            cv = StratifiedKFold(n_splits=num_cv, shuffle=True, random_state=0)
+            cv = StratifiedKFold(n_splits=num_cv, shuffle=True, random_state=kwargs['random_state'] if 'random_state' in  kwargs.keys() else 0)
+            # Init SHAP values
+            self.shap_values = np.zeros((num_cv, self.dataset.X_train.shape[0], len(self.features_name)))
+            self.models_expected_value = np.zeros(num_cv)
+            
         print('Performing {} fold cross-validation.'.format(num_cv)) if self.verbosity > 1 else None
         
         for i, (train, test) in enumerate(cv.split(self.dataset._X, self.dataset._y)):
-
             # Init data
             X_train, X_test = self.dataset.X_train[train], self.dataset.X_train[test]
             y_train, y_test = self.dataset._y[train].squeeze(), self.dataset._y[test].squeeze()
@@ -748,11 +774,17 @@ class Experiments(object):
 
             X_train, y_train = self.dataset.upsample_minority(X_train, y_train)
             # Reset model 
-            self._init_model()
+            self._init_model(**kwargs)
 
             # Fit model 
             if self.approach == 'xgboost':
-                self.model.fit(X_train, y_train, eval_metric=corrected_f1_xgboost)#'auc')#corrected_f1_xgboost)
+                self.model.fit(X_train, 
+                               y_train, 
+                               sample_weight=self.sample_weight[train] if self.sample_weight is not None else None,
+                               verbose=True)
+                tree_df = self.model.get_booster().trees_to_dataframe()
+                self.tree_usage.append(len(tree_df[tree_df['Feature']=='Leaf']) / 2**self.model.max_depth)
+                
             else:
                 self.model.fit(X_train, y_train)
                 
@@ -761,10 +793,19 @@ class Experiments(object):
 
             # Add shap value of this sample:
 
-            explainer = shap.TreeExplainer(self.model)
-            self.shap_values[test] = explainer.shap_values(X_test)
-            self.models_expected_value[test] = explainer.expected_value
+            #explainer = shap.TreeExplainer(self.model)
+            #shap_values = explainer.shap_values(self.dataset.X_train)
+            #self.shap_values[i] =  shap_values / np.abs(shap_values).sum(axis=1)[:, np.newaxis]
+            #self.models_expected_value[i] = explainer.expected_value
             
+            #Collect interaction shap values
+            #shap_interaction_values = explainer.shap_interaction_values(X_test)
+            # Normalize them per subjects to have percentages
+            # Note that the interaction values is oh shape [N x K x K], and that for a sample, the sum of the matrix equal the prediction, and the sum over rows (or columns) 
+            # equal the shap value of that each features! 
+            #shap_interaction_values_normalized = shap_interaction_values/np.abs(shap_interaction_values).sum(axis=1).sum(axis=1)[:, np.newaxis, np.newaxis]
+            #self.shap_interaction_value[test] = shap_interaction_values_normalized
+
 
         # Create the df associated to the test sample 
         n_features = self.dataset.X_train.shape[1]
@@ -777,7 +818,7 @@ class Experiments(object):
         test_df.columns = self.features_name + ["y_true", "y_pred"]
 
         # Finally fit the model with all the data for plotting purposes 
-        self._init_model()
+        self._init_model(**kwargs)
         
         X_train = self.dataset.X_train
         y_train = self.dataset._y.squeeze()
@@ -785,11 +826,11 @@ class Experiments(object):
         # Fit model 
         self.model.fit(X_train, y_train)
 
-        if self.save_experiment and self.approach != 'ebm': # TODOADD
-            pickle.dump(self.model, open(os.path.join(self.experiment_path, 'best_model.pt'), "wb"))
+        #if self.save_experiment and self.approach != 'ebm': # TODOADD
+        #    pickle.dump(self.model, open(os.path.join(self.experiment_path, 'best_model.pt'), "wb"))
 
         return test_df
-    
+
     def _predict_map(self):
     
         #################################################################
@@ -883,6 +924,156 @@ class Experiments(object):
 
         return
     
+    ################################ Computing features importance based on shap and confidence scores ###########################
+    
+    def _compute_features_importance(self):
+        #shap_values = np.zeros(self.dataset.X_train.shape)
+
+        #for i in range(self.dataset.num_samples):
+        #    shap_values[i, :] = self.shap_values[i, i, :]
+            
+        shap_values = self.shap_values.mean(axis=0)
+            
+        mask_shap_present = (~np.isnan(self.dataset._X_train)).astype(int)
+        
+        # Computes shap for the features when there are present 
+        shap_present = np.multiply(shap_values, mask_shap_present)
+        # Computes shap for the features when there are absent 
+        shap_missing = np.multiply(shap_values, (mask_shap_present==0).astype(int))
+
+        # Normalized shap value separating real variables and when there are missing.
+        general_shap_values = np.concatenate([shap_present, shap_missing], axis=1)
+        general_shap_values_normalized  = np.abs(general_shap_values) / np.abs(general_shap_values).sum(axis=1)[:, np.newaxis]
+        shap_attributions = np.abs(general_shap_values).sum(axis=0)/ np.abs(general_shap_values).sum()
+
+        shap_present_real_variables = shap_present[:, :len(self.dataset.raw_features_name)]
+        shap_present_normalized = np.abs(shap_present_real_variables) / np.abs(shap_present_real_variables).sum(axis=1)[:, np.newaxis] 
+        
+        # compute the relative shap importance of each app-based variables (no indicator functions and only account for the present ones)
+        self.shap_attributions_present = np.abs(shap_present_normalized).sum(axis=0)/ np.abs(shap_present_normalized).sum()
+        
+        if self.verbosity  > 2:
+            
+            labels = self.features_name + ["Z_{}".format(feat_name) for feat_name in self.features_name]                  
+
+            
+            fi(25, 5)
+            plt.title("Features importance score for present/missing variables accross the dataset (sum to 1)")
+
+            for i, feat in enumerate(self.features_name):
+                plt.bar(i, shap_attributions[i], color='tab:blue')
+            plt.xticks(ticks = np.arange(len(self.features_name)), labels=self.features_name, rotation =90)
+
+            for i, feat in enumerate(self.features_name):
+                j = i + len(self.features_name)
+                plt.bar(j, shap_attributions[j], color='tab:blue')
+            plt.xticks(ticks = np.arange(shap_attributions.shape[0]), labels=labels, rotation =90)
+
+            fi(25, 5)
+            plt.title("Features importance score accross the dataset when the features are present (sum to 1)")
+            for i, feat in enumerate(self.dataset.raw_features_name):
+                plt.bar(i, self.shap_attributions_present[i], color='tab:blue')
+            plt.xticks(ticks = np.arange(len(self.dataset.raw_features_name)), labels=self.dataset.raw_features_name, rotation =90)
+
+            fi(30, 35)
+            plt.title("|Shap values|")
+            plt.imshow(general_shap_values_normalized.transpose())
+            plt.xlabel("Participants")
+            plt.ylabel("Variables")   
+            None
+
+            
+        
+        return self.shap_attributions_present
+    
+    def _compute_features_confidence(self):
+        
+        X_conf = np.zeros((self.dataset.num_samples, len(self.dataset.raw_features_name)))
+        
+        for i, feat in enumerate(self.dataset.raw_features_name):
+            
+            if feat in TOUCH_VARIABLES:
+                
+                # These features don't depend on the number of touches, it is a value that we measures and so its confidence should be 1. 
+                # We weight only the features that depend on the number of features.
+                if feat in ['number_of_touches', 'number_of_target']:
+                    
+                    X_conf[:, i] = (~np.isnan(self.dataset._X_train[:,i])).astype(int)
+                
+                else:
+                    
+                    X_conf[:, i] = (~np.isnan(self.dataset._X_train[:,i])).astype(int) * self.dataset.df['touch_conf']
+                
+            elif feat == 'proportion_of_name_call_responses':
+                
+                X_conf[:, i] = self.dataset.df['RTN_conf']
+                
+            elif feat == 'average_response_to_name_delay':
+                
+                # 0 if the delay is missing, the proportion of valid  name calls otherwise
+                
+                X_conf[:, i] = (~np.isnan(self.dataset._X_train[:,i])).astype(int) * self.dataset.df['RTN_conf']
+                    
+            else:
+                X_conf[:, i] = self.dataset.df['{}_conf'.format(feat)]
+                    
+        # --------------- Add the weights asssociated with the missingness ---------------------- #
+        self.X_conf = np.concatenate([X_conf, np.isnan(self.dataset._X_train).astype(int)], axis=1)
+        
+        
+        if self.verbosity >2:
+            fi(30, 35)
+            plt.title("Weight (confidence) matrix")
+            plt.imshow(self.X_conf.transpose())
+            plt.xlabel("Participants")
+            plt.ylabel("Variables")   
+            
+        return self.X_conf
+    
+    def compute_samples_weight(self, num_cv='loocv', **kwargs):
+        
+        if num_cv =='loocv':
+            cv = LeaveOneOut()
+            
+            # Init SHAP values
+            self.shap_values = np.zeros((self.dataset.X_train.shape[0], self.dataset.X_train.shape[0], len(self.features_name)))
+            self.models_expected_value = np.zeros(self.dataset.X_train.shape[0])
+            
+        else:
+            cv = StratifiedKFold(n_splits=num_cv, shuffle=True, random_state=np.random.randint(10000))
+            # Init SHAP values
+            self.shap_values = np.zeros((num_cv, self.dataset.X_train.shape[0], len(self.features_name)))
+            self.models_expected_value = np.zeros(num_cv)
+                    
+        for i, (train, test) in enumerate(cv.split(self.dataset._X, self.dataset._y)):
+
+            # Init data
+            X_train, X_test = self.dataset.X_train[train], self.dataset.X_train[test]
+            y_train, y_test = self.dataset._y[train].squeeze(), self.dataset._y[test].squeeze()
+
+            X_train, y_train = self.dataset.upsample_minority(X_train, y_train)
+            # Reset model 
+            self._init_model(**kwargs)
+
+            # Fit model 
+            self.model.fit(X_train, y_train, sample_weight=None)
+            
+            explainer = shap.TreeExplainer(self.model)
+            shap_values = explainer.shap_values(self.dataset.X_train)
+            self.shap_values[i] =  shap_values / np.abs(shap_values).sum(axis=1)[:, np.newaxis]
+            self.models_expected_value[i] = explainer.expected_value
+            
+        # Compute the features weights
+        self._compute_features_importance()
+        
+        # Compute the features confidence
+        self._compute_features_confidence()
+            
+        # Compute quality score for each admin
+        self.sample_weight = np.multiply(self.X_conf[:,:len(self.dataset.raw_features_name)], self.shap_attributions_present).sum(axis=1)
+        
+        return self.sample_weight
+
     ################################ Computing performances (performcances_df attribute) ###########################
 
     def _performances(self):
@@ -908,6 +1099,7 @@ class Experiments(object):
             raise ValueError("Please use 'single_distribution', 'multi_distributions' or 'nam', 'xgboost', or 'ebm' approach.")
         
         if self.save_experiment:
+            self.experiment_number, self.experiment_path, self.json_path = self._init_experiment_path()
             self.save() 
 
         return
@@ -922,6 +1114,10 @@ class Experiments(object):
             
             y_true = self.predictions_df['y_true'].to_numpy()
             y_pred = self.predictions_df['y_pred'].to_numpy()
+            
+        
+        if len(np.unique(y_true)) > 2:
+            return
             
         # Compute imbalance_ratio of our sample
         pi = y_true.mean()
@@ -941,12 +1137,17 @@ class Experiments(object):
 
         # Compute the AUC-PR Gain corrected
         auc_pr_g_corrected = calc_auprg(create_prg_curve(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO))
+        
+        
+        # compute the best F1, F2, optimal threshold for the !F2! measure, and the index of the optimal threshold
+        f1, f2, f1c, f2c, self.index_threshold_f1, self.index_threshold_f2, self.optimal_threshold = find_optimal_threshold(y_true, y_pred)
+
 
         # Compute the F1 score
-        f1, self.optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
+        #f1, self.optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
 
         # Compute the corrected F1 score
-        f1_corrected, _ = bestf1score(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO)
+        #f1_corrected, _ = bestf1score(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO)
 
         tn, fp, fn, tp = confusion_matrix(y_true, y_pred >= self.optimal_threshold).ravel()
         
@@ -969,7 +1170,10 @@ class Experiments(object):
                             'AUC-PR-Corrected': round(auc_pr_corrected, 3),
                             'AUC-PR-Gain-Corrected' :round(auc_pr_g_corrected, 3),
                             'F1 score (2 PPVxTPR/(PPV+TPR))': round(f1, 3),
-                            'F1 score Corrected': round(f1_corrected, 3),
+                            'F1 score Corrected': round(f1c, 3),
+                            'F2': round(f2, 3),
+                            'F2 Corrected': round(f2c, 3),
+                            
                             'Accuracy' : round(acc, 3),
                             'Matthews correlation coefficient (MCC)': round(mcc, 3),
                             'Sensitivity, recall, hit rate, or true positive rate (TPR)': round(tpr, 3),
@@ -995,7 +1199,7 @@ class Experiments(object):
         self.predictions_df['FN'] = ((self.predictions_df['y_true']==1) & (self.predictions_df['y_pred']<self.optimal_threshold)).astype(int)
         self.predictions_df['pred_class'] = np.array(['TP', 'TN', 'FP', 'FN'])[np.argwhere(self.predictions_df[['TP', 'TN', 'FP', 'FN']].to_numpy()==1)[:,1]]
         return 
-
+            
     def _performances_nam(self):
         """
             Create the predictions_df and performances_df based on the dataframe that recap all the results for the replciates. 
@@ -1421,8 +1625,6 @@ class Experiments(object):
 
             plt.tight_layout();plt.show()
             return
-            
-
         
         # Create the pannel 
         fig_mosaic = """
@@ -1442,17 +1644,26 @@ class Experiments(object):
 
         cm = confusion_matrix(y_true, y_pred>= self.optimal_threshold)
         disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-        disp.plot(cmap='Blues', ax=axes['B']);disp.im_.colorbar.remove()    
-                                                                                                    
+        disp.plot(cmap='Blues', ax=axes['B']);disp.im_.colorbar.remove()
+                            
         # Plot the roc curves
-        axes['A'] = plot_roc_curves_xgboost(self.predictions_df, ax=axes['A']) 
+        fpr, tpr, thresholds = roc_curve(y_true, y_pred); roc_auc = auc(fpr, tpr)
+        axes['A'].plot(fpr, tpr, '-', color='darkorange', lw=1.5, label='ROC curve (area = %0.2f)' % roc_auc,)
+        axes['A'].plot([0, 1], [0, 1], color='navy', lw=1.5, linestyle='--')
+        axes['A'].scatter(fpr[self.index_threshold_f2], tpr[self.index_threshold_f2], color='tab:red', s=100, label="Optimal F2")
+        axes['A'].scatter(fpr[self.index_threshold_f1], tpr[self.index_threshold_f1], color='k', s=100, label="Optimal F1")
+        axes['A'].set_xlim([0.0, 1.0]); axes['A'].set_ylim([0.0, 1.05]); axes['A'].grid()
+        axes['A'].set_xlabel('False Positive Rate'); axes['A'].set_ylabel('True Positive Rate')
+        axes['A'].legend()
+        
+        #axes['A'] = plot_roc_curves_xgboost(self.predictions_df, ax=axes['A']) 
         
         # Plot features importance
         self.model.get_booster().feature_names = self.features_name
         axes['C'] = plot_importance(self.model.get_booster(),  height=0.5, ax = axes['C'])
         
         # Plot Tree
-        axes['F'] = plot_tree(self.model.get_booster(), num_trees=self.model.best_iteration, ax=axes['F'])
+        axes['F'] = plot_tree(self.model.get_booster(), num_trees=0, ax=axes['F'])
 
         plt.tight_layout();plt.show()
 
@@ -1660,7 +1871,6 @@ class Experiments(object):
                     predictions_df.query(" `Have missing`==0 and `False Negative`==1")['X2'],
                     color='tab:red', s=100, alpha=alpha, label="FN (n={})".format(len(predictions_df.query(" `Have missing`==0 and `False Negative`==1"))))
 
-
         # Plot the sample points without missing data
         axes['G'].scatter(predictions_df.query(" `Have missing`==1 and `True Positive`==1")['X1'], 
                     predictions_df.query(" `Have missing`==1 and `True Positive`==1")['X2'],
@@ -1717,9 +1927,68 @@ class Experiments(object):
         disp.plot(cmap='Blues', ax=axes['B']);disp.im_.colorbar.remove()    
                                                                                                                                                                           
         plt.tight_layout();plt.show()
-
         return 
 
+    def _plot_multiclass(self):
+        
+        y_true = self.predictions_df['y_true'].to_numpy()
+        y_pred = self.predictions_df['y_pred'].to_numpy()
+        
+        #creating a set of all the unique classes using the actual class list
+        unique_class = [0, 1, 2]
+        labels = ['NT', 'ASD', 'DDLD']
+        colors = ['tab:orange', 'tab:purple', 'tab:green']
+
+        fi, axes = plt.subplots(1, 5, figsize=(35, 8))
+
+        for i, (positive_class, label_positive) in enumerate(zip([[1], [1, 2], [2]], ['ASD', 'ASD+DDLD', 'DDLD'])):
+
+
+            #marking the current class as 1 and all other classes as 0
+            y_true_new = np.array([1 if x in positive_class else 0 for x in y_true])
+
+            #using the sklearn metrics method to calculate the roc_auc_score
+            roc_auc = roc_auc_score(y_true_new, y_pred)
+
+            fpr, tpr, thresholds = roc_curve(y_true_new, y_pred); roc_auc = auc(fpr, tpr)
+            hanley_ci = compute_SD(roc_auc, np.sum(y_true_new==0), np.sum(y_true_new==1))
+            
+            
+            # compute the best F1, F2, optimal threshold for the !F2! measure, and the index of the optimal threshold
+            f1, f2, f1c, f2c, index_threshold_f1, index_threshold_f2, optimal_threshold = find_optimal_threshold(y_true_new, y_pred)
+
+            axes[0].plot(fpr, tpr, '-', lw=1.5, color=colors[i], label='+:{} AUC = {:.2f} +/- {:.2f})'.format(label_positive, roc_auc, hanley_ci))
+            axes[0].plot([0, 1], [0, 1], color='navy', lw=1.5, linestyle='--')
+            axes[0].set_xlim([0.0, 1.0]); axes[0].set_ylim([0.0, 1.]); axes[0].grid()
+            axes[0].set_xlabel('False Positive Rate'); axes[0].set_ylabel('True Positive Rate')
+            tprs_upper = np.minimum(tpr + hanley_ci, 1)
+            tprs_lower = np.maximum(tpr - hanley_ci, 0)
+            axes[0].fill_between(fpr, tprs_lower, tprs_upper,  color=colors[i], alpha=.2)
+            axes[0].scatter(fpr[index_threshold_f2], tpr[index_threshold_f2], color='tab:red', s=100, label="Optimal F2" if i == 2 else None)
+
+            axes[0].legend(loc='lower right', prop={'size':15})
+            axes[0].set_title('Roc changing the + class', weight='bold', fontsize=18)
+            
+            
+            # COnfusion matrix
+            cm = confusion_matrix(y_true_new, y_pred >= optimal_threshold)
+            disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+            disp.plot(cmap='Blues', ax=axes[i+1]);disp.im_.colorbar.remove()  
+            axes[i+1].set_title("{}".format(label_positive), weight='bold', fontsize=18)
+            
+            
+        thresholds = sorted(np.unique(y_pred))
+        f2 = []
+        for th in thresholds:
+            f2.append(fbeta_score(y_true, y_pred >= th, beta=2, average='weighted'))
+            
+        optimal_threshold = thresholds[np.argmax(f2)]
+        
+        cm = confusion_matrix(y_true, y_pred>= optimal_threshold)
+        disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+        disp.plot(cmap='Blues', ax=axes[4]);disp.im_.colorbar.remove()
+        axes[4].set_title("Complete confusion matrix", weight='bold', fontsize=18)
+        return 
     ################################  Experiments maintenance ################################ 
 
     def _init_experiment_path(self, suffix=None):
@@ -1821,20 +2090,23 @@ class Experiments(object):
         elif self.approach == 'xgboost':
             
             self.model = XGBClassifier(use_label_encoder=False, # TODO ADD PLAYING WITH PARAMETERS 
-                                      learning_rate=0.01,
-                                       n_estimators= 100,
-                                      max_depth = 5,
+                                       n_estimators= self.model_hyperparameters['n_estimators'] if 'n_estimators' in self.model_hyperparameters.keys() else 100,
+                                      max_depth = self.model_hyperparameters['max_depth'] if 'max_depth' in self.model_hyperparameters.keys() else 5,
                                       verbosity=1,
                                       objective='binary:logistic',
                                       eval_metric='auc',
                                       booster='gbtree',
-                                      enable_categorical=True, 
-                                      scale_pos_weight=417/50,
-                                      tree_method='gpu_hist',
+                                      #enable_categorical=True, 
+                                      scale_pos_weight= np.sum(self.dataset.y_train==0)/np.sum(self.dataset.y_train==1) if (('scale_pos_weight' in self.model_hyperparameters.keys()) and  (self.model_hyperparameters['scale_pos_weight'])) else None,
+                                      tree_method='exact',
                                       colsample_bytree=.8,
-                                      subsample=.8,
+                                      min_child_weight=self.model_hyperparameters['min_child_weight'] if 'min_child_weight' in self.model_hyperparameters.keys() else 1,
+                                      subsample=1,
                                       colsample_bylevel=.8,
-                                      alpha=0)
+                                      gamma = self.model_hyperparameters['gamma'] if 'gamma' in self.model_hyperparameters.keys() else 0,
+                                      learning_rate = self.model_hyperparameters['learning_rate'] if 'learning_rate' in self.model_hyperparameters.keys() else 0.01,
+                                      reg_lambda=self.model_hyperparameters['reg_lambda'] if 'reg_lambda' in self.model_hyperparameters.keys() else 0,
+                                      alpha=self.model_hyperparameters['alpha'] if 'alpha' in self.model_hyperparameters.keys() else 0)
 
         elif self.approach == 'ebm':
 

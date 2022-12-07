@@ -22,7 +22,7 @@ sys.path.insert(0, '../src')
 
 from const import *
 from const_autism import *
-from utils import repr
+from utils import repr, select
 
 
 class Dataset(object):
@@ -413,7 +413,7 @@ class Dataset(object):
 
             print("Upampling minority class. Imbalance ratio of: {:.2f} to {:.2f}".format(self.imbalance_ratio, np.sum(y==1)/np.sum(y==0))) if self.verbosity > 1 else None
                   
-        elif self.sampling_method=='without':
+        elif self.sampling_method in ['without', 'scale_pos_weight']:
             pass
         
         else:
@@ -478,9 +478,11 @@ class Dataset(object):
             Post-process the raw dataframe. Note that some of these steps could be done at the API level when building the dataframe.
             1) Add a study, remote (bool) field
             2) Add ASD diagnosis to SAESDM IMPACT and P3R
+            3) Add EHR data diagnosis
             3) Encode diagnosis, ethnicity, race, sex, StateOfTHeChild, Comments. 
             4) Add norder of the administration by using adm timing. 
             5) Compute the Aggregated CVA biomarkers (S/NS gaze, postural sway, etc.)
+            6) Compute the confidence of each variables
         """
 
         if self.verbosity > 1:
@@ -498,10 +500,13 @@ class Dataset(object):
                     'P3':0,
                     'IMPACT':0,
                     'SAESDM':0,
-                    'ARC':1,
+                    'ARC':0,
                     'P3R':1, 
                     'S2KP':0,
-                    'P1R':1}, inplace = True)        
+                    'P1R':1}, inplace = True)   
+        
+        # Add EHR diagnosis
+        df = self._add_ehr_diagnosis(df, verbose=False)     
 
         # encode categorical variables
         df['diagnosis'].replace({'TD':0., 
@@ -510,10 +515,10 @@ class Dataset(object):
                                 'ADHD':3.,
                                  'Other':4., 
                                  np.nan: -1}, inplace = True)
-
+    
         df['ethnicity'].replace({'Not Hispanic/Latino':0, 
                                 'Hispanic/Latino':1, 
-                                 'Unknown or not reported':np.nan}, inplace = True)
+                                'Unknown or not reported':np.nan}, inplace = True)
         
 
         df['race'].replace({'White':0., 
@@ -525,7 +530,7 @@ class Dataset(object):
                     'Asian':2.,
                     'Unknown or not reported':np.nan,
                     'Unknown/Declined':np.nan,
-                   }, inplace = True)
+                }, inplace = True)
 
         df['sex'].replace({'M':0, 'F':1}, inplace=True)
         df['completed'].replace({'Complete (Do not readminister)':0, 'Partial (Do not readminister)':1, 'Incomplete (Readminister at next visit)':2}, inplace = True)
@@ -545,6 +550,12 @@ class Dataset(object):
 
         # Merge postural sway variables into social and non-social 
         df = self._compute_cva_condensed_variables(df)
+        
+        # Compute linear mapping of the confidence on each variables
+        df = self._compute_features_confidence(df)
+        
+        # Add Z_variables to predictors
+        df = self._add_Z_variables(df)
 
         # Sort df
         df.sort_values(by=['id', 'date'], inplace=True)
@@ -617,6 +628,94 @@ class Dataset(object):
             print("Predicting {} based on {} features".format(self.outcome_column, len(self.features_name)))
             
         return X_raw, y
+    
+    def _add_ehr_diagnosis(self, df, verbose=True):
+        
+            """
+                Input: df with columns `id` as strings, and `diagnosis` 
+                column with entries in ['ASD', 'DDLD', 'TD', 'Other', 'ADHD', nan].
+                
+            """
+            
+
+            # Load EHR data and reformat
+            ehr_data = pd.read_csv(os.path.join(DATA_DIR, 'P1_EHR_FINAL.csv'))
+            ehr_data.rename(columns={'ace_id':'id'}, inplace=True)
+            ehr_data['id'] = ehr_data['id'].astype(str)
+            del ehr_data['sex']
+
+            # First we select the app data that are included in the EHR dataset
+            df_merge = pd.merge(df, ehr_data, how='left', on='id')
+            diagnosis_category = list(df_merge.diagnosis.unique())
+
+            if verbose: 
+                
+                # Sanity check: Does all the ASD have a asd_dx to 1 ? 
+                print("Subjects diagnosed with ASD as per our data but not ASD as per the EHR: {}".format(len(select(select(df_merge, 'diagnosis', 'ASD'), 'asd_dx', 0))))
+
+                # Subjects with TD diagnosis actually having ASD:
+                print("Subjects with TD diagnosis actually having ASD: {}".format(len(select(select(df_merge, 'diagnosis', 'TD'), 'asd_dx', 1))))
+
+                # Subjects with Unknown diagnosis actually having ASD:
+                print("Subjects with Unknown diagnosis actually having ASD: {}".format(len(select(df_merge[(df_merge['diagnosis'] == 'Other') | (df_merge['diagnosis'].isnull())], 'asd_dx', 1))))
+
+                # Subjects with ADHD actually having ASD:
+                print("Subjects with ADHD diagnosis actually having ASD: {}".format(len(select(select(df_merge, 'diagnosis', 'ADHD'), 'asd_dx', 1))))
+
+                # Subjects with DDLD actually having ASD:
+                print("Subjects with DDLD diagnosis actually having ASD: {}".format(len(select(select(df_merge, 'diagnosis', 'DDLD'), 'asd_dx', 1))))
+
+                # Subjects with Unknown diagnosis actually having DDLD:
+                print("Subjects with Unknown diagnosis actually having DDLD: {}".format(len(select(df_merge[(df_merge['diagnosis'] == 'Other') | (df_merge['diagnosis'].isnull())], 'ddld_dx', 1))))
+            
+                dict_maching = {'ASD':'asd_dx', 
+                                'DDLD': 'ddld_dx',
+                                'ADHD': 'adhd_dx'
+                            }
+
+                transition_matrix = np.zeros((len(diagnosis_category), 3))
+
+                for i, initial_diag in enumerate(diagnosis_category):
+
+                    if initial_diag not in ['ASD', 'DDLD', 'TD', 'Other', 'ADHD']:
+
+                        for j, (new_diag, code) in enumerate(dict_maching.items()):                
+
+                            transition_matrix[i][j] = len(select(df_merge[df_merge['diagnosis'].isnull()], code, 1))
+                    else:
+
+                        for j, (new_diag, code) in enumerate(dict_maching.items()):
+
+                            transition_matrix[i][j] = len(select(select(df_merge, 'diagnosis', initial_diag), code, 1))
+
+                transition_matrix = pd.DataFrame(transition_matrix, columns = ['ASD', 'DDLD', 'ADHD'], index=diagnosis_category)
+                display(transition_matrix)
+
+
+            # Add the updated_diagnosis column
+            df['diagnosis'] = np.nan
+            
+
+            # Set the unknown diagnosis or TD having ASD as ASD
+            df_merge.loc[((df_merge['diagnosis'] == 'Other') | (df_merge['diagnosis'].isnull()) | (df_merge['diagnosis'] == 'TD')) &  df_merge['asd_dx'] == 1, 'diagnosis'] = 'ASD'
+            
+            # Set the unknown diagnosis or TD having DDLD as DDLD
+            df_merge.loc[((df_merge['diagnosis'] == 'Other') | (df_merge['diagnosis'].isnull()) | (df_merge['diagnosis'] == 'TD')) &  df_merge['ddld_dx'] == 1, 'diagnosis'] = 'DDLD'
+
+            # Set the unknown diagnosis or TD having ADHD as ADHD
+            df_merge.loc[((df_merge['diagnosis'] == 'Other') | (df_merge['diagnosis'].isnull()) | (df_merge['diagnosis'] == 'TD')) &  df_merge['adhd_dx'] == 1, 'diagnosis'] = 'ADHD'
+
+
+            # Set the DDLD with ASD as ASD
+            df_merge.loc[((df_merge['diagnosis'] == 'DDLD')) &  df_merge['asd_dx'] == 1, 'diagnosis'] = 'ASD'
+
+            # Set the TD diagnosis having DDLD as DDLD
+            df_merge.loc[((df_merge['diagnosis'] == 'TD')) &  df_merge['ddld_dx'] == 1, 'diagnosis'] = 'DDLD'
+
+            # Set the TD diagnosis having ADHD as ADHD
+            df_merge.loc[((df_merge['diagnosis'] == 'ADHD')) &  df_merge['adhd_dx'] == 1, 'diagnosis'] = 'ADHD'
+            
+            return df_merge
 
     def _retrieve_administration_timing(self, df):
 
@@ -642,18 +741,19 @@ class Dataset(object):
         '''
 
 
-        S_postural_sway = df[['ST_postural_sway', 'BB_postural_sway', 'RT_postural_sway', 'MML_postural_sway', 'FP_postural_sway']].mean(axis=1)
+        S_postural_sway = df[['ST_postural_sway', 'BB_postural_sway', 'MML_postural_sway', 'FP_postural_sway']].mean(axis=1) # 'RT_postural_sway',
         NS_postural_sway = df[['DIGC_postural_sway', 'DIGRRL_postural_sway', 'FB_postural_sway', 'MP_postural_sway']].mean(axis=1)
         df['S_postural_sway'] = S_postural_sway
         df['NS_postural_sway'] = NS_postural_sway
         
-        S_postural_sway_derivative = df[['ST_postural_sway_derivative', 'BB_postural_sway_derivative', 'RT_postural_sway_derivative', 'MML_postural_sway_derivative', 'FP_postural_sway_derivative']].mean(axis=1)
+        S_postural_sway_derivative = df[['ST_postural_sway_derivative', 'BB_postural_sway_derivative', 'MML_postural_sway_derivative', 'FP_postural_sway_derivative']].mean(axis=1) # 'RT_postural_sway_derivative',
         NS_postural_sway_derivative = df[['DIGC_postural_sway_derivative', 'DIGRRL_postural_sway_derivative', 'FB_postural_sway_derivative', 'MP_postural_sway_derivative']].mean(axis=1)
         df['S_postural_sway_derivative'] = S_postural_sway_derivative
         df['NS_postural_sway_derivative'] = NS_postural_sway_derivative
         
         # Merge silhouette scores
-        gaze_silhouette_score = df[['BB_gaze_silhouette_score','S_gaze_silhouette_score','FP_gaze_silhouette_score']].mean(axis=1)
+        #gaze_silhouette_score = df[['BB_gaze_silhouette_score','S_gaze_silhouette_score' 'FP_gaze_silhouette_score']].mean(axis=1)
+        gaze_silhouette_score = df[['BB_gaze_silhouette_score','S_gaze_silhouette_score']].mean(axis=1)
         df['gaze_silhouette_score'] = gaze_silhouette_score
 
         # Merge percent right 
@@ -661,6 +761,49 @@ class Dataset(object):
         df['inv_S_gaze_percent_right'] = inv_S_gaze_percent_right
         mean_gaze_percent_right = df[['BB_gaze_percent_right', 'inv_S_gaze_percent_right']].mean(axis=1)
         df['mean_gaze_percent_right'] = mean_gaze_percent_right
+        
+        df['S_postural_sway_complexity'] = df[['ST_head_movement_complexity', 'BB_head_movement_complexity', 'MML_head_movement_complexity', 'FP_head_movement_complexity']].mean(axis=1)
+        df['NS_postural_sway_complexity'] = df[['DIGC_head_movement_complexity', 'DIGRRL_head_movement_complexity', 'FB_head_movement_complexity', 'MP_head_movement_complexity']].mean(axis=1)
+
+        df['S_facing_forward'] = df[['ST_facing_forward', 'BB_facing_forward', 'MML_facing_forward', 'FP_facing_forward']].mean(axis=1)
+        df['NS_facing_forward'] = df[['DIGC_facing_forward', 'DIGRRL_facing_forward', 'FB_facing_forward', 'MP_facing_forward']].mean(axis=1)
+
+        df['S_eyebrows_complexity'] = df[['ST_eyebrows_complexity', 'BB_eyebrows_complexity', 'MML_eyebrows_complexity', 'FP_eyebrows_complexity']].mean(axis=1)
+        df['NS_eyebrows_complexity'] = df[['DIGC_eyebrows_complexity', 'DIGRRL_eyebrows_complexity', 'FB_eyebrows_complexity', 'MP_eyebrows_complexity']].mean(axis=1)
+
+        df['S_mouth_complexity'] = df[['ST_mouth_complexity', 'BB_mouth_complexity', 'MML_mouth_complexity', 'FP_mouth_complexity']].mean(axis=1)
+        df['NS_mouth_complexity'] = df[['DIGC_mouth_complexity', 'DIGRRL_mouth_complexity', 'FB_mouth_complexity', 'MP_mouth_complexity']].mean(axis=1)
+
+        
+        
+        return df
+    
+    def _compute_features_confidence(self, df):
+        
+        df['S_postural_sway_conf'] = (~df[['ST_postural_sway', 'BB_postural_sway', 'MML_postural_sway', 'FP_postural_sway']].isna()).sum(axis=1)/4
+        df['NS_postural_sway_conf'] = (~df[['DIGC_postural_sway', 'DIGRRL_postural_sway', 'FB_postural_sway', 'MP_postural_sway']].isna()).sum(axis=1)/4
+        df['S_postural_sway_derivative_conf'] = (~df[['ST_postural_sway_derivative', 'BB_postural_sway_derivative', 'MML_postural_sway_derivative', 'FP_postural_sway_derivative']].isna()).sum(axis=1)/4
+        df['NS_postural_sway_derivative_conf'] = (~df[['DIGC_postural_sway_derivative', 'DIGRRL_postural_sway_derivative', 'FB_postural_sway_derivative', 'MP_postural_sway_derivative']].isna()).sum(axis=1)/4
+        df['gaze_silhouette_score_conf'] = (~df[['BB_gaze_silhouette_score','S_gaze_silhouette_score','FP_gaze_silhouette_score']].isna()).sum(axis=1)/2
+        df['mean_gaze_percent_right_conf'] = (~df[['S_gaze_percent_right','BB_gaze_percent_right']].isna()).sum(axis=1)/2
+
+        df['S_facing_forward_conf'] = (~df[['ST_facing_forward', 'BB_facing_forward', 'MML_facing_forward', 'FP_facing_forward']].isna()).sum(axis=1)/4
+        df['NS_facing_forward_conf'] = (~df[['DIGC_facing_forward', 'DIGRRL_facing_forward', 'FB_facing_forward', 'MP_facing_forward']].isna()).sum(axis=1)/4
+
+        df['S_eyebrows_complexity_conf'] = (~df[['ST_eyebrows_complexity', 'BB_eyebrows_complexity', 'MML_eyebrows_complexity', 'FP_eyebrows_complexity']].isna()).sum(axis=1)/4
+        df['NS_eyebrows_complexity_conf'] = (~df[['DIGC_eyebrows_complexity', 'DIGRRL_eyebrows_complexity', 'FB_eyebrows_complexity', 'MP_eyebrows_complexity']].isna()).sum(axis=1)/4
+
+        df['S_mouth_complexity_conf'] = (~df[['ST_mouth_complexity', 'BB_mouth_complexity', 'MML_mouth_complexity', 'FP_mouth_complexity']].isna()).sum(axis=1)/4
+        df['NS_mouth_complexity_conf'] = (~df[['DIGC_mouth_complexity', 'DIGRRL_mouth_complexity', 'FB_mouth_complexity', 'MP_mouth_complexity']].isna()).sum(axis=1)/4
+
+        df['S_postural_sway_complexity_conf'] = (~df[['ST_head_movement_complexity', 'BB_head_movement_complexity', 'MML_head_movement_complexity', 'FP_head_movement_complexity']].isna()).sum(axis=1)/4
+        df['NS_postural_sway_complexity_conf'] = (~df[['DIGC_head_movement_complexity', 'DIGRRL_head_movement_complexity', 'FB_head_movement_complexity', 'MP_head_movement_complexity']].isna()).sum(axis=1)/4
+
+
+        df['RTN_conf'] = df['valid_name_calls'].apply(lambda x: np.sum(x))/3
+        df['touch_conf'] = df['number_of_touches'].apply(lambda x: 0 if np.isnan(x) else x/15  if x <=15 else 1. if x>= 16 else 0)
+        
+        
         return df
 
     def _plot_missing(self):
@@ -732,11 +875,34 @@ class Dataset(object):
 
         return drop_indices
     
+    def _add_Z_variables(self, df):
+        
+        for feat in DEFAULT_PREDICTORS:
+            df['Z_{}'.format(feat)] = np.isnan(df[feat])
+        
+        return df 
+    
     def _init_scenario(self, scenario):
         
         self.scenario = scenario
     
-        if scenario == 'multimodal_2023':
+        if scenario == 'multimodal_2023_regular':
+            
+            self.filter(administration={'studies':  ['ARC', 'P1', 'P2', 'P3'],
+                                        'order': 'first',
+                                        'completed': True}, 
+                           demographics={'age':[17, 37]},
+                            clinical={'diagnosis': [0, 1]},
+                            verbose=True)
+            
+        elif scenario == 'multimodal_2023_regular_ddld':
+            self.filter(administration={'studies':  ['ARC', 'P1', 'P2', 'P3'],
+                                        'order': 'first',
+                                        'completed': True}, 
+                           demographics={'age':[17, 37]},
+                            clinical={'diagnosis': [0, 1, 2]},
+                            verbose=True)            
+        elif scenario == 'multimodal_2023_extended':
             
             self.filter(administration={'studies':  ['ARC', 'P1', 'P2', 'P3'],
                                         'order': 'first',
@@ -744,6 +910,15 @@ class Dataset(object):
                            demographics={'age':[17, 50]},
                             clinical={'diagnosis': [0, 1]},
                             verbose=True)
+            
+        elif scenario == 'multimodal_2023_extended_ddld':
+            self.filter(administration={'studies':  ['ARC', 'P1', 'P2', 'P3'],
+                                        'order': 'first',
+                                        'completed': True}, 
+                           demographics={'age':[17, 50]},
+                            clinical={'diagnosis': [0, 1, 2]},
+                            verbose=True)      
+            
             
         elif scenario == 'multimodal_2023_all':
             
