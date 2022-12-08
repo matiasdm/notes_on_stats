@@ -792,11 +792,11 @@ class Experiments(object):
             y_pred_score[test] = self.model.predict_proba(X_test)[:,1]
 
             # Add shap value of this sample:
-            if False: 
+            if True: 
                 explainer = shap.TreeExplainer(self.model)
-                shap_values = explainer.shap_values(self.dataset.X_train)
-                self.shap_values[i] =  shap_values / np.abs(shap_values).sum(axis=1)[:, np.newaxis]
-                self.models_expected_value[i] = explainer.expected_value
+                #shap_values = explainer.shap_values(self.dataset.X_train)
+                #self.shap_values[i] =  shap_values / np.abs(shap_values).sum(axis=1)[:, np.newaxis]
+                #self.models_expected_value[i] = explainer.expected_value
                 
                 #Collect interaction shap values
                 shap_interaction_values = explainer.shap_interaction_values(X_test)

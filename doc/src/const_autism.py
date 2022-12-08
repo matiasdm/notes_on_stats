@@ -22,9 +22,10 @@ xgboost_hyperparameters = {'scale_pos_weight':True,#np.sum(data.y_train==0)/np.s
                             'max_depth' : 3,
                             'learning_rate' : 0.15, 
                             'gamma': 0.1,
-                            'n_estimators': 200,
+                            'n_estimators': 100,
                             'min_child_weight': 1,
                             'reg_lambda': 0.1}
+    
 
 DEMOGRAPHIC_COLUMNS = ['age', 
                        'sex',
