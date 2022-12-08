@@ -360,6 +360,21 @@ dict_missing_stimulis = {'PopTheBubbles': 'number_of_touches',
                              'MakeMeLaugh': ['MML_postural_sway', 'MML_postural_sway_derivative'],
                              'RTNDelay': ['average_response_to_name_delay']}
 
+dict_missing_stimulis = {'PopTheBubbles': ['number_of_touches'],
+                         'FloatingBubbles': ['FB_postural_sway', 'FB_postural_sway_derivative'],
+                            'DogInGrassC': ['DIGC_postural_sway', 'DIGC_postural_sway_derivative'],
+                            'DogInGrassRRL': ['DIGRRL_postural_sway', 'DIGRRL_postural_sway_derivative'],
+                            'SpinningTop': ['ST_postural_sway', 'ST_postural_sway_derivative'],
+                            'PlayingWithBlocks': ['PWB_postural_sway', 'PWB_postural_sway_derivative'],
+                            'FunAtThePark': ['FP_postural_sway', 'FP_postural_sway_derivative',
+                                                'FP_gaze_speech_correlation', 'FP_gaze_silhouette_score'],
+                             'MechanicalPuppy': ['MP_postural_sway', 'MP_postural_sway_derivative'],
+                             'BlowingBubbles': ['BB_postural_sway', 'BB_postural_sway_derivative',
+                                                   'BB_gaze_percent_right', 'BB_gaze_percent_right'],
+                            'RhymesAndToys': ['RT_postural_sway', 'RT_postural_sway_derivative'],
+                             'MakeMeLaugh': ['MML_postural_sway', 'MML_postural_sway_derivative'],
+                             'RTNDelay': ['average_response_to_name_delay']}
+
 
 TOUCH_VARIABLES  =['number_of_touches',
                   'average_length',

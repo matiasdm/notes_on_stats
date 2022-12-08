@@ -792,19 +792,19 @@ class Experiments(object):
             y_pred_score[test] = self.model.predict_proba(X_test)[:,1]
 
             # Add shap value of this sample:
-
-            #explainer = shap.TreeExplainer(self.model)
-            #shap_values = explainer.shap_values(self.dataset.X_train)
-            #self.shap_values[i] =  shap_values / np.abs(shap_values).sum(axis=1)[:, np.newaxis]
-            #self.models_expected_value[i] = explainer.expected_value
-            
-            #Collect interaction shap values
-            #shap_interaction_values = explainer.shap_interaction_values(X_test)
-            # Normalize them per subjects to have percentages
-            # Note that the interaction values is oh shape [N x K x K], and that for a sample, the sum of the matrix equal the prediction, and the sum over rows (or columns) 
-            # equal the shap value of that each features! 
-            #shap_interaction_values_normalized = shap_interaction_values/np.abs(shap_interaction_values).sum(axis=1).sum(axis=1)[:, np.newaxis, np.newaxis]
-            #self.shap_interaction_value[test] = shap_interaction_values_normalized
+            if False: 
+                explainer = shap.TreeExplainer(self.model)
+                shap_values = explainer.shap_values(self.dataset.X_train)
+                self.shap_values[i] =  shap_values / np.abs(shap_values).sum(axis=1)[:, np.newaxis]
+                self.models_expected_value[i] = explainer.expected_value
+                
+                #Collect interaction shap values
+                shap_interaction_values = explainer.shap_interaction_values(X_test)
+                # Normalize them per subjects to have percentages
+                # Note that the interaction values is oh shape [N x K x K], and that for a sample, the sum of the matrix equal the prediction, and the sum over rows (or columns) 
+                # equal the shap value of that each features! 
+                shap_interaction_values_normalized = shap_interaction_values/np.abs(shap_interaction_values).sum(axis=1).sum(axis=1)[:, np.newaxis, np.newaxis]
+                self.shap_interaction_value[test] = shap_interaction_values_normalized
 
 
         # Create the df associated to the test sample 

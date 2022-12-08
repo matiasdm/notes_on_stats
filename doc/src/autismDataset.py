@@ -48,6 +48,7 @@ class Dataset(object):
                 df,
                 dataset_name='SenseToKnow',
                 outcome_column='diagnosis',
+                positive_class = None,
                 features_name=DEFAULT_PREDICTORS, 
                 scenario=None,
                 missing_data_handling='encoding',
@@ -62,6 +63,7 @@ class Dataset(object):
         
         self.dataset_name = dataset_name
         self.outcome_column = outcome_column
+        self.positive_class = positive_class
         self.proportion_train = proportion_train
         self.scale_data = scale_data
         self.sampling_method = sampling_method
@@ -619,6 +621,11 @@ class Dataset(object):
         # Init the y.
         if self.outcome_column in list(self.df.keys()):
             y = self.df[self.outcome_column].to_numpy().astype(float)
+            
+            if self.positive_class is not None:
+                #marking the current class as 1 and all other classes as 0
+                y = np.array([1 if x in self.positive_class else 0 for x in y])
+    
         elif self.outcome_column[:2] == 'Z_':
             y = (~np.isnan(self.df[self.outcome_column[2:]].to_numpy().astype(float))).astype(int)
 
@@ -777,7 +784,7 @@ class Dataset(object):
         
         
         return df
-    
+
     def _compute_features_confidence(self, df):
         
         df['S_postural_sway_conf'] = (~df[['ST_postural_sway', 'BB_postural_sway', 'MML_postural_sway', 'FP_postural_sway']].isna()).sum(axis=1)/4
