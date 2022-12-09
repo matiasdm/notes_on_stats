@@ -805,6 +805,7 @@ class Experiments(object):
                 # equal the shap value of that each features! 
                 shap_interaction_values_normalized = shap_interaction_values/np.abs(shap_interaction_values).sum(axis=1).sum(axis=1)[:, np.newaxis, np.newaxis]
                 self.shap_interaction_value[test] = shap_interaction_values_normalized
+        print("YP")
 
 
         # Create the df associated to the test sample 
