@@ -290,7 +290,7 @@ class Dataset(object):
                     
                 self.df.drop(index=indexes_to_drop, inplace=True)
 
-        if self.verbosity > 1 or verbose:
+        if self.verbosity > 1 and verbose:
             print("{} administrations left.".format(len(self.df)))
             
             display(self.df.groupby(self.outcome_column)[['id']].count())
@@ -522,17 +522,17 @@ class Dataset(object):
                                 'Hispanic/Latino':1, 
                                 'Unknown or not reported':np.nan}, inplace = True)
         
-
-        df['race'].replace({'White':0., 
-                    'White/Caucasian':0.,
-                    'Black/African American':1., 
-                    'More than one race':2.,
-                    'American Indian/Alaskan Native':2.,
-                    'Other':2.,
-                    'Asian':2.,
-                    'Unknown or not reported':np.nan,
-                    'Unknown/Declined':np.nan,
-                }, inplace = True)
+        if True:
+            df['race'].replace({'White':0., 
+                        'White/Caucasian':0.,
+                        'Black/African American':1., 
+                        'More than one race':2.,
+                        'American Indian/Alaskan Native':2.,
+                        'Other':2.,
+                        'Asian':2.,
+                        'Unknown or not reported':np.nan,
+                        'Unknown/Declined':np.nan,
+                    }, inplace = True)
 
         df['sex'].replace({'M':0, 'F':1}, inplace=True)
         df['completed'].replace({'Complete (Do not readminister)':0, 'Partial (Do not readminister)':1, 'Incomplete (Readminister at next visit)':2}, inplace = True)
@@ -558,6 +558,9 @@ class Dataset(object):
         
         # Add Z_variables to predictors
         df = self._add_Z_variables(df)
+        
+        # Add Confidence
+        df = self._compute_features_confidence(df)
 
         # Sort df
         df.sort_values(by=['id', 'date'], inplace=True)
@@ -767,7 +770,7 @@ class Dataset(object):
         inv_S_gaze_percent_right = 1-df['S_gaze_percent_right']
         df['inv_S_gaze_percent_right'] = inv_S_gaze_percent_right
         mean_gaze_percent_right = df[['BB_gaze_percent_right', 'inv_S_gaze_percent_right']].mean(axis=1)
-        df['mean_gaze_percent_right'] = mean_gaze_percent_right
+        df['mean_gaze_percent_right'] = 1-mean_gaze_percent_right
         
         df['S_postural_sway_complexity'] = df[['ST_head_movement_complexity', 'BB_head_movement_complexity', 'MML_head_movement_complexity', 'FP_head_movement_complexity']].mean(axis=1)
         df['NS_postural_sway_complexity'] = df[['DIGC_head_movement_complexity', 'DIGRRL_head_movement_complexity', 'FB_head_movement_complexity', 'MP_head_movement_complexity']].mean(axis=1)
@@ -791,8 +794,10 @@ class Dataset(object):
         df['NS_postural_sway_conf'] = (~df[['DIGC_postural_sway', 'DIGRRL_postural_sway', 'FB_postural_sway', 'MP_postural_sway']].isna()).sum(axis=1)/4
         df['S_postural_sway_derivative_conf'] = (~df[['ST_postural_sway_derivative', 'BB_postural_sway_derivative', 'MML_postural_sway_derivative', 'FP_postural_sway_derivative']].isna()).sum(axis=1)/4
         df['NS_postural_sway_derivative_conf'] = (~df[['DIGC_postural_sway_derivative', 'DIGRRL_postural_sway_derivative', 'FB_postural_sway_derivative', 'MP_postural_sway_derivative']].isna()).sum(axis=1)/4
-        df['gaze_silhouette_score_conf'] = (~df[['BB_gaze_silhouette_score','S_gaze_silhouette_score','FP_gaze_silhouette_score']].isna()).sum(axis=1)/2
+        df['gaze_silhouette_score_conf'] = (~df[['BB_gaze_silhouette_score','S_gaze_silhouette_score']].isna()).sum(axis=1)/2
         df['mean_gaze_percent_right_conf'] = (~df[['S_gaze_percent_right','BB_gaze_percent_right']].isna()).sum(axis=1)/2
+        df['FP_gaze_speech_correlation_conf'] = (~df[['FP_gaze_speech_correlation']].isna()).sum(axis=1)
+
 
         df['S_facing_forward_conf'] = (~df[['ST_facing_forward', 'BB_facing_forward', 'MML_facing_forward', 'FP_facing_forward']].isna()).sum(axis=1)/4
         df['NS_facing_forward_conf'] = (~df[['DIGC_facing_forward', 'DIGRRL_facing_forward', 'FB_facing_forward', 'MP_facing_forward']].isna()).sum(axis=1)/4
@@ -805,8 +810,13 @@ class Dataset(object):
 
         df['S_postural_sway_complexity_conf'] = (~df[['ST_head_movement_complexity', 'BB_head_movement_complexity', 'MML_head_movement_complexity', 'FP_head_movement_complexity']].isna()).sum(axis=1)/4
         df['NS_postural_sway_complexity_conf'] = (~df[['DIGC_head_movement_complexity', 'DIGRRL_head_movement_complexity', 'FB_head_movement_complexity', 'MP_head_movement_complexity']].isna()).sum(axis=1)/4
+        
+        df['average_response_to_name_delay_conf'] = df['valid_name_calls'].apply(lambda x: np.sum(x))/3
+        df['proportion_of_name_call_responses_conf'] = df['valid_name_calls'].apply(lambda x: np.sum(x))/3
 
-
+        for f in TOUCH_VARIABLES:
+            df['{}_conf'.format(f)] = df['number_of_touches'].apply(lambda x: 0 if np.isnan(x) else x/15  if x <=15 else 1. if x>= 16 else 0)
+            
         df['RTN_conf'] = df['valid_name_calls'].apply(lambda x: np.sum(x))/3
         df['touch_conf'] = df['number_of_touches'].apply(lambda x: 0 if np.isnan(x) else x/15  if x <=15 else 1. if x>= 16 else 0)
         
@@ -908,7 +918,22 @@ class Dataset(object):
                                         'completed': True}, 
                            demographics={'age':[17, 37]},
                             clinical={'diagnosis': [0, 1, 2]},
-                            verbose=True)            
+                            verbose=True)  
+        elif scenario == 'multimodal_2023_regular_ddld_only':
+            self.filter(administration={'studies':  ['ARC', 'P1', 'P2', 'P3'],
+                                        'order': 'first',
+                                        'completed': True}, 
+                           demographics={'age':[17, 37]},
+                            clinical={'diagnosis': [0, 2]},
+                            verbose=True) 
+            
+        elif scenario == 'multimodal_2023_nt_ddld':
+            self.filter(administration={'studies':  ['ARC', 'P1', 'P2', 'P3'],
+                                        'order': 'first',
+                                        'completed': True}, 
+                           demographics={'age':[17, 37]},
+                            clinical={'diagnosis': [0, 2]},
+                            verbose=True)     
         elif scenario == 'multimodal_2023_extended':
             
             self.filter(administration={'studies':  ['ARC', 'P1', 'P2', 'P3'],

@@ -5,6 +5,32 @@ REFERENCE_IMBALANCE_RATIO = 1/44
 
 S2K_STUDIES =  ['ARC','P1','P2','P3','IMPACT','SAESDM','SenseToKnowStudy','P1R','S2KP','P3R']
 
+
+feature_name_mapping = {'S_facing_forward':"Facing forward during social movies", 
+                 'NS_facing_forward':"Facing forward during non-social movies", 
+                 'S_postural_sway': "Head movements during social movies", 
+                 'NS_postural_sway': "Head movements during non-social movies", 
+                 'S_postural_sway_complexity':  "Head movements complexity during social movies", 
+                 'NS_postural_sway_complexity':  "Head movements complexity during non-social movies", 
+                 
+                 'mean_gaze_percent_right': "Gase Percent Social",
+                 'FP_gaze_speech_correlation': "Attention to speech",
+                 'gaze_silhouette_score': 'Gaze silhouette score',
+                 
+                 'average_response_to_name_delay': 'Response to name delay [s]',
+                 'proportion_of_name_call_responses': 'Response to name proportion',
+                 'S_eyebrows_complexity': 'Eyebrows complexity during social movies', 
+                 'NS_eyebrows_complexity': 'Eyebrows complexity during non-social movies', 
+                 'S_mouth_complexity': 'Mouth complexity during social movies', 
+                 'NS_mouth_complexity': 'Mouth complexity during non-social movies', 
+                 'pop_rate': 'Pop The Bubbles Popping rate', 
+                 'std_error': 'Pop The Bubbles Accuracy variations', 
+                 'average_force_applied':  'Pop The Bubbles Average force applied', 
+                 'average_length':  'Pop The Bubbles Average touch length', 
+                 'S_postural_sway_derivative': 'Head movements acceleration during social movies', 
+                 'NS_postural_sway_derivative': 'Head movements acceleration during non-social movies'
+                }
+
 CLINICAL_COLUMNS = [# DIAGNOSIS RELATED
                     'diagnosis',
                     # MULLEN RELATED
@@ -24,8 +50,7 @@ xgboost_hyperparameters = {'scale_pos_weight':True,#np.sum(data.y_train==0)/np.s
                             'gamma': 0.1,
                             'n_estimators': 100,
                             'min_child_weight': 1,
-                            'reg_lambda': 0.1}
-    
+                            'reg_lambda': 0.1}  
 
 DEMOGRAPHIC_COLUMNS = ['age', 
                        'sex',
@@ -110,6 +135,7 @@ CVA_COLUMNS_old = [# GAZE RELATED
 DEFAULT_PREDICTORS = [# GAZE RELATED
                  'mean_gaze_percent_right', #aggregated
                  'gaze_silhouette_score', #aggregated
+                 'FP_gaze_speech_correlation',
     
                 # NAME CALL RELATED
                  'proportion_of_name_call_responses',
@@ -136,7 +162,8 @@ DEFAULT_PREDICTORS = [# GAZE RELATED
                  'NS_mouth_complexity',
                  
                 # TOUCH RELATED
-                'std_error','number_of_touches','number_of_target','average_error']
+                'pop_rate', 'std_error', 'average_length', 'average_force_applied']
+                #'std_error','number_of_touches','number_of_target','average_error']
 
 
         
@@ -165,55 +192,56 @@ USE_MISSING_INDICATOR_PREDICTORS = {'PlayingWithBlocks': ['PWB_postural_sway', '
                                   }
 
 
-DEFAULT_PREDICTORS_BY_TYPES = {'Gaze':['mean_gaze_percent_right', 'gaze_silhouette_score'],
+DEFAULT_PREDICTORS_BY_TYPES = {'Gaze':['mean_gaze_percent_right', 'gaze_silhouette_score', 'FP_gaze_speech_correlation'],
                                'RTN':['proportion_of_name_call_responses', 'average_response_to_name_delay'],
                                'PosturalSway':['S_postural_sway', 'NS_postural_sway', 'S_postural_sway_derivative', 'NS_postural_sway_derivative',
                                 'S_postural_sway_complexity', 'NS_postural_sway_complexity'],
                                'FacialComplexity': ['S_eyebrows_complexity', 'NS_eyebrows_complexity',
                                                     'S_mouth_complexity', 'NS_mouth_complexity'],
                                'FacingForward': ['S_facing_forward', 'NS_facing_forward'],
-                               'Touch': ['std_error','number_of_touches','number_of_target','average_error'],
+                               'Touch': ['pop_rate', 'std_error', 'average_length', 'average_force_applied'],
                                'All': DEFAULT_PREDICTORS,
-                               'All - Gaze': ['proportion_of_name_call_responses','average_response_to_name_delay',
+                               'All - Gaze': ['proportion_of_name_call_responses','average_response_to_name_delay', 
                                               'S_postural_sway','NS_postural_sway', 'S_postural_sway_derivative', 'NS_postural_sway_derivative',
                                               'S_postural_sway_complexity', 'NS_postural_sway_complexity',
                                               'S_eyebrows_complexity', 'NS_eyebrows_complexity',
                                                 'S_mouth_complexity', 'NS_mouth_complexity',
                                                 'S_facing_forward', 'NS_facing_forward',
-                                               'std_error','number_of_touches','number_of_target','average_error'],
-                               'All - RTN': ['mean_gaze_percent_right', 'gaze_silhouette_score', 
+                                               'pop_rate', 'std_error', 'average_length', 'average_force_applied'],
+                               'All - RTN': ['mean_gaze_percent_right', 'gaze_silhouette_score',  'FP_gaze_speech_correlation',
                                               'S_postural_sway','NS_postural_sway', 'S_postural_sway_derivative', 'NS_postural_sway_derivative',
                                               'S_postural_sway_complexity', 'NS_postural_sway_complexity',
                                             'S_eyebrows_complexity', 'NS_eyebrows_complexity',
                                               'S_mouth_complexity', 'NS_mouth_complexity',
                                               'S_facing_forward', 'NS_facing_forward',
-                                               'std_error','number_of_touches','number_of_target','average_error'],
-                               'All - PosturalSway': ['mean_gaze_percent_right', 'gaze_silhouette_score', 
+                                               'pop_rate', 'std_error', 'average_length', 'average_force_applied'],
+                               'All - PosturalSway': ['mean_gaze_percent_right', 'gaze_silhouette_score', 'FP_gaze_speech_correlation',
                                               'proportion_of_name_call_responses','average_response_to_name_delay',
-                                               'std_error','number_of_touches','number_of_target','average_error',
+                                               'pop_rate', 'std_error', 'average_length', 'average_force_applied',
                                               'S_eyebrows_complexity', 'NS_eyebrows_complexity',
                                                 'S_mouth_complexity', 'NS_mouth_complexity',
                                                 'S_facing_forward', 'NS_facing_forward'],
-                               'All - Touch': ['mean_gaze_percent_right', 'gaze_silhouette_score', 
+                               'All - Touch': ['mean_gaze_percent_right', 'gaze_silhouette_score',  'FP_gaze_speech_correlation',
                                               'proportion_of_name_call_responses','average_response_to_name_delay',
                                               'S_postural_sway','NS_postural_sway', 'S_postural_sway_derivative', 'NS_postural_sway_derivative','S_postural_sway_complexity', 'NS_postural_sway_complexity',
                                               'S_eyebrows_complexity', 'NS_eyebrows_complexity',
                                                 'S_mouth_complexity', 'NS_mouth_complexity',
                                                 'S_facing_forward', 'NS_facing_forward'],
-                               'All - FacialComplexity':['mean_gaze_percent_right', 'gaze_silhouette_score', 
+                               'All - FacialComplexity':['mean_gaze_percent_right', 'gaze_silhouette_score',  'FP_gaze_speech_correlation',
                                               'S_postural_sway','NS_postural_sway', 'S_postural_sway_derivative', 'NS_postural_sway_derivative',
                                               'proportion_of_name_call_responses', 'average_response_to_name_delay',
                                               'S_postural_sway_complexity', 'NS_postural_sway_complexity',
                                               'S_facing_forward', 'NS_facing_forward',
                                                'std_error','number_of_touches','number_of_target','average_error'],
-                               'All - FacingForward':['mean_gaze_percent_right', 'gaze_silhouette_score', 
+                               'All - FacingForward':['mean_gaze_percent_right', 'gaze_silhouette_score', 'FP_gaze_speech_correlation',
                                               'S_postural_sway','NS_postural_sway', 'S_postural_sway_derivative', 'NS_postural_sway_derivative',
                                               'proportion_of_name_call_responses', 'average_response_to_name_delay',
                                               'S_postural_sway_complexity', 'NS_postural_sway_complexity',
                                             'S_eyebrows_complexity', 'NS_eyebrows_complexity',
                                               'S_mouth_complexity', 'NS_mouth_complexity',
                                                'std_error','number_of_touches','number_of_target','average_error'],
-                               'All with MCHAT': ['mchat_final', 'mean_gaze_percent_right',
+                               'All with MCHAT': ['mchat_final', 'mean_gaze_percent_right', 
+                                                  'FP_gaze_speech_correlation',
                                                   'gaze_silhouette_score',
                                                   'proportion_of_name_call_responses',
                                                   'average_response_to_name_delay',
@@ -229,10 +257,7 @@ DEFAULT_PREDICTORS_BY_TYPES = {'Gaze':['mean_gaze_percent_right', 'gaze_silhouet
                                                   'NS_eyebrows_complexity',
                                                   'S_mouth_complexity',
                                                   'NS_mouth_complexity',
-                                                  'std_error',
-                                                  'number_of_touches',
-                                                  'number_of_target',
-                                                  'average_error']
+                                                  'pop_rate', 'std_error', 'average_length', 'average_force_applied']
                               }
                                     
 USE_MISSING_INDICATOR_PREDICTORS_BY_TYPES = {'Gaze':{'FunAtThePark': ['FP_gaze_speech_correlation','FP_gaze_silhouette_score'],
@@ -281,7 +306,7 @@ USE_MISSING_INDICATOR_PREDICTORS_BY_TYPES = {'Gaze':{'FunAtThePark': ['FP_gaze_s
                                             }
 
 
-grouped_missing_features = {'Gaze': ['mean_gaze_percent_right', 'gaze_silhouette_score'],
+grouped_missing_features = {'Gaze': ['mean_gaze_percent_right', 'gaze_silhouette_score', 'FP_gaze_speech_correlation'],
                             'Social' : ['S_postural_sway', 'S_postural_sway_derivative'],
                             'Non Social' : ['NS_postural_sway', 'NS_postural_sway_derivative'],
                              #'gaze_silhouette_score': ['gaze_silhouette_score'],
@@ -295,6 +320,7 @@ grouped_missing_features = {'Gaze': ['mean_gaze_percent_right', 'gaze_silhouette
                              'Game': ['average_length','std_length','average_error', 'pop_rate','average_delay_to_pop','average_time_spent']}
 
 MINIMAL_SET_OF_FEATURES = ['BB_gaze_percent_right',
+                           'FP_gaze_speech_correlation',
                             'BB_gaze_silhouette_score',
                             'S_gaze_percent_right',
                             'S_gaze_silhouette_score',

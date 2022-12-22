@@ -794,8 +794,8 @@ class Experiments(object):
             # Add shap value of this sample:
             if True: 
                 explainer = shap.TreeExplainer(self.model)
-                #shap_values = explainer.shap_values(self.dataset.X_train)
-                #self.shap_values[i] =  shap_values / np.abs(shap_values).sum(axis=1)[:, np.newaxis]
+                #shap_values = explainer.shap_values(X_test)
+                #self.shap_values[test] =  shap_values / np.abs(shap_values).sum(axis=1)[:, np.newaxis]
                 #self.models_expected_value[i] = explainer.expected_value
                 
                 #Collect interaction shap values
@@ -803,10 +803,8 @@ class Experiments(object):
                 # Normalize them per subjects to have percentages
                 # Note that the interaction values is oh shape [N x K x K], and that for a sample, the sum of the matrix equal the prediction, and the sum over rows (or columns) 
                 # equal the shap value of that each features! 
-                shap_interaction_values_normalized = shap_interaction_values/np.abs(shap_interaction_values).sum(axis=1).sum(axis=1)[:, np.newaxis, np.newaxis]
-                self.shap_interaction_value[test] = shap_interaction_values_normalized
-        print("YP")
-
+                #shap_interaction_values_normalized = shap_interaction_values/np.abs(shap_interaction_values).sum(axis=1).sum(axis=1)[:, np.newaxis, np.newaxis]
+                self.shap_interaction_value[test] = shap_interaction_values
 
         # Create the df associated to the test sample 
         n_features = self.dataset.X_train.shape[1]
@@ -1618,7 +1616,7 @@ class Experiments(object):
             fig, axes = plt.subplot_mosaic(mosaic=fig_mosaic, figsize=(25,15))
             
             # Plot features importance
-            self.model.get_booster().feature_names = self.features_name
+            self.model.get_booster().feature_names = [feature_name_mapping[f] for f in self.features_name]
             axes['C'] = plot_importance(self.model.get_booster(),  height=0.5, ax = axes['C'])
             
             # Plot Tree
@@ -1660,13 +1658,15 @@ class Experiments(object):
         #axes['A'] = plot_roc_curves_xgboost(self.predictions_df, ax=axes['A']) 
         
         # Plot features importance
-        self.model.get_booster().feature_names = self.features_name
+        self.model.get_booster().feature_names = [feature_name_mapping[f] for f in self.features_name]
         axes['C'] = plot_importance(self.model.get_booster(),  height=0.5, ax = axes['C'])
         
         # Plot Tree
         axes['F'] = plot_tree(self.model.get_booster(), num_trees=0, ax=axes['F'])
 
-        plt.tight_layout();plt.show()
+        plt.tight_layout()
+        plt.savefig(os.path.join(DATA_DIR, 'figures', 'XGBOOST_TREE.png'), dpi=200, bbox_inches = 'tight')
+        plt.show()
 
         return 
 

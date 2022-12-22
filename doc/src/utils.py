@@ -19,6 +19,9 @@ from const_autism import *
 
 sys.path.insert(0, '../../src')
 def compute_SD(AUC, N1, N2):
+    """
+            In the original paper of 1982, N1 is the number of "abnormal images", therefore here it is supposed to translate as the number of cases in the positive class.
+    """
     Q1=AUC/(2-AUC)
     Q2 = 2*AUC*AUC/(1+AUC)
     return(np.sqrt((AUC*(1-AUC)+(N1-1)*(Q1-AUC*AUC) + (N2-1)*(Q2-AUC*AUC))/(N1*N2)))
@@ -544,52 +547,56 @@ def create_autism_df(folder_names):
 
     for experiment_path in tqdm(experiments_paths):
         
-        exp_path = os.path.join(experiment_path, 'experiment_log.json')
-        dataset_path = os.path.join(experiment_path, 'dataset_log.json')
+        try:
+            
+            exp_path = os.path.join(experiment_path, 'experiment_log.json')
+            dataset_path = os.path.join(experiment_path, 'dataset_log.json')
 
-        dist_None_path = os.path.join(experiment_path, 'distributions_None_log.json')
-        dist_1_path = os.path.join(experiment_path, 'distributions_1_log.json')
-        dist_0_path = os.path.join(experiment_path, 'distributions_0_log.json')
+            dist_None_path = os.path.join(experiment_path, 'distributions_None_log.json')
+            dist_1_path = os.path.join(experiment_path, 'distributions_1_log.json')
+            dist_0_path = os.path.join(experiment_path, 'distributions_0_log.json')
 
-        dist_0_data, dist_0_data, dist_None_data = None, None, None
+            dist_0_data, dist_0_data, dist_None_data = None, None, None
 
-        if os.path.isfile(exp_path):
+            if os.path.isfile(exp_path):
 
-            with open(exp_path) as experiment_json:
+                with open(exp_path) as experiment_json:
 
-                # Load experiment data
-                experiment_data = json.load(experiment_json)
-        else:
+                    # Load experiment data
+                    experiment_data = json.load(experiment_json)
+            else:
+                continue
+
+            if os.path.isfile(dataset_path):
+                with open(dataset_path) as data_json:
+
+                    # Load experiment data
+                    dataset_data = json.load(data_json)
+            else:
+                continue
+
+            if os.path.isfile(dist_None_path):
+
+                with open(dist_None_path) as dist_json:
+
+                    # Load experiment data
+                    dist_None_data = json.load(dist_json)
+
+            if os.path.isfile(dist_1_path):
+
+                with open(dist_1_path) as dist_json:
+
+                    # Load experiment data
+                    dist_1_data = json.load(dist_json)
+
+            if os.path.isfile(dist_0_path):
+
+                with open(dist_0_path) as dist_json:
+
+                    # Load experiment data
+                    dist_0_data = json.load(dist_json)
+        except:
             continue
-
-        if os.path.isfile(dataset_path):
-            with open(dataset_path) as data_json:
-
-                # Load experiment data
-                dataset_data = json.load(data_json)
-        else:
-            continue
-
-        if os.path.isfile(dist_None_path):
-
-            with open(dist_None_path) as dist_json:
-
-                # Load experiment data
-                dist_None_data = json.load(dist_json)
-
-        if os.path.isfile(dist_1_path):
-
-            with open(dist_1_path) as dist_json:
-
-                # Load experiment data
-                dist_1_data = json.load(dist_json)
-
-        if os.path.isfile(dist_0_path):
-
-            with open(dist_0_path) as dist_json:
-
-                # Load experiment data
-                dist_0_data = json.load(dist_json)
 
         # append rows to an empty DataFrame
         df = df.append({'dataset_name' : experiment_path.split('/')[-3], 
