@@ -136,3 +136,6 @@ doc/_build/.doctrees/glue_cache.json
 .gitignore
 doc/src/data/
 df_all.csv
+
+
+*.csv
