@@ -546,6 +546,9 @@ class Dataset(object):
         df.loc[~df['AppTeamComment'].isnull(), 'AppTeamComment'] = 1
         
         df['valid_name_calls'] = df['valid_name_calls'].apply(literal_eval)
+        
+        # Add Blink data that came afterwards
+        df = self._add_blink_data(df)
 
         # Merge time information and create `administration_number` column
         df = self._retrieve_administration_timing(df)
@@ -745,18 +748,30 @@ class Dataset(object):
 
         return df
 
+    def _add_blink_data(self, df, blink_data_path=BLINK_DATA_PATH):
+        
+        blink_col = ['FB_blink_rate','DIGC_blink_rate','DIGRRL_blink_rate','ST_blink_rate','MP_blink_rate','PB_blink_rate','BB_blink_rate','RT_blink_rate','MML_blink_rate','PWB_blink_rate','FP_blink_rate']
+        
+        df_blink = pd.read_csv(blink_data_path, usecols=['participant_id', 'study', 'date'] + blink_col)
+        df_blink.rename(columns={'participant_id':'id'}, inplace=True)
+        df_blink['id'] = df_blink['id'].apply(lambda x: str(x))
+
+        df = pd.merge(left=df, right=df_blink, how = 'outer', on=['id', 'date', 'study'])
+        
+        return df   
+    
     def _compute_cva_condensed_variables(self, df):
         '''
             Merge postural sway variables into social and non-social 
         '''
 
 
-        S_postural_sway = df[['ST_postural_sway', 'BB_postural_sway', 'MML_postural_sway', 'FP_postural_sway']].mean(axis=1) # 'RT_postural_sway',
+        S_postural_sway = df[['ST_postural_sway', 'BB_postural_sway', 'MML_postural_sway', 'FP_postural_sway', 'PWB_postural_sway']].mean(axis=1) # 'RT_postural_sway',
         NS_postural_sway = df[['DIGC_postural_sway', 'DIGRRL_postural_sway', 'FB_postural_sway', 'MP_postural_sway']].mean(axis=1)
         df['S_postural_sway'] = S_postural_sway
         df['NS_postural_sway'] = NS_postural_sway
         
-        S_postural_sway_derivative = df[['ST_postural_sway_derivative', 'BB_postural_sway_derivative', 'MML_postural_sway_derivative', 'FP_postural_sway_derivative']].mean(axis=1) # 'RT_postural_sway_derivative',
+        S_postural_sway_derivative = df[['ST_postural_sway_derivative', 'BB_postural_sway_derivative', 'MML_postural_sway_derivative', 'FP_postural_sway_derivative', 'PWB_postural_sway_derivative']].mean(axis=1) # 'RT_postural_sway_derivative',
         NS_postural_sway_derivative = df[['DIGC_postural_sway_derivative', 'DIGRRL_postural_sway_derivative', 'FB_postural_sway_derivative', 'MP_postural_sway_derivative']].mean(axis=1)
         df['S_postural_sway_derivative'] = S_postural_sway_derivative
         df['NS_postural_sway_derivative'] = NS_postural_sway_derivative
@@ -772,19 +787,20 @@ class Dataset(object):
         mean_gaze_percent_right = df[['BB_gaze_percent_right', 'inv_S_gaze_percent_right']].mean(axis=1)
         df['mean_gaze_percent_right'] = 1-mean_gaze_percent_right
         
-        df['S_postural_sway_complexity'] = df[['ST_head_movement_complexity', 'BB_head_movement_complexity', 'MML_head_movement_complexity', 'FP_head_movement_complexity']].mean(axis=1)
+        df['S_postural_sway_complexity'] = df[['ST_head_movement_complexity', 'BB_head_movement_complexity', 'MML_head_movement_complexity', 'FP_head_movement_complexity', 'PWB_head_movement_complexity']].mean(axis=1)
         df['NS_postural_sway_complexity'] = df[['DIGC_head_movement_complexity', 'DIGRRL_head_movement_complexity', 'FB_head_movement_complexity', 'MP_head_movement_complexity']].mean(axis=1)
 
-        df['S_facing_forward'] = df[['ST_facing_forward', 'BB_facing_forward', 'MML_facing_forward', 'FP_facing_forward']].mean(axis=1)
+        df['S_facing_forward'] = df[['ST_facing_forward', 'BB_facing_forward', 'MML_facing_forward', 'FP_facing_forward', 'PWB_facing_forward']].mean(axis=1)
         df['NS_facing_forward'] = df[['DIGC_facing_forward', 'DIGRRL_facing_forward', 'FB_facing_forward', 'MP_facing_forward']].mean(axis=1)
 
-        df['S_eyebrows_complexity'] = df[['ST_eyebrows_complexity', 'BB_eyebrows_complexity', 'MML_eyebrows_complexity', 'FP_eyebrows_complexity']].mean(axis=1)
+        df['S_eyebrows_complexity'] = df[['ST_eyebrows_complexity', 'BB_eyebrows_complexity', 'MML_eyebrows_complexity', 'FP_eyebrows_complexity', 'PWB_eyebrows_complexity']].mean(axis=1)
         df['NS_eyebrows_complexity'] = df[['DIGC_eyebrows_complexity', 'DIGRRL_eyebrows_complexity', 'FB_eyebrows_complexity', 'MP_eyebrows_complexity']].mean(axis=1)
 
-        df['S_mouth_complexity'] = df[['ST_mouth_complexity', 'BB_mouth_complexity', 'MML_mouth_complexity', 'FP_mouth_complexity']].mean(axis=1)
+        df['S_mouth_complexity'] = df[['ST_mouth_complexity', 'BB_mouth_complexity', 'MML_mouth_complexity', 'FP_mouth_complexity', 'PWB_mouth_complexity']].mean(axis=1)
         df['NS_mouth_complexity'] = df[['DIGC_mouth_complexity', 'DIGRRL_mouth_complexity', 'FB_mouth_complexity', 'MP_mouth_complexity']].mean(axis=1)
-
         
+        df['S_blink_rate']  = df[[ 'MML_blink_rate', 'FP_blink_rate', 'PWB_blink_rate']].mean(axis=1) # 'ST_blink_rate', 'BB_blink_rate',
+        df['NS_blink_rate'] = df[['DIGC_blink_rate', 'DIGRRL_blink_rate', 'FB_blink_rate', 'MP_blink_rate']].mean(axis=1)
         
         return df
 

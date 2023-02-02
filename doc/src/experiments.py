@@ -34,7 +34,7 @@ sys.path.insert(0, '../src')
 
 from const import *
 from const_autism import *
-from utils import fi, repr, corrected_f1_xgboost, find_optimal_threshold,compute_SD
+from utils import fi, repr, corrected_f1_xgboost, find_optimal_threshold_f, find_optimal_threshold_youden, compute_SD
 from metrics import f1score, average_precision, bestf1score, calc_auprg, create_prg_curve
 from generateToyDataset import DatasetGenerator
 from autismDataset import Dataset
@@ -74,6 +74,7 @@ class Experiments(object):
                 resolution=RESOLUTION, 
                 bandwidth=BANDWIDTH, 
                 sampling_method=DEFAULT_SAMPLING_METHOD,
+                positivity_threshold = DEFAULT_POSITIVITY_THRESHOLD,
                 previous_experiment=None,        
                 save_experiment=True, 
                 experiment_folder_name=EXPERIMENT_FOLDER_NAME,
@@ -114,10 +115,13 @@ class Experiments(object):
         self._init_model()
         self.tree_usage = []
         self.fitted = False
+        
 
         # Interesting byproducts
         self.predictions_df = None
         self.performances_df = None
+        self.df_breakdown_results = None
+        self.positivity_threshold = positivity_threshold
         self.index_threshold_f2, self.index_threshold_f1, self.optimal_threshold = None, None, None
 
         # Init SHAP values
@@ -333,6 +337,7 @@ class Experiments(object):
         model = self.model if hasattr(self, 'model') else None #TODO MAJOR
         performances_df = self.performances_df
         predictions_df = self.predictions_df
+        df_breakdown_results = self.df_breakdown_results
 
         self.dataset = None 
         self.dist_pos = None
@@ -355,6 +360,7 @@ class Experiments(object):
         self.model = model
         self.performances_df = performances_df
         self.predictions_df = predictions_df
+        self.df_breakdown_results = df_breakdown_results
 
         return    
     
@@ -507,6 +513,10 @@ class Experiments(object):
             
             self.predictions_df = pd.DataFrame(json.loads(self.predictions_df))
             self.performances_df = pd.DataFrame(self.performances_df, index=[0])
+            if df_breakdown_results in self.__dict__.keys():
+                self.df_breakdown_results = pd.DataFrame(json.loads(self.df_breakdown_results))
+            else:
+                self.df_breakdown_results = None
             
             self.model = XGBClassifier(use_label_encoder=False, # TODO ADD PLAYING WITH PARAMETERS 
                                       learning_rate=0.01,
@@ -1093,6 +1103,7 @@ class Experiments(object):
             
             # Compute perf.
             self._performances_vanilla()
+            self._compute_performances_operating_points()
             
         else:
             raise ValueError("Please use 'single_distribution', 'multi_distributions' or 'nam', 'xgboost', or 'ebm' approach.")
@@ -1139,8 +1150,18 @@ class Experiments(object):
         
         
         # compute the best F1, F2, optimal threshold for the !F2! measure, and the index of the optimal threshold
-        f1, f2, f1c, f2c, self.index_threshold_f1, self.index_threshold_f2, self.optimal_threshold = find_optimal_threshold(y_true, y_pred)
-
+        f1, f2, f1c, f2c, self.index_threshold_f1, self.index_threshold_f2, self.optimal_threshold_f2 = find_optimal_threshold_f(y_true, y_pred)
+        
+        max_youden, self.index_threshold_y, self.optimal_threshold_y = find_optimal_threshold_youden(y_true, y_pred)
+        
+        if self.positivity_threshold == 'Youden':
+            
+            self.optimal_threshold = self.optimal_threshold_y
+            
+        elif self.positivity_threshold == 'F2':
+            
+            self.optimal_threshold = self.optimal_threshold_f2
+        
 
         # Compute the F1 score
         #f1, self.optimal_threshold = bestf1score(y_true, y_pred, pi0=None)
@@ -1294,6 +1315,61 @@ class Experiments(object):
 
         return
 
+    def _compute_performances_operating_points(self, y_true=None, y_pred=None):
+        
+        if y_true is None:
+            
+            # Build a function that display the Table S2 showing all performances for diffferent threshold or operating points) 
+
+            y_true = self.predictions_df['y_true'].to_numpy()
+            y_pred = self.predictions_df['y_pred'].to_numpy()
+
+
+        # Compute all the possible threshold
+        specificities_bar, sensitivities , thresholds = roc_curve(y_true, y_pred)
+
+        specificities = 1 - specificities_bar
+
+
+        # Compute imbalance_ratio of our sample
+        pi = y_true.mean()
+        correction_factor = (pi*(1-REFERENCE_IMBALANCE_RATIO))/(REFERENCE_IMBALANCE_RATIO*(1-pi))
+
+        ppv_list = []
+        npv_list = []
+        ppv_corr_list = []
+        npv_corr_list = []
+
+        for th in thresholds:
+
+            tn, fp, fn, tp = confusion_matrix(y_true, y_pred >= th).ravel()
+
+            ppv = tp / (tp+fp)
+            npv = tn / (tn+fn)
+
+            # Compute corrected precision (ppv)
+            ppv_corr = tp/(tp+correction_factor*fp)
+            npv_corr = (correction_factor*tn)/(correction_factor*tn+fn)
+
+            ppv_list.append(ppv)
+            npv_list.append(npv)
+            ppv_corr_list.append(ppv_corr)
+            npv_corr_list.append(npv_corr)
+
+
+
+
+        self.df_breakdown_results = pd.DataFrame({"Threshold index": np.arange(len(thresholds)), 
+                                            "Threshold": thresholds, 
+                                            "Sensitivity": sensitivities, 
+                                            "Specificity": specificities, 
+                                            "PPV": ppv_list, 
+                                            "PPV_corr": ppv_corr_list, 
+                                            "NPV": npv_list, 
+                                            "NPV_corr": npv_corr_list, 
+                                            })
+        
+        return 
     ################################ Plotting functions ###########################
 
     def _plot_estimation(self):
@@ -1651,6 +1727,7 @@ class Experiments(object):
         axes['A'].plot([0, 1], [0, 1], color='navy', lw=1.5, linestyle='--')
         axes['A'].scatter(fpr[self.index_threshold_f2], tpr[self.index_threshold_f2], color='tab:red', s=100, label="Optimal F2")
         axes['A'].scatter(fpr[self.index_threshold_f1], tpr[self.index_threshold_f1], color='k', s=100, label="Optimal F1")
+        axes['A'].scatter(fpr[self.index_threshold_y], tpr[self.index_threshold_y], color='tab:green', s=100, label="Optimal Y")
         axes['A'].set_xlim([0.0, 1.0]); axes['A'].set_ylim([0.0, 1.05]); axes['A'].grid()
         axes['A'].set_xlabel('False Positive Rate'); axes['A'].set_ylabel('True Positive Rate')
         axes['A'].legend()
@@ -1667,6 +1744,9 @@ class Experiments(object):
         plt.tight_layout()
         plt.savefig(os.path.join(DATA_DIR, 'figures', 'XGBOOST_TREE.png'), dpi=200, bbox_inches = 'tight')
         plt.show()
+        
+        if self.df_breakdown_results is not None:
+            display(self.df_breakdown_results)
 
         return 
 
@@ -1956,7 +2036,24 @@ class Experiments(object):
             
             
             # compute the best F1, F2, optimal threshold for the !F2! measure, and the index of the optimal threshold
-            f1, f2, f1c, f2c, index_threshold_f1, index_threshold_f2, optimal_threshold = find_optimal_threshold(y_true_new, y_pred)
+            f1, f2, f1c, f2c, index_threshold_f1, index_threshold_f2, optimal_threshold = find_optimal_threshold_f(y_true_new, y_pred) # TODOCHANGE
+            
+            
+            # compute the best F1, F2, optimal threshold for the !F2! measure, and the index of the optimal threshold
+            f1, f2, f1c, f2c, index_threshold_f1, index_threshold_f2, optimal_threshold_f2 = find_optimal_threshold_f(y_true, y_pred)
+            
+            max_youden, index_threshold_y, optimal_threshold_y = find_optimal_threshold_youden(y_true, y_pred)
+            
+            if self.positivity_threshold == 'Youden':
+                
+                optimal_threshold = optimal_threshold_y
+                index_threshold = index_threshold_f2
+                
+            elif self.positivity_threshold == 'F2':
+                
+                optimal_threshold = optimal_threshold_f2
+                index_threshold = index_threshold_y
+            
 
             axes[0].plot(fpr, tpr, '-', lw=1.5, color=colors[i], label='+:{} AUC = {:.2f} +/- {:.2f})'.format(label_positive, roc_auc, hanley_ci))
             axes[0].plot([0, 1], [0, 1], color='navy', lw=1.5, linestyle='--')
@@ -1965,7 +2062,7 @@ class Experiments(object):
             tprs_upper = np.minimum(tpr + hanley_ci, 1)
             tprs_lower = np.maximum(tpr - hanley_ci, 0)
             axes[0].fill_between(fpr, tprs_lower, tprs_upper,  color=colors[i], alpha=.2)
-            axes[0].scatter(fpr[index_threshold_f2], tpr[index_threshold_f2], color='tab:red', s=100, label="Optimal F2" if i == 2 else None)
+            axes[0].scatter(fpr[index_threshold], tpr[index_threshold], color='tab:red', s=100, label="Optimal {}".format(self.positivity_threshold) if i == 2 else None)
 
             axes[0].legend(loc='lower right', prop={'size':15})
             axes[0].set_title('Roc changing the + class', weight='bold', fontsize=18)

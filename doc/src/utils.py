@@ -10,14 +10,244 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from sklearn.metrics import  (confusion_matrix, roc_curve, fbeta_score)
-
+from sklearn.metrics import  (confusion_matrix, roc_curve, fbeta_score, roc_auc_score, average_precision_score)
+from metrics import f1score, average_precision, bestf1score, calc_auprg, create_prg_curve
+import prg
 
 # Import local packages
 from const import *
 from const_autism import *
 
 sys.path.insert(0, '../../src')
+
+def bootstrap_sensitivity_specificity(y_true, y_pred, optimal_threshold, verbose=False):
+    
+    def compute_sens_spec(y_true, y_pred, optimal_threshold):
+    
+        from sklearn.metrics import  (confusion_matrix, roc_curve)
+
+
+        specificities_bar, sensitivities , thresholds = roc_curve(y_true, y_pred)
+
+        specificities = 1 - specificities_bar
+
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred >= optimal_threshold).ravel()
+
+        tpr =  tp / (tp+fn)
+        tnr = tn / (tn+fp)
+        return tpr, tnr
+
+
+    n_pos  = np.sum(y_true == 1)
+    n_neg  = np.sum(y_true == 0)
+
+    idx_pos = np.argwhere(y_true == 1).flatten()
+    idx_neg = np.argwhere(y_true == 0).flatten()
+
+    specificities = []
+    sensitivities = []
+
+    for K in range(100):
+
+        idx_resampled_pos = np.random.choice(idx_pos, size=n_pos)
+        idx_resampled_neg = np.random.choice(idx_neg, size=n_neg)
+
+        y_pred_resampled = np.concatenate([y_pred[idx_resampled_pos], y_pred[idx_resampled_neg]], axis=0)
+        y_true_resampled = np.concatenate([y_true[idx_resampled_pos], y_true[idx_resampled_neg]], axis=0)
+
+        sensitivity, specificity = compute_sens_spec(y_true=y_true_resampled, y_pred=y_pred_resampled, optimal_threshold=optimal_threshold)
+
+        specificities.append(specificity); sensitivities.append(sensitivity)
+    
+    if verbose:
+        print("Average Sensitivity: {:.3f} +/- {:.3f}".format(np.mean(sensitivities), np.std(sensitivities)))
+        print("Average Specificity: {:.3f} +/- {:.3f}".format(np.mean(specificities), np.std(specificities)))
+    
+    return np.std(sensitivities), np.std(specificities)
+
+
+
+
+def compute_performances(df, name=""):
+    """
+        df. is a dataframe with each rows representing one of the K exprriments. 
+        
+    """
+
+    
+    # 1) Compute Conclusiveness score 
+    conslusiveness_score = []
+    for i, row in df.iterrows():
+
+        y_true = row['y_true'][0]
+        y_pred = row['y_pred'][0]
+        conslusiveness_score.append(list((y_pred >row['optimal_threshold']).astype(int)))
+    conslusiveness_score = np.array(conslusiveness_score).mean(axis=0)
+    
+    y_pred = conslusiveness_score
+    # 2) Compute Youden-optimal threshold
+    
+    specificities_bar, sensitivities , thresholds = roc_curve(y_true, y_pred)
+
+    specificities = 1 - specificities_bar
+
+    younden_indexes = sensitivities + specificities - 1
+
+    max_youden, index_threshold = np.max(younden_indexes),  np.argmax(younden_indexes)
+    
+    optimal_threshold = thresholds[index_threshold]
+    num_samples = row['num_samples']
+    
+    # 3) Compute performances
+    y_pred = conslusiveness_score
+    
+    # Compute imbalance_ratio of our sample
+    pi = y_true.mean()
+    correction_factor = (pi*(1-REFERENCE_IMBALANCE_RATIO))/(REFERENCE_IMBALANCE_RATIO*(1-pi))
+    
+    # Compute first AUROC
+    auroc = roc_auc_score(y_true, y_pred)
+
+    # Compute the AUC-PR
+    auc_pr = average_precision_score(y_true, y_pred)
+
+    # Compute the AUC-PR Corrected
+    auc_pr_corrected = average_precision(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO)
+
+    # Compute the AUC-PR Gain
+    auc_pr_g = prg.calc_auprg(prg.create_prg_curve(y_true, y_pred))
+
+    # Compute the AUC-PR Gain corrected
+    auc_pr_g_corrected = calc_auprg(create_prg_curve(y_true, y_pred, pi0=REFERENCE_IMBALANCE_RATIO))
+    
+    # Compute f1 and f2 scores
+    f1 = fbeta_score(y_true, y_pred > optimal_threshold, beta=1) 
+    f2 = fbeta_score(y_true, y_pred >= optimal_threshold, beta=2) 
+
+    tn, fp, fn, tp = confusion_matrix(y_true, y_pred >= optimal_threshold).ravel()
+
+    # Compute corrected precision (ppv)
+    ppv_corr = tp/(tp+correction_factor*fp)
+    
+    npv_corr = (correction_factor*tn)/(correction_factor*tn+fn)
+
+    acc = (tp + tn) / (tp + tn + fp +  fn)
+    mcc = (tp*tn - fp*fn) / np.sqrt((tp+fp)*(tp+fn)*(tn+fp)*(tn+fn))
+    tpr =  tp / (tp+fn)
+    tnr = tn / (tn+fp)
+    ppv = tp / (tp+fp)
+    npv = tn / (tn+fn)
+    fnr = fn / (tp+fn)
+    
+    # Compute corrected F1 and F2
+    f1_c = 2*(ppv_corr*tpr)/(ppv_corr+tpr)
+    
+    beta = 2
+    f2_c = (1+beta**2)*(ppv_corr*tpr)/(beta**2 * ppv_corr + tpr)
+    
+    std_sens, std_spec = bootstrap_sensitivity_specificity(y_true, y_pred, optimal_threshold)
+
+    performances_dict = {'name':name+'\n(N='+str(len(y_true))+')', 
+                         'AUROC':round(auroc, 3),
+                        'AUC-PR': round(auc_pr, 3),
+                        'AUC-PR-Gain': round(auc_pr_g, 3),
+                        'AUC-PR-Corrected': round(auc_pr_corrected, 3),
+                        'AUC-PR-Gain-Corrected' :round(auc_pr_g_corrected, 3),
+                        'F1 score (2 PPVxTPR/(PPV+TPR))': round(f1, 3),
+                        'F1 score Corrected': round(f1_c, 3),
+                        'F2': round(f2, 3),
+                        'F2 Corrected': round(f2_c, 3),
+                        'Accuracy' : round(acc, 3),
+                        'Matthews correlation coefficient (MCC)': round(mcc, 3),
+                        'Sensitivity, recall, hit rate, or true positive rate (TPR)': round(tpr, 3),
+                        'Std - Sensitivity': round(std_sens, 3),  
+                        'Specificity, selectivity or true negative rate (TNR)': round(tnr, 3),
+                        'Std - Specificity': round(std_spec, 3), 
+                        'Precision or positive predictive value (PPV)': round(ppv, 3),
+                        'Corrected Precision or positive predictive value (PPV)': round(ppv_corr, 3),
+                        'Corrected NPV': round(npv_corr, 3),
+                        'Negative predictive value (NPV)': round(npv, 3),
+                        'Miss rate or false negative rate (FNR)': round(fnr, 3),
+                        'False discovery rate (FDR=1-PPV)': round(1-ppv, 3),
+                        'False omission rate (FOR=1-NPV)': round(1-npv, 3),
+                        'TP': tp,
+                        'TN': tn,
+                        'FP': fp,
+                        'FN': fn, 
+                        'optimal_threshold' :optimal_threshold,
+                        'num_samples' : num_samples
+                        }
+    
+    performances_df = pd.DataFrame(performances_dict, index=[name+'\n(N='+str(len(y_true))+')'])
+
+    performances_df['TN'] = tn
+    performances_df['TP'] = tp
+    performances_df['FP'] = fp
+    performances_df['FN'] = fn
+
+    performances_df['TN_normalized'] = 100*tn/len(y_true)
+    performances_df['TP_normalized'] = 100*tp/len(y_true)
+    performances_df['FP_normalized'] =  100*fp/len(y_true)
+    performances_df['FN_normalized'] =  100*fn/len(y_true)    
+    performances_df['N'] = len(y_true) 
+    performances_df['y_true'] = [y_true]
+    performances_df['y_pred'] = [y_pred]
+    performances_df['Hanley_CI'] = performances_df['AUROC'] .apply(lambda x: compute_SD(x, np.sum(y_true==1), np.sum(y_true==0)))
+    
+    return performances_df
+
+def compute_performances_operating_points(y_true=None, y_pred=None):
+    
+    # Build a function that display the Table S2 showing all performances for diffferent threshold or operating points) 
+    
+    # Compute all the possible threshold
+    specificities_bar, sensitivities , thresholds = roc_curve(y_true, y_pred)
+
+    specificities = 1 - specificities_bar
+
+
+    # Compute imbalance_ratio of our sample
+    pi = y_true.mean()
+    correction_factor = (pi*(1-REFERENCE_IMBALANCE_RATIO))/(REFERENCE_IMBALANCE_RATIO*(1-pi))
+
+    ppv_list = []
+    npv_list = []
+    ppv_corr_list = []
+    npv_corr_list = []
+
+    for th in thresholds:
+
+        tn, fp, fn, tp = confusion_matrix(y_true, y_pred >= th).ravel()
+
+        ppv = tp / (tp+fp)
+        npv = tn / (tn+fn)
+
+        # Compute corrected precision (ppv)
+        ppv_corr = tp/(tp+correction_factor*fp)
+        npv_corr = (correction_factor*tn)/(correction_factor*tn+fn)
+
+        ppv_list.append(ppv)
+        npv_list.append(npv)
+        ppv_corr_list.append(ppv_corr)
+        npv_corr_list.append(npv_corr)
+
+
+
+
+    df_breakdown_results = pd.DataFrame({"Threshold index": np.arange(len(thresholds)), 
+                                        "Threshold": thresholds, 
+                                        "Sensitivity": sensitivities, 
+                                        "Specificity": specificities, 
+                                        "PPV": ppv_list, 
+                                        "PPV_corr": ppv_corr_list, 
+                                        "NPV": npv_list, 
+                                        "NPV_corr": npv_corr_list, 
+                                        })
+    
+    return df_breakdown_results
+
+
+
 def compute_SD(AUC, N1, N2):
     """
             In the original paper of 1982, N1 is the number of "abnormal images", therefore here it is supposed to translate as the number of cases in the positive class.
@@ -26,7 +256,7 @@ def compute_SD(AUC, N1, N2):
     Q2 = 2*AUC*AUC/(1+AUC)
     return(np.sqrt((AUC*(1-AUC)+(N1-1)*(Q1-AUC*AUC) + (N2-1)*(Q2-AUC*AUC))/(N1*N2)))
 
-def find_optimal_threshold(y_true, y_pred):
+def find_optimal_threshold_f(y_true, y_pred):
 
     pi = y_true.mean()
     correction_factor = (pi*(1-REFERENCE_IMBALANCE_RATIO))/(REFERENCE_IMBALANCE_RATIO*(1-pi))
@@ -66,6 +296,23 @@ def find_optimal_threshold(y_true, y_pred):
     # Also return the f1c and f2c for the optimal f2 measure
     return best_f1, best_f2, f1_c[np.argmax(f2)-1], f2_c[np.argmax(f2)-1], index_optimal_f1, index_optimal_f2, threshold_optimal_f2
 
+def find_optimal_threshold_youden(y_true, y_pred):
+    
+    # Compute the performances using Younden Index
+    
+    # Compute all the possible threshold
+    specificities_bar, sensitivities , thresholds = roc_curve(y_true, y_pred)
+
+    specificities = 1 - specificities_bar
+
+    younden_indexes = sensitivities + specificities - 1
+
+    max_youden, index_threshold = np.max(younden_indexes),  np.argmax(younden_indexes)
+    
+    optimal_threshold = thresholds[index_threshold]
+    
+    
+    return max_youden, index_threshold, optimal_threshold
 
 def corrected_f1_sklearn(clf, X, y):
     
