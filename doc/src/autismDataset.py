@@ -159,7 +159,6 @@ class Dataset(object):
 
         self.split_test_train()
 
-
     def _reset(self):
         """
             Reset the df to the ost-processed df. 
@@ -508,7 +507,7 @@ class Dataset(object):
                     'P1R':1}, inplace = True)   
         
         # Add EHR diagnosis
-        df = self._add_ehr_diagnosis(df, verbose=False)     
+        df = self._add_ehr_diagnosis(df, verbose=True if self.verbosity >=2 else False)     
 
         # encode categorical variables
         df['diagnosis'].replace({'TD':0., 
@@ -835,8 +834,7 @@ class Dataset(object):
             
         df['RTN_conf'] = df['valid_name_calls'].apply(lambda x: np.sum(x))/3
         df['touch_conf'] = df['number_of_touches'].apply(lambda x: 0 if np.isnan(x) else x/15  if x <=15 else 1. if x>= 16 else 0)
-        
-        
+
         return df
 
     def _plot_missing(self):
